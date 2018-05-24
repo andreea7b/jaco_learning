@@ -27,10 +27,6 @@ import os
 
 import pickle
 
-#CUP_RANGE = 17.12161451
-#TABLE_RANGE = 10.28238132
-#LAPTOP_RANGE = 9.99367477
-
 # possible range of feature values for each feature
 CUP_RANGE = 1.87608702
 TABLE_RANGE = 0.6918574 
@@ -50,11 +46,7 @@ HUMAN_CENTER = [0.0, 0.2, 0.0]
 # feature learning methods
 ALL = "ALL" 							# updates all features
 MAX = "MAX"								# updates only feature that changed the most
-LIKELY = "LIKELY"						# updates the most likely feature 
-
-ONE_FEAT = 1					# experiment where human has to correct only one feature (out of three)
-TWO_FEAT = 2					# experiment where human has to correc two features
-
+BETA = "BETA"							# updates beta-adaptive features 
 
 goodTable_badCup = np.array([[ 1.81863308, 2.64591915, 3.20791517,  1.77674518,  3.91302818,  3.78561915, 5.42448332], 
 					[ 2.56066528,  2.03835773,  3.00033969,  1.67359358,  3.58466093,  3.98627262, 5.11606871],
@@ -79,8 +71,8 @@ class Planner(object):
 		else:
 			self.MAX_ITER = 40
 
-		self.featMethod = featMethod	# can be ALL, MAX, or LIKELY
-		self.numFeat = numFeat			# can be ONE_FEAT or TWO_FEAT
+		self.feat_method = featMethod	# can be ALL, MAX, or BETA
+		self.num_features = numFeat			# can be variable
 
 		self.start_time = None
 		self.final_time = None
@@ -92,9 +84,9 @@ class Planner(object):
 		self.step_time_plan = None
 
 		# this is the cache of trajectories computed for all max/min weights
-		here = os.path.dirname(os.path.realpath(__file__))
-		self.traj_cache_1feat = pickle.load( open( here+"/traj_cache_1feat.p", "rb" ) )
-		self.traj_cache_2feat = pickle.load( open( here+"/traj_cache_2feat.p", "rb" ) )	
+		#here = os.path.dirname(os.path.realpath(__file__))
+		#self.traj_cache_1feat = pickle.load( open( here+"/traj_cache_1feat.p", "rb" ) )
+		#self.traj_cache_2feat = pickle.load( open( here+"/traj_cache_2feat.p", "rb" ) )	
 
 		# these variables are for the upsampled trajectory
 		self.waypts = None
@@ -102,7 +94,7 @@ class Planner(object):
 		self.step_time = None
 		self.waypts_time = None
 
-		self.weights = [0.0, 0.0] #0.0]
+		self.weights = [0.0]*self.num_features
 		self.waypts_prev = None
 
 		# ---- Plotting weights & features over time ---- #
@@ -164,11 +156,11 @@ class Planner(object):
 		---
 		input trajectory, output list of feature values
 		"""
-		features = [None,None,None]#,None]
+		features = [None]*self.num_features
+		features = np.zeros(self.num_features, len(waypts)-1)
 		features[0] = self.velocity_features(waypts)
-		features[1] = [0.0]*(len(waypts)-1)
-		features[2] = [0.0]*(len(waypts)-1)
-		#features[3] = [0.0]*(len(waypts)-1)
+		#TODO THIS IS INCOMPLETE
+
 		for index in range(0,len(waypts)-1):
 			features[1][index] = self.coffee_features(waypts[index+1])
 			features[2][index] = self.table_features(waypts[index+1])
@@ -276,54 +268,6 @@ class Planner(object):
 		self.robot.SetDOFValues(waypt)
 		EE_link = self.robot.GetLinks()[7]
 		return sum(abs(EE_link.GetTransform()[:2,:3].dot([1,0,0])))
-
-		# ---------------------
-		"""
-		# plot base tf
-		base_tf = self.robot.GetLinks()[0].GetTransform()
-		#plotMug(self.env, self.bodies, base_tf)
-
-		angle = np.pi/2
-		rot_x = np.array([[1,0,0,0],[0,np.cos(angle),-np.sin(angle),0],[0,np.sin(angle),np.cos(angle),0],[0,0,0,1]]) 
-		rot_y = np.array([[np.cos(angle),0,np.sin(angle),0],[0,1,0,0],[-np.sin(angle),0,np.cos(angle),0],[0,0,0,1]]) 
-		rot_z = np.array([[np.cos(angle),-np.sin(angle),0,0],[np.sin(angle),0,np.cos(angle),0],[0,0,1,0],[0,0,0,1]]) 
-		trans = np.array([[0,0,0,0.05],[0,0,0,0.05],[0,0,0,0.05],[0,0,0,1]]) 
-
-		# to rotate cup upright --> angle = pi/2, rot_x
-		# to rotate cup down --> angle = -pi/2, rot_x
-		rot_base_tf = np.dot(base_tf, rot_x)
-		base_mug = plotMug(self.env, self.bodies, rot_base_tf, color=[0,0,1])
-
-		# plot EE tf
-		ee_tf = self.robot.GetLinks()[6].GetTransform()
-		plotMug(self.env, self.bodies, ee_tf, color=[0,1,0])
-		rot_ee_tf = np.dot(ee_tf, rot_z)
-		plotMug(self.env, self.bodies, rot_ee_tf)
-
-		base_rot = base_mug.GetTransform()[:3,:3] 
-		base_axis_up = openravepy.axisAngleFromRotationMatrix(base_rot)
-		wrist_rot = self.robot.GetLinks()[6].GetTransform()[:3,:3]
-		wrist_axis = openravepy.axisAngleFromRotationMatrix(wrist_rot)
-
-		#base_axis = np.array(self.robot.GetJoints()[0].GetAxis())
-		#EE_axis = np.array(self.robot.GetJoints()[2].GetAxis())
-		#print "base_axis: " + str(base_axis)
-		#print "EE_axis: " + str(EE_axis)
-
-		#ideal_angle = np.array([0, np.pi, 0])
-		#wrist_angle = openravepy.axisAngleFromRotationMatrix(self.robot.GetLinks()[7].GetTransform()[:3,:3])
-
-		#tf = EE_link.GetTransform()[:3,:3]
-		#r_x = abs(tf[1][1])+abs(tf[2][1]) #+abs(tf[0][1]) 
-		#r_y = abs(tf[0][2])+abs(tf[2][2]) #+abs(tf[1][2])
-		#r_z = abs(tf[0][0])+abs(tf[1][0]) #+abs(tf[2][0])
-		#coffee_feature = r_z
-
-		coffee_feature = abs(np.dot(base_axis_up, wrist_axis))
-		print "coffee feature: " + str(coffee_feature)
-
-		return coffee_feature
-		"""
 		
 	def coffee_cost(self, waypt):
 		"""
@@ -688,28 +632,6 @@ class Planner(object):
 
 
 	# ---- here's our algorithms for modifying the trajectory ---- #
-
-	def computeDeltaQDes(self, start, goal):
-		"""
-		Computes the optimal change in configuration space (delta Q) for each feature.		
-		Returns a dictionary indexed by feature and direction
-		"""
-		num_features = len(self.weights)
-		# save current weights		
-		w_curr = [self.weights[i] for i in range(num_features)]		
-		deltaQdes = {}
-		for f_idx in range(num_features):
-			deltaQdes[f_idx] = {}
-			for direction in [-1,1]:
-				delta = 2.0
-				delta_w = [0.0]*num_features
-				delta_w[f_idx] = delta*self.weights[f_idx]
-				# update weights based on ideal correction for given features and direction
-				self.weights = w_curr + direction*delta_w
-				deltaQdes[f_idx][direction] = traj - self.waypts_plan 
-		# resets the current weights to original weights
-		self.weights = w_curr
-		return deltaQdes
 
 	def learnWeights(self, u_h):
 		"""
