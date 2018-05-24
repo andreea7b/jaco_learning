@@ -15,13 +15,15 @@
 	<!-- Record data mode -->
 	<arg name="record" default="F"/>
 
-	<!-- Feature learning method (ALL, MAX, LIKELY)-->
+	<!-- Feature learning method (ALL, MAX, BETA)-->
 	<arg name="featMethod" default="ALL"/>
 
-	<!-- How many features need correcting (1 = ONE_FEAT, 2 = TWO_FEAT)-->
-	<arg name="numFeat" default="1"/>
+	<!-- List of string features that need correcting -->
+	<arg name="featList" default="table"/>
 
 	<!-- velocity-based with trajopt planning PID -->
-	<node name="pid_trajopt" pkg="iact_control" type="pid_trajopt.py" args="$(arg ID) $(arg task) $(arg methodType) $(arg demo) $(arg record) $(arg featMethod) $(arg numFeat)" output="screen"/>
+	<node name="pid_trajopt" pkg="iact_control" type="pid_trajopt.py"
+    args="$(arg ID) $(arg task) $(arg methodType) $(arg demo) $(arg record)
+    $(arg featMethod) $(arg featList)" output="screen"/>
 
 </launch>

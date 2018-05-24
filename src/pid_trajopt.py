@@ -17,7 +17,6 @@ import argparse
 import actionlib
 import time
 import trajopt_planner
-#import planner
 import traj
 import ros_utils
 import experiment_utils
@@ -40,6 +39,7 @@ home_pos = [103.366,197.13,180.070,43.4309,265.11,257.271,287.9276]
 candlestick_pos = [180.0]*7
 
 pick_basic = [104.2, 151.6, 183.8, 101.8, 224.2, 216.9, 310.8]
+pick_basic_EEtilt = [104.2, 151.6, 183.8, 101.8, 224.2, 216.9, 200.0]
 pick_shelf = [210.8, 241.0, 209.2, 97.8, 316.8, 91.9, 322.8]
 place_lower = [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 322.0]
 place_higher = [210.5,118.5,192.5,105.4,229.15,245.47,316.4]
@@ -62,18 +62,15 @@ EXP_TASK = 2
 ZERO_FEEDBACK = 'A'
 HAPTIC_FEEDBACK = 'B'
 
-ONE_FEAT = 1					# experiment where human has to correct only one feature (out of three)
-TWO_FEAT = 2					# experiment where human has to correc two features
+ALL = "ALL"						# updates all features
+MAX = "MAX"						# updates only feature that changed the most
+BETA = "BETA"					# updates the most likely feature 
 
-ALL = "ALL" 							# updates all features
-MAX = "MAX"								# updates only feature that changed the most
-LIKELY = "LIKELY"						# updates the most likely feature 
-
-class PIDVelJaco(object): 
+class PIDVelJaco(object):
 	"""
 	This class represents a node that moves the Jaco with PID control.
 	The joint velocities are computed as:
-		
+
 		V = -K_p(e) - K_d(e_dot) - K_i*Integral(e)
 	where:
 		e = (target_joint configuration) - (current joint configuration)
@@ -81,20 +78,20 @@ class PIDVelJaco(object):
 		K_p = accounts for present values of position error
 		K_i = accounts for past values of error, accumulates error over time
 		K_d = accounts for possible future trends of error, based on current rate of change
-	
-	Subscribes to: 
+
+	Subscribes to:
 		/j2s7s300_driver/out/joint_angles	- Jaco sensed joint angles
 		/j2s7s300_driver/out/joint_torques	- Jaco sensed joint torques
-	
+
 	Publishes to:
-		/j2s7s300_driver/in/joint_velocity	- Jaco commanded joint velocities 
-	
+		/j2s7s300_driver/in/joint_velocity	- Jaco commanded joint velocities
+
 	Required parameters:
 		p_gain, i_gain, d_gain    - gain terms for the PID controller
-		sim_flag 				  - flag for if in simulation or not
+		sim_flag                  - flag for if in simulation or not
 	"""
 
-	def __init__(self, ID, task, methodType, demo, record, featMethod, numFeat):
+	def __init__(self, ID, task, methodType, demo, record, featMethod, featList):
 		"""
 		Setup of the ROS node. Publishing computed torques happens at 100Hz.
 		"""
@@ -105,14 +102,15 @@ class PIDVelJaco(object):
 		elif task == "EXP" or task == "exp":
 			self.task = EXP_TASK
 
-		# method type - A=IMPEDANCE, B=LEARNING
+		# method type - A=IMPEDANCE, B=LEARNING, C=DEMONSTRATION
 		self.methodType = methodType
 
-		# can be ALL, MAX, or LIKELY
+		# can be ALL, MAX, or BETA
 		self.featMethod = featMethod
 
-		# can be ONE_FEAT or TWO_FEAT
-		self.numFeat = numFeat
+		# can be strings 'table', 'coffee', 'human', 'origin', 'laptop'
+		self.featList = featList
+        self.numFeats = len(self.featList)
 
 		# optimal demo mode
 		if demo == "F" or demo == "f":
@@ -145,39 +143,32 @@ class PIDVelJaco(object):
 		# ---- Trajectory Setup ---- #
 
 		# total time for trajectory
-		self.T = 20.0 	#TODO THIS IS EXPERIMENTAL - used to be 15.0
+		self.T = 20.0   #TODO THIS IS EXPERIMENTAL - used to be 15.0
 
 		# initialize trajectory weights
 
 		# TODO THIS IS EXPERIMENTAL - CHANGE BACK TO ALL 0
-		self.weights = [0.0, 0.0] 
+		self.weights = [0.0]*self.numFeats
 
 		# if in demo mode, then set the weights to be optimal
 		if self.demo:
-			if self.task == FAM_TASK:
-				self.weights = [1.0,0.0]
-			elif self.task == EXP_TASK:
-				if self.numFeat == ONE_FEAT:
-					self.weights = [0.0,1.0]
-				elif self.numFeat == TWO_FEAT:
-					self.weights = [1.0,1.0]
+			self.weights = [1.0]*self.numFeats
 
 		# initialize start/goal based on task 
+        # TODO: Need to change this for my purposes
 		if self.task == FAM_TASK:
 			pick = pick_shelf
 		else:
-			if self.numFeat == TWO_FEAT:
-				# if two features are wrong, initialize the starting config badly (tilted cup)
-				pick = pick_basic
-				pick[-1] = 200.0
+            if 'coffee' in self.featList:
+				pick = pick_basic_EEtilt
 			else:
-				pick = pick_basic 
+				pick = pick_basic
 
 		if self.task == FAM_TASK:
 			place = place_higher
 		else:
 			place = place_lower
-		
+
 		start = np.array(pick)*(math.pi/180.0)
 		goal = np.array(place)*(math.pi/180.0)
 		self.start = start
@@ -185,19 +176,16 @@ class PIDVelJaco(object):
 
 		# TODO THIS IS EXPERIMENTAL
 		self.place_pose = place_pose
-		
+
 		self.curr_pos = None
 
 		# create the trajopt planner and plan from start to goal
+		self.planner = trajopt_planner.Planner(self.task, self.demo,
+                                         self.featMethod, self.featList)
 
-		# TODO THIS IS EXPERIMENTAL
-		self.planner = trajopt_planner.Planner(self.task, self.demo, self.featMethod, self.numFeat)
-		#self.planner = planner.Planner(self.task, self.demo, self.featMethod)
-		
 		# stores the current trajectory we are tracking, produced by planner
-		self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=None)		
+		self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=None)
 
-		#self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, goal_pose=self.place_pose)
 		print "original traj: " + str(self.traj)
 
 		# save intermediate target position from degrees (default) to radians 
@@ -257,7 +245,7 @@ class PIDVelJaco(object):
 
 		print "----------------------------------"
 		print "Moving robot, press ENTER to quit:"
-		
+
 		while not rospy.is_shutdown():
 
 			if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
@@ -266,7 +254,7 @@ class PIDVelJaco(object):
 
 			self.vel_pub.publish(ros_utils.cmd_to_JointVelocityMsg(self.cmd))
 			r.sleep()
-		
+
 		print "----------------------------------"
 
 		# plot weight update over time
@@ -280,14 +268,14 @@ class PIDVelJaco(object):
 				method = "A"
 			elif featMethod == MAX:
 				method = "B"
-				
+
 			weights_filename = "weights" + str(ID) + str(numFeat) + method
-			force_filename = "force" + str(ID) + str(numFeat) + method		
+			force_filename = "force" + str(ID) + str(numFeat) + method
 			tracked_filename = "tracked" + str(ID) + str(numFeat) + method
 			deformed_filename = "deformed" + str(ID) + str(numFeat) + method
-			replanned_filename = "replanned" + str(ID) + str(numFeat) + method		
+			replanned_filename = "replanned" + str(ID) + str(numFeat) + method
 			self.expUtil.pickle_weights(weights_filename)
-			self.expUtil.pickle_force(force_filename)	
+			self.expUtil.pickle_force(force_filename)
 			self.expUtil.pickle_tracked_traj(tracked_filename)
 			self.expUtil.pickle_deformed_traj(deformed_filename)
 			self.expUtil.pickle_replanned_trajList(replanned_filename)
@@ -299,27 +287,27 @@ class PIDVelJaco(object):
 		"""
 		Switches Jaco to admittance-control mode using ROS services
 		"""
-		service_address = prefix+'/in/start_force_control'	
+		service_address = prefix+'/in/start_force_control'
 		rospy.wait_for_service(service_address)
 		try:
 			startForceControl = rospy.ServiceProxy(service_address, Start)
-			startForceControl()           
+			startForceControl()
 		except rospy.ServiceException, e:
 			print "Service call failed: %s"%e
-			return None	
+			return None
 
 	def stop_admittance_mode(self):
 		"""
 		Switches Jaco to position-control mode using ROS services
 		"""
-		service_address = prefix+'/in/stop_force_control'	
+		service_address = prefix+'/in/stop_force_control'
 		rospy.wait_for_service(service_address)
 		try:
 			stopForceControl = rospy.ServiceProxy(service_address, Stop)
-			stopForceControl()           
+			stopForceControl()
 		except rospy.ServiceException, e:
 			print "Service call failed: %s"%e
-			return None	
+			return None
 
 	def PID_control(self, pos):
 		"""
@@ -330,7 +318,7 @@ class PIDVelJaco(object):
 
 	def joint_torques_callback(self, msg):
 		"""
-		Reads the latest torque sensed by the robot and records it for 
+		Reads the latest torque sensed by the robot and records it for
 		plotting & analysis
 		"""
 		# read the current joint torques from the robot
@@ -360,16 +348,11 @@ class PIDVelJaco(object):
 				self.expUtil.update_tauH(timestamp, torque_curr)
 
 
-				# TODO THIS IS EXPERIMENTAL
 				self.weights = self.planner.learnWeights(torque_curr)
-				#self.weights = self.planner.learnWeights(torque_curr, self.traj) #feat_idx=feat_idx_opt
 				#print "here are my new weights: ", self.weights
 
 				print "in joint torques callback: going to plan..."
-				# TODO THIS IS EXPERIMENTAL
-				#self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5)				
-				self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=self.traj)				
-				#self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=self.traj, goal_pose=self.place_pose)
+				self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=self.traj)
 				print "in joint torques callback: finished planning -- self.traj = " + str(self.traj)
 
 				# update the experimental data with new weights
@@ -380,9 +363,7 @@ class PIDVelJaco(object):
 				self.expUtil.update_replanned_trajList(timestamp, self.traj)
 
 				# store deformed trajectory
-				# TODO THIS IS EXPERIMENTAL
 				deformed_traj = self.planner.get_waypts_plan()
-				#deformed_traj = self.traj.get_waypts_plan()
 				self.expUtil.update_deformed_traj(deformed_traj)
 
 	def joint_angles_callback(self, msg):
@@ -390,12 +371,12 @@ class PIDVelJaco(object):
 		Reads the latest position of the robot and publishes an
 		appropriate torque command to move the robot to the target
 		"""
-	
+
 		# read the current joint angles from the robot
 		self.curr_pos = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
 
 		# convert to radians
-		self.curr_pos = self.curr_pos*(math.pi/180.0)	
+		self.curr_pos = self.curr_pos*(math.pi/180.0)
 
 		# update the OpenRAVE simulation 
 		#self.planner.update_curr_pos(curr_pos)
@@ -431,7 +412,7 @@ class PIDVelJaco(object):
 		# check if the arm is at the start of the path to execute
 		if not self.reached_start:
 
-			dist_from_start = -((curr_pos - self.start_pos + math.pi)%(2*math.pi) - math.pi)			
+			dist_from_start = -((curr_pos - self.start_pos + math.pi)%(2*math.pi) - math.pi)
 			dist_from_start = np.fabs(dist_from_start)
 
 			# check if every joint is close enough to start configuration
@@ -461,22 +442,20 @@ class PIDVelJaco(object):
 
 			# get next target position from position along trajectory
 
-			# TODO THIS IS EXPERIMENTAL
 			self.target_pos = self.planner.interpolate(t + 0.1)
-			#self.target_pos = self.traj.interpolate(t + 0.1)
-			
+
 			# check if the arm reached the goal, and restart path
 			if not self.reached_goal:
-			
-				dist_from_goal = -((curr_pos - self.goal_pos + math.pi)%(2*math.pi) - math.pi)			
+
+				dist_from_goal = -((curr_pos - self.goal_pos + math.pi)%(2*math.pi) - math.pi)
 				dist_from_goal = np.fabs(dist_from_goal)
 
 				# check if every joint is close enough to goal configuration
 				close_to_goal = [dist_from_goal[i] < epsilon for i in range(7)]
-			
+
 				# if all joints are close enough, robot is at goal
 				is_at_goal = all(close_to_goal)
-			
+
 				if is_at_goal:
 					self.reached_goal = True
 			else:
@@ -486,17 +465,17 @@ class PIDVelJaco(object):
 				self.expUtil.set_endT(time.time())
 
 if __name__ == '__main__':
-	#if len(sys.argv) < 7:
-	#	print "ERROR: Not enough arguments. Specify ID, task, methodType, demo, record, featMethod, numFeat"
-	#else:	
-	ID = int(sys.argv[1])
-	task = sys.argv[2]
-	methodType = 'B' #sys.argv[3]
-	demo = sys.argv[4]
-	record = sys.argv[5]
-	featMethod = sys.argv[6]
-	numFeat = int(sys.argv[7])
+	if len(sys.argv) < 7:
+		print "ERROR: Not enough arguments. Specify ID, task, methodType, demo, record, featMethod, featList"
+	else:
+        ID = int(sys.argv[1])
+        task = sys.argv[2]
+        methodType = sys.argv[3]
+        demo = sys.argv[4]
+        record = sys.argv[5]
+        featMethod = sys.argv[6]
+        featList = [x.strip() for x in sys.argv[7].split(',')]
 
-	PIDVelJaco(ID,task,methodType,demo,record,featMethod,numFeat)
+	PIDVelJaco(ID,task,methodType,demo,record,featMethod,featList)
 
 
