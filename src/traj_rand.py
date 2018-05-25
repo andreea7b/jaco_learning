@@ -26,22 +26,23 @@ if __name__ == '__main__':
 	feat_list = "table"
 	planner = Planner(feat_method, feat_list)
 
-    feat_list = [x.strip() for x in feat_list.split(',')]
-    num_features = len(feat_list)
+	feat_list = [x.strip() for x in feat_list.split(',')]
+	num_features = len(feat_list)
 
-    rand_thetas = [-0.5, 0, 0.5]
-    weights_span = num_features * [rand_thetas]
-    weights_pairs = list(itertools.product(*weights_span))
-    num_trajs = len(weights_pairs)
-	traj_rand = np.zeros(num_trajs, T)
+	rand_thetas = [-0.5, 0, 0.5]
+	weights_span = num_features * [rand_thetas]
+	weights_pairs = list(itertools.product(*weights_span))
+	num_trajs = len(weights_pairs)
+	traj_rand = [0] * num_trajs
 
-	for (w_i, weights) in enumerate(weight_pairs):
+	for (w_i, weights) in enumerate(weights_pairs):
 		traj = planner.replan(start, goal, weights, 0.0, T, 0.5)
-        traj_rand[w_i] = traj
+ 		traj_rand[w_i] = traj
 
+	traj_rand = np.array(traj_rand)
 	print traj_rand
 	#print "-------"
 
-    savestr = "_".join(feat_list)
-    savefile = "traj_rand_"+savestr+".p"
+	savestr = "_".join(feat_list)
+	savefile = "traj_rand_"+savestr+".p"
 	pickle.dump(traj_rand, open( savefile, "wb" ) )

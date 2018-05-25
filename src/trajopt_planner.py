@@ -49,7 +49,7 @@ class Planner(object):
 		# ---- important internal variables ---- #
 		self.feat_method = feat_method	# can be ALL, MAX, or BETA
 		self.feat_list = feat_list		# 'table', 'human', 'coffee', 'origin', 'laptop'
-        self.num_features = len(self.feat_list)
+		self.num_features = len(self.feat_list)
 
 		self.start_time = None
 		self.final_time = None
@@ -59,11 +59,14 @@ class Planner(object):
 		self.waypts_plan = None
 		self.num_waypts_plan = None
 		self.step_time_plan = None
+		self.MAX_ITER = 40
 
 		# this is the cache of trajectories computed for all max/min weights
-        if traj_cache is not None:
-            here = os.path.dirname(os.path.realpath(__file__))
-            self.traj_cache = pickle.load( open( here + traj_cache, "rb" ) )
+		if traj_cache is not None:
+			here = os.path.dirname(os.path.realpath(__file__))
+			self.traj_cache = pickle.load( open( here + traj_cache, "rb" ) )
+		else:
+			self.traj_cache = None
 
 		# these variables are for the upsampled trajectory
 		self.waypts = None
@@ -133,19 +136,19 @@ class Planner(object):
 		input trajectory, output list of feature values
 		"""
 		features = [self.velocity_features(waypts)]
-        features += self.num_features * [[0.0] * (len(waypts)-1)]
+		features += self.num_features * [[0.0] * (len(waypts)-1)]
 		for index in range(0,len(waypts)-1):
-            for feat in range(1,self.num_features+1):
-                if self.feat_list[feat-1] == 'table':
-                    features[feat][index] = self.table_features(waypts[index+1])
-                elif self.feat_list[feat-1] == 'coffee':
-                    features[feat][index] = self.coffee_features(waypts[index+1])
-                elif self.feat_list[feat-1] == 'human':
-                    features[feat][index] = self.human_features(waypts[index+1],waypts[index])
-                elif self.feat_list[feat-1] == 'laptop':
-                    features[feat][index] = self.laptop_features(waypts[index+1],waypts[index])
-                elif self.feat_list[feat-1] == 'origin':
-                    features[feat][index] = self.origin_features(waypts[index+1])
+			for feat in range(1,self.num_features+1):
+				if self.feat_list[feat-1] == 'table':
+					features[feat][index] = self.table_features(waypts[index+1])
+				elif self.feat_list[feat-1] == 'coffee':
+					features[feat][index] = self.coffee_features(waypts[index+1])
+				elif self.feat_list[feat-1] == 'human':
+					features[feat][index] = self.human_features(waypts[index+1],waypts[index])
+				elif self.feat_list[feat-1] == 'laptop':
+					features[feat][index] = self.laptop_features(waypts[index+1],waypts[index])
+				elif self.feat_list[feat-1] == 'origin':
+					features[feat][index] = self.origin_features(waypts[index+1])
 		return features
 
 	# -- Velocity -- #
@@ -182,7 +185,7 @@ class Planner(object):
 		input trajectory, output scalar feature
 		"""
 		if len(waypt) < 10:
-			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
 		self.robot.SetDOFValues(waypt)
 		coords = robotToCartesian(self.robot)
@@ -202,7 +205,7 @@ class Planner(object):
 		input trajectory, output scalar cost
 		"""
 		feature = self.origin_features(waypt)
-        feature_idx = self.feat_list.index('origin')
+		feature_idx = self.feat_list.index('origin')
 		return feature*self.weights[feature_idx]
 
 	# -- Distance to Table -- #
@@ -215,7 +218,7 @@ class Planner(object):
 		input trajectory, output scalar feature
 		"""
 		if len(waypt) < 10:
-			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
 		self.robot.SetDOFValues(waypt)
 		coords = robotToCartesian(self.robot)
@@ -229,7 +232,7 @@ class Planner(object):
 		input trajectory, output scalar cost
 		"""
 		feature = self.table_features(waypt)
-        feature_idx = self.feat_list.index('table')
+		feature_idx = self.feat_list.index('table')
 		return feature*self.weights[feature_idx]
 
 	# -- Coffee (or z-orientation of end-effector) -- #
@@ -243,7 +246,7 @@ class Planner(object):
 		input trajectory, output scalar cost
 		"""
 		if len(waypt) < 10:
-			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
 		self.robot.SetDOFValues(waypt)
 		EE_link = self.robot.GetLinks()[7]
@@ -256,7 +259,7 @@ class Planner(object):
 		input trajectory, output scalar cost
 		"""
 		feature = self.coffee_features(waypt)
-        feature_idx = self.feat_list.index('coffee')
+		feature_idx = self.feat_list.index('coffee')
 		return feature*self.weights[feature_idx]
 
 	# -- Distance to Laptop -- #
@@ -283,7 +286,7 @@ class Planner(object):
 			+: EE is closer than 0.4 meters to laptop
 		"""
 		if len(waypt) < 10:
-			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
 		self.robot.SetDOFValues(waypt)
 		coords = robotToCartesian(self.robot)
@@ -303,7 +306,7 @@ class Planner(object):
 		prev_waypt = waypt[0:7]
 		curr_waypt = waypt[7:14]
 		feature = self.laptop_features(curr_waypt,prev_waypt)
-        feature_idx = self.feat_list.index('laptop')
+		feature_idx = self.feat_list.index('laptop')
 		return feature*self.weights[feature_idx]*np.linalg.norm(curr_waypt - prev_waypt)
 
 	# -- Distance to Human -- #
@@ -330,7 +333,7 @@ class Planner(object):
 			+: EE is closer than 0.4 meters to human
 		"""
 		if len(waypt) < 10:
-			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
 		self.robot.SetDOFValues(waypt)
 		coords = robotToCartesian(self.robot)
@@ -350,7 +353,7 @@ class Planner(object):
 		prev_waypt = waypt[0:7]
 		curr_waypt = waypt[7:14]
 		feature = self.human_features(curr_waypt,prev_waypt)
-        feature_idx = self.feat_list.index('human')
+		feature_idx = self.feat_list.index('human')
 		return feature*self.weights[feature_idx]*np.linalg.norm(curr_waypt - prev_waypt)
 
 	# ---- custom constraints --- #
@@ -361,7 +364,7 @@ class Planner(object):
 		above the table.
 		"""
 		if len(waypt) < 10:
-			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
 		self.robot.SetDOFValues(waypt)
 		EE_link = self.robot.GetLinks()[10]
@@ -376,7 +379,7 @@ class Planner(object):
 		holding coffee mug upright.
 		"""
 		if len(waypt) < 10:
-			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
 		self.robot.SetDOFValues(waypt)
 		EE_link = self.robot.GetLinks()[7]
@@ -388,7 +391,7 @@ class Planner(object):
 		Analytic derivative for coffee constraint.
 		"""
 		if len(waypt) < 10:
-			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
 		self.robot.SetDOFValues(waypt)
 		world_dir = self.robot.GetLinks()[7].GetTransform()[:3,:3].dot([1,0,0])
@@ -415,7 +418,7 @@ class Planner(object):
 		#plotSphere(self.env, self.bodies, goal_pose, size=40)
 
 		if len(start) < 10:
-			aug_start = np.append(start.reshape(7), np.array([0,0,0]), 1)
+			aug_start = np.append(start.reshape(7), np.array([0,0,0]))
 		self.robot.SetDOFValues(aug_start)
 
 		self.num_waypts_plan = 4
@@ -429,25 +432,25 @@ class Planner(object):
 		for count in range(self.num_waypts_plan):
 			init_waypts[count,:] = start + count/(self.num_waypts_plan - 1.0)*(goal - start)
 
-        if self.traj_cache is not None:
-            # choose seeding trajectory from cache if the weights match
-            weights_span = [None]*self.num_features
-            min_dist_w = [None]*self.num_features
-            for feat in range(0,self.num_features):
-                limit = MAX_WEIGHTS[self.feat_list[feat]]
-                weights_span[feat] = range(-limit, limit+1, limit/2)
-                min_dist_w[feat] = -limit
+		if self.traj_cache is not None:
+			# choose seeding trajectory from cache if the weights match
+			weights_span = [None]*self.num_features
+			min_dist_w = [None]*self.num_features
+			for feat in range(0,self.num_features):
+				limit = MAX_WEIGHTS[self.feat_list[feat]]
+				weights_span[feat] = range(-limit, limit+1, limit/2)
+				min_dist_w[feat] = -limit
 
-            weight_pairs = list(itertools.product(*weights_span))
+			weight_pairs = list(itertools.product(*weights_span))
 
-            # current weights
-            w = self.weights
-            for w_i in weight_pairs:
-                dist = np.linalg.norm(w-w_i)
-                if dist < np.linalg.norm(w-min_dist_w):
-                    min_dist_w = w_i
+			# current weights
+			w = self.weights
+			for w_i in weight_pairs:
+				dist = np.linalg.norm(w-w_i)
+				if dist < np.linalg.norm(w-min_dist_w):
+					min_dist_w = w_i
 
-            init_waypts = np.array(self.traj_cache[min_dist_w])
+			init_waypts = np.array(self.traj_cache[min_dist_w])
 
 		request = {
 			"basic_info": {
@@ -487,16 +490,16 @@ class Planner(object):
 		prob = trajoptpy.ConstructProblem(s, self.env)
 
 		for t in range(1,self.num_waypts_plan):
-            if 'coffee' in self.feat_list:
-                prob.AddCost(self.coffee_cost, [(t,j) for j in range(7)], "coffee%i"%t)
-            if 'table' in self.feat_list:
+			if 'coffee' in self.feat_list:
+				prob.AddCost(self.coffee_cost, [(t,j) for j in range(7)], "coffee%i"%t)
+			if 'table' in self.feat_list:
 				prob.AddCost(self.table_cost, [(t,j) for j in range(7)], "table%i"%t)
-            if 'laptop' in self.feat_list:
-                prob.AddCost(self.laptop_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "laptop%i"%t)
-            if 'origin' in self.feat_list:
-                prob.AddCost(self.origin_cost, [(t,j) for j in range(7)], "origin%i"%t)
-            if 'human' in self.feat_list:
-                prob.AddCost(self.human_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "human%i"%t)
+			if 'laptop' in self.feat_list:
+			    prob.AddCost(self.laptop_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "laptop%i"%t)
+			if 'origin' in self.feat_list:
+			    prob.AddCost(self.origin_cost, [(t,j) for j in range(7)], "origin%i"%t)
+			if 'human' in self.feat_list:
+			    prob.AddCost(self.human_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "human%i"%t)
 
 		for t in range(1,self.num_waypts_plan - 1):
 			prob.AddConstraint(self.table_constraint, [(t,j) for j in range(7)], "INEQ", "table%i"%t)
@@ -523,9 +526,8 @@ class Planner(object):
 		"""
 
 		print "I'm in normal trajOpt!"
-
 		if len(start) < 10:
-			aug_start = np.append(start.reshape(7), np.array([0,0,0]), 1)
+			aug_start = np.append(start.reshape(7), np.array([0,0,0]))
 		self.robot.SetDOFValues(aug_start)
 
 		self.num_waypts_plan = 4
@@ -541,25 +543,25 @@ class Planner(object):
 			init_waypts = traj_seed
 			print init_waypts
 
-        if self.traj_cache is not None:
-            # choose seeding trajectory from cache if the weights match
-            weights_span = [None]*self.num_features
-            min_dist_w = [None]*self.num_features
-            for feat in range(0,self.num_features):
-                limit = MAX_WEIGHTS[self.feat_list[feat]]
-                weights_span[feat] = range(-limit, limit+1, limit/2)
-                min_dist_w[feat] = -limit
+		if self.traj_cache is not None:
+			# choose seeding trajectory from cache if the weights match
+			weights_span = [None]*self.num_features
+			min_dist_w = [None]*self.num_features
+			for feat in range(0,self.num_features):
+				limit = MAX_WEIGHTS[self.feat_list[feat]]
+				weights_span[feat] = range(-limit, limit+1, limit/2)
+				min_dist_w[feat] = -limit
 
-            weight_pairs = list(itertools.product(*weights_span))
+			weight_pairs = list(itertools.product(*weights_span))
 
-            # current weights
-            w = self.weights
-            for w_i in weight_pairs:
-                dist = np.linalg.norm(w-w_i)
-                if dist < np.linalg.norm(w-min_dist_w):
-                    min_dist_w = w_i
+			# current weights
+			w = self.weights
+			for w_i in weight_pairs:
+				dist = np.linalg.norm(w-w_i)
+				if dist < np.linalg.norm(w-min_dist_w):
+					min_dist_w = w_i
 
-            init_waypts = np.array(self.traj_cache[min_dist_w])
+			init_waypts = np.array(self.traj_cache[min_dist_w])
 
 			#print "init_waypts: " + str(init_waypts)
 			#print "start config: " + str(start)
@@ -592,18 +594,17 @@ class Planner(object):
 		prob = trajoptpy.ConstructProblem(s, self.env)
 
 		for t in range(1,self.num_waypts_plan):
-			prob.AddCost(self.coffee_cost, [(t,j) for j in range(7)], "coffee%i"%t)
-            if 'coffee' in self.feat_list:
-                prob.AddCost(self.coffee_cost, [(t,j) for j in range(7)], "coffee%i"%t)
-            if 'table' in self.feat_list:
+			if 'coffee' in self.feat_list:
+				prob.AddCost(self.coffee_cost, [(t,j) for j in range(7)], "coffee%i"%t)
+			if 'table' in self.feat_list:
 				prob.AddCost(self.table_cost, [(t,j) for j in range(7)], "table%i"%t)
-            if 'laptop' in self.feat_list:
-                prob.AddErrorCost(self.laptop_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "HINGE", "laptop%i"%t)
-                prob.AddCost(self.laptop_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "laptop%i"%t)
-            if 'origin' in self.feat_list:
-                prob.AddCost(self.origin_cost, [(t,j) for j in range(7)], "origin%i"%t)
-            if 'human' in self.feat_list:
-                prob.AddCost(self.human_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "human%i"%t)
+			if 'laptop' in self.feat_list:
+				prob.AddErrorCost(self.laptop_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "HINGE", "laptop%i"%t)
+				prob.AddCost(self.laptop_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "laptop%i"%t)
+			if 'origin' in self.feat_list:
+				prob.AddCost(self.origin_cost, [(t,j) for j in range(7)], "origin%i"%t)
+			if 'human' in self.feat_list:
+				prob.AddCost(self.human_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "human%i"%t)
 
 
 		for t in range(1,self.num_waypts_plan - 1):
@@ -633,28 +634,28 @@ class Planner(object):
 		if waypts_deform != None:
 			new_features = self.featurize(waypts_deform)
 			old_features = self.featurize(waypts_prev)
-            Phi_p = np.array([new_features[0]] + [sum(x) for x in new_features[1:]])
-            Phi = np.array([old_features[0]] + [sum(x) for x in old_features[1:]])
+			Phi_p = np.array([new_features[0]] + [sum(x) for x in new_features[1:]])
+			Phi = np.array([old_features[0]] + [sum(x) for x in old_features[1:]])
 
 			self.prev_features = Phi_p
 			self.curr_features = Phi
 
 			# Determine alpha and max theta
-            update_gains = [0.0] * self.num_features
-            max_weights = [0.0] * self.num_features
-            feat_range = [0.0] * self.num_features
-            for feat in range(0, self.num_features):
-                update_gains[feat] = UPDATE_GAINS[self.feat_list[feat]]
-                max_weights[feat] = MAX_WEIGHTS[self.feat_list[feat]]
-                feat_range[feat] = FEAT_RANGE[self.feat_list[feat]]
+			update_gains = [0.0] * self.num_features
+			max_weights = [0.0] * self.num_features
+			feat_range = [0.0] * self.num_features
+			for feat in range(0, self.num_features):
+				update_gains[feat] = UPDATE_GAINS[self.feat_list[feat]]
+				max_weights[feat] = MAX_WEIGHTS[self.feat_list[feat]]
+				feat_range[feat] = FEAT_RANGE[self.feat_list[feat]]
 			update = Phi_p - Phi
 
 			if self.feat_method == ALL:
 				# update all weights 
-                curr_weight = self.weights - np.dot(update_gains, update[1:])
+				curr_weight = self.weights - np.dot(update_gains, update[1:])
 			elif self.feat_method == MAX:
 				print "updating max weight"
-                change_in_features = np.divide(update[1:], feat_range)
+				change_in_features = np.divide(update[1:], feat_range)
 
 				# get index of maximal change
 				max_idx = np.argmax(np.fabs(change_in_features))
@@ -662,28 +663,28 @@ class Planner(object):
 				# update only weight of feature with maximal change
 				curr_weight = [self.weights[i] for i in range(len(self.weights))]
 				curr_weight[max_idx] = curr_weight[max_idx] - update_gains[max_idx]*update[max_idx+1]
-            elif self.feat_method == BETA:
+			elif self.feat_method == BETA:
 
-                # Define minimization function
-                def u_minimizer(u):
-                    lambda1 = 1
-                    (waypts_deform_p, waypts_prev) = self.deform(u)
-                    H_features = self.featurize(waypts_deform_p)
-                    R_features = self.featurize(waypts_prev)
-                    Phi_H = np.array([H_features[0]] + [sum(x) for x in H_features[1:]])
-                    Phi_R = np.array([R_features[0]] + [sum(x) for x in R_features[1:]])
-                    cost = norm(u)^2 + lambda1 * sum((Phi_H[1:] - Phi_R[1:] - update)^2)
-                    return cost
+				# Define minimization function
+				def u_minimizer(u):
+					lambda1 = 1
+					(waypts_deform_p, waypts_prev) = self.deform(u)
+					H_features = self.featurize(waypts_deform_p)
+					R_features = self.featurize(waypts_prev)
+					Phi_H = np.array([H_features[0]] + [sum(x) for x in H_features[1:]])
+					Phi_R = np.array([R_features[0]] + [sum(x) for x in R_features[1:]])
+					cost = norm(u)^2 + lambda1 * sum((Phi_H[1:] - Phi_R[1:] - update)^2)
+					return cost
 
-                # First compute what the optimal action would have been
-                u_H_star = minimize(u_minimizer, u_H)
+				# First compute what the optimal action would have been
+				u_H_star = minimize(u_minimizer, u_H)
 
-                # Compute beta
-                beta = 1/(norm(u_H)^2 - norm(u_H_star)^2)
-                beta = min(1, beta)
+				# Compute beta
+				beta = 1/(norm(u_H)^2 - norm(u_H_star)^2)
+				beta = min(1, beta)
 
-                # Compute new weights
-                curr_weight = self.weights - beta * np.dot(update_gains, update[1:])
+				# Compute new weights
+				curr_weight = self.weights - beta * np.dot(update_gains, update[1:])
 
 			# clip values at max and min allowed weights
 			for i in range(self.num_features):
@@ -734,8 +735,8 @@ class Planner(object):
 		if 'coffee' in self.feat_list:
 			place_pose = [-0.46513, 0.29041, 0.69497]
 			self.trajOptPose(start, goal, place_pose)
-        else:
-            self.trajOpt(start, goal, traj_seed=seed)
+		else:
+			self.trajOpt(start, goal, traj_seed=seed)
 
         #print "waypts_plan after trajopt: " + str(self.waypts_plan)
 		self.upsample(step_time)
@@ -870,7 +871,7 @@ if __name__ == '__main__':
 
 	feat_method = "ALL"
 	feat_list = "table,coffee"
-	planner = Planner(feat_method, feal_list)
+	planner = Planner(feat_method, feat_list)
 
 	"""
 	if len(goal) < 10:

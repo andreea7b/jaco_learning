@@ -45,21 +45,21 @@ class DiscretePlanner(object):
 
 	def __init__(self, feat_method, feat_list, traj_cache=None, traj_rand=None, traj_optimal=None):
 
-        # ---- important discrete variables ---- #
-        self.weights_dict = [[0.5,0], [0,0], [-0.5,0]]
-        self.betas_dict = [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1]
+		# ---- important discrete variables ---- #
+		self.weights_dict = [[0.5,0], [0,0], [-0.5,0]]
+		self.betas_dict = [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1]
 
-        self.num_betas = len(betas_dict)
-        self.num_weights = len(weights_dict)
+		self.num_betas = len(self.betas_dict)
+		self.num_weights = len(self.weights_dict)
 
-        # Construct uninformed prior
-        P_bt = np.ones((num_betas, num_weights))
-        self.P_bt = 1.0/num_betas * P_bt
+		# Construct uninformed prior
+		P_bt = np.ones((self.num_betas, self.num_weights))
+		self.P_bt = 1.0/self.num_betas * P_bt
 
 		# ---- important internal variables ---- #
 		self.feat_method = feat_method	# can be ALL, MAX, or BETA
 		self.feat_list = feat_list		# 'table', 'human', 'coffee', 'origin', 'laptop'
-        self.num_features = len(self.feat_list)
+		self.num_features = len(self.feat_list)
 
 		self.start_time = None
 		self.final_time = None
@@ -69,17 +69,19 @@ class DiscretePlanner(object):
 		self.waypts_plan = None
 		self.num_waypts_plan = None
 		self.step_time_plan = None
+		self.MAX_ITER = 40
 
 		# this is the cache of trajectories computed for all max/min weights
-        if traj_cache is not None:
-            here = os.path.dirname(os.path.realpath(__file__))
-            self.traj_cache = pickle.load( open( here + traj_cache, "rb" ) )
-        if traj_rand is not None:
-            here = os.path.dirname(os.path.realpath(__file__))
-            self.traj_rand = pickle.load( open( here + traj_rand, "rb" ) )
-        if traj_optimal is not None:
-            here = os.path.dirname(os.path.realpath(__file__))
-            self.traj_optimal = pickle.load( open( here + traj_optimal, "rb" ) )
+		self.traj_cache = self.traj_optimal = self.traj_rand = None	
+		if traj_cache is not None:
+			here = os.path.dirname(os.path.realpath(__file__))
+			self.traj_cache = pickle.load( open( here + traj_cache, "rb" ) )
+		if traj_rand is not None:
+			here = os.path.dirname(os.path.realpath(__file__))
+			self.traj_rand = pickle.load( open( here + traj_rand, "rb" ) )
+		if traj_optimal is not None:
+			here = os.path.dirname(os.path.realpath(__file__))
+			self.traj_optimal = pickle.load( open( here + traj_optimal, "rb" ) )
 
 		# these variables are for the upsampled trajectory
 		self.waypts = None
@@ -149,19 +151,19 @@ class DiscretePlanner(object):
 		input trajectory, output list of feature values
 		"""
 		features = [self.velocity_features(waypts)]
-        features += self.num_features * [[0.0] * (len(waypts)-1)]
+		features += self.num_features * [[0.0] * (len(waypts)-1)]
 		for index in range(0,len(waypts)-1):
-            for feat in range(1,self.num_features+1):
-                if self.feat_list[feat-1] == 'table':
-                    features[feat][index] = self.table_features(waypts[index+1])
-                elif self.feat_list[feat-1] == 'coffee':
-                    features[feat][index] = self.coffee_features(waypts[index+1])
-                elif self.feat_list[feat-1] == 'human':
-                    features[feat][index] = self.human_features(waypts[index+1],waypts[index])
-                elif self.feat_list[feat-1] == 'laptop':
-                    features[feat][index] = self.laptop_features(waypts[index+1],waypts[index])
-                elif self.feat_list[feat-1] == 'origin':
-                    features[feat][index] = self.origin_features(waypts[index+1])
+			for feat in range(1,self.num_features+1):
+				if self.feat_list[feat-1] == 'table':
+					features[feat][index] = self.table_features(waypts[index+1])
+				elif self.feat_list[feat-1] == 'coffee':
+					features[feat][index] = self.coffee_features(waypts[index+1])
+				elif self.feat_list[feat-1] == 'human':
+					features[feat][index] = self.human_features(waypts[index+1],waypts[index])
+				elif self.feat_list[feat-1] == 'laptop':
+					features[feat][index] = self.laptop_features(waypts[index+1],waypts[index])
+				elif self.feat_list[feat-1] == 'origin':
+					features[feat][index] = self.origin_features(waypts[index+1])
 		return features
 
 	# -- Velocity -- #
@@ -198,7 +200,7 @@ class DiscretePlanner(object):
 		input trajectory, output scalar feature
 		"""
 		if len(waypt) < 10:
-			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
 		self.robot.SetDOFValues(waypt)
 		coords = robotToCartesian(self.robot)
@@ -218,7 +220,7 @@ class DiscretePlanner(object):
 		input trajectory, output scalar cost
 		"""
 		feature = self.origin_features(waypt)
-        feature_idx = self.feat_list.index('origin')
+		feature_idx = self.feat_list.index('origin')
 		return feature*self.weights[feature_idx]
 
 	# -- Distance to Table -- #
@@ -231,7 +233,7 @@ class DiscretePlanner(object):
 		input trajectory, output scalar feature
 		"""
 		if len(waypt) < 10:
-			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
 		self.robot.SetDOFValues(waypt)
 		coords = robotToCartesian(self.robot)
@@ -245,7 +247,7 @@ class DiscretePlanner(object):
 		input trajectory, output scalar cost
 		"""
 		feature = self.table_features(waypt)
-        feature_idx = self.feat_list.index('table')
+		feature_idx = self.feat_list.index('table')
 		return feature*self.weights[feature_idx]
 
 	# -- Coffee (or z-orientation of end-effector) -- #
@@ -259,7 +261,7 @@ class DiscretePlanner(object):
 		input trajectory, output scalar cost
 		"""
 		if len(waypt) < 10:
-			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
 		self.robot.SetDOFValues(waypt)
 		EE_link = self.robot.GetLinks()[7]
@@ -272,7 +274,7 @@ class DiscretePlanner(object):
 		input trajectory, output scalar cost
 		"""
 		feature = self.coffee_features(waypt)
-        feature_idx = self.feat_list.index('coffee')
+		feature_idx = self.feat_list.index('coffee')
 		return feature*self.weights[feature_idx]
 
 	# -- Distance to Laptop -- #
@@ -299,7 +301,7 @@ class DiscretePlanner(object):
 			+: EE is closer than 0.4 meters to laptop
 		"""
 		if len(waypt) < 10:
-			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
 		self.robot.SetDOFValues(waypt)
 		coords = robotToCartesian(self.robot)
@@ -319,7 +321,7 @@ class DiscretePlanner(object):
 		prev_waypt = waypt[0:7]
 		curr_waypt = waypt[7:14]
 		feature = self.laptop_features(curr_waypt,prev_waypt)
-        feature_idx = self.feat_list.index('laptop')
+		feature_idx = self.feat_list.index('laptop')
 		return feature*self.weights[feature_idx]*np.linalg.norm(curr_waypt - prev_waypt)
 
 	# -- Distance to Human -- #
@@ -346,7 +348,7 @@ class DiscretePlanner(object):
 			+: EE is closer than 0.4 meters to human
 		"""
 		if len(waypt) < 10:
-			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
 		self.robot.SetDOFValues(waypt)
 		coords = robotToCartesian(self.robot)
@@ -366,7 +368,7 @@ class DiscretePlanner(object):
 		prev_waypt = waypt[0:7]
 		curr_waypt = waypt[7:14]
 		feature = self.human_features(curr_waypt,prev_waypt)
-        feature_idx = self.feat_list.index('human')
+		feature_idx = self.feat_list.index('human')
 		return feature*self.weights[feature_idx]*np.linalg.norm(curr_waypt - prev_waypt)
 
 	# ---- custom constraints --- #
@@ -377,7 +379,7 @@ class DiscretePlanner(object):
 		above the table.
 		"""
 		if len(waypt) < 10:
-			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
 		self.robot.SetDOFValues(waypt)
 		EE_link = self.robot.GetLinks()[10]
@@ -392,7 +394,7 @@ class DiscretePlanner(object):
 		holding coffee mug upright.
 		"""
 		if len(waypt) < 10:
-			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
 		self.robot.SetDOFValues(waypt)
 		EE_link = self.robot.GetLinks()[7]
@@ -404,7 +406,7 @@ class DiscretePlanner(object):
 		Analytic derivative for coffee constraint.
 		"""
 		if len(waypt) < 10:
-			waypt = np.append(waypt.reshape(7), np.array([0,0,0]), 1)
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
 		self.robot.SetDOFValues(waypt)
 		world_dir = self.robot.GetLinks()[7].GetTransform()[:3,:3].dot([1,0,0])
@@ -431,7 +433,7 @@ class DiscretePlanner(object):
 		#plotSphere(self.env, self.bodies, goal_pose, size=40)
 
 		if len(start) < 10:
-			aug_start = np.append(start.reshape(7), np.array([0,0,0]), 1)
+			aug_start = np.append(start.reshape(7), np.array([0,0,0]))
 		self.robot.SetDOFValues(aug_start)
 
 		self.num_waypts_plan = 4
@@ -445,25 +447,25 @@ class DiscretePlanner(object):
 		for count in range(self.num_waypts_plan):
 			init_waypts[count,:] = start + count/(self.num_waypts_plan - 1.0)*(goal - start)
 
-        if self.traj_cache is not None:
-            # choose seeding trajectory from cache if the weights match
-            weights_span = [None]*self.num_features
-            min_dist_w = [None]*self.num_features
-            for feat in range(0,self.num_features):
-                limit = MAX_WEIGHTS[self.feat_list[feat]]
-                weights_span[feat] = range(-limit, limit+1, limit/2)
-                min_dist_w[feat] = -limit
+		if self.traj_cache is not None:
+			# choose seeding trajectory from cache if the weights match
+			weights_span = [None]*self.num_features
+			min_dist_w = [None]*self.num_features
+			for feat in range(0,self.num_features):
+				limit = MAX_WEIGHTS[self.feat_list[feat]]
+				weights_span[feat] = range(-limit, limit+1, limit/2)
+				min_dist_w[feat] = -limit
 
-            weight_pairs = list(itertools.product(*weights_span))
+			weight_pairs = list(itertools.product(*weights_span))
 
-            # current weights
-            w = self.weights
-            for w_i in weight_pairs:
-                dist = np.linalg.norm(w-w_i)
-                if dist < np.linalg.norm(w-min_dist_w):
-                    min_dist_w = w_i
+			# current weights
+			w = self.weights
+			for w_i in weight_pairs:
+				dist = np.linalg.norm(w-w_i)
+				if dist < np.linalg.norm(w-min_dist_w):
+					min_dist_w = w_i
 
-            init_waypts = np.array(self.traj_cache[min_dist_w])
+		init_waypts = np.array(self.traj_cache[min_dist_w])
 
 		request = {
 			"basic_info": {
@@ -503,16 +505,16 @@ class DiscretePlanner(object):
 		prob = trajoptpy.ConstructProblem(s, self.env)
 
 		for t in range(1,self.num_waypts_plan):
-            if 'coffee' in self.feat_list:
-                prob.AddCost(self.coffee_cost, [(t,j) for j in range(7)], "coffee%i"%t)
-            if 'table' in self.feat_list:
+			if 'coffee' in self.feat_list:
+				prob.AddCost(self.coffee_cost, [(t,j) for j in range(7)], "coffee%i"%t)
+			if 'table' in self.feat_list:
 				prob.AddCost(self.table_cost, [(t,j) for j in range(7)], "table%i"%t)
-            if 'laptop' in self.feat_list:
-                prob.AddCost(self.laptop_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "laptop%i"%t)
-            if 'origin' in self.feat_list:
-                prob.AddCost(self.origin_cost, [(t,j) for j in range(7)], "origin%i"%t)
-            if 'human' in self.feat_list:
-                prob.AddCost(self.human_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "human%i"%t)
+			if 'laptop' in self.feat_list:
+				prob.AddCost(self.laptop_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "laptop%i"%t)
+			if 'origin' in self.feat_list:
+				prob.AddCost(self.origin_cost, [(t,j) for j in range(7)], "origin%i"%t)
+			if 'human' in self.feat_list:
+				prob.AddCost(self.human_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "human%i"%t)
 
 		for t in range(1,self.num_waypts_plan - 1):
 			prob.AddConstraint(self.table_constraint, [(t,j) for j in range(7)], "INEQ", "table%i"%t)
@@ -541,7 +543,7 @@ class DiscretePlanner(object):
 		print "I'm in normal trajOpt!"
 
 		if len(start) < 10:
-			aug_start = np.append(start.reshape(7), np.array([0,0,0]), 1)
+			aug_start = np.append(start.reshape(7), np.array([0,0,0]))
 		self.robot.SetDOFValues(aug_start)
 
 		self.num_waypts_plan = 4
@@ -557,28 +559,28 @@ class DiscretePlanner(object):
 			init_waypts = traj_seed
 			print init_waypts
 
-        if self.traj_cache is not None:
-            # choose seeding trajectory from cache if the weights match
-            weights_span = [None]*self.num_features
-            min_dist_w = [None]*self.num_features
-            for feat in range(0,self.num_features):
-                limit = MAX_WEIGHTS[self.feat_list[feat]]
-                weights_span[feat] = range(-limit, limit+1, limit/2)
-                min_dist_w[feat] = -limit
+		if self.traj_cache is not None:
+			# choose seeding trajectory from cache if the weights match
+			weights_span = [None]*self.num_features
+			min_dist_w = [None]*self.num_features
+			for feat in range(0,self.num_features):
+				limit = MAX_WEIGHTS[self.feat_list[feat]]
+				weights_span[feat] = range(-limit, limit+1, limit/2)
+				min_dist_w[feat] = -limit
 
-            weight_pairs = list(itertools.product(*weights_span))
+			weight_pairs = list(itertools.product(*weights_span))
 
-            # current weights
-            w = self.weights
-            for w_i in weight_pairs:
-                dist = np.linalg.norm(w-w_i)
-                if dist < np.linalg.norm(w-min_dist_w):
-                    min_dist_w = w_i
+			# current weights
+			w = self.weights
+			for w_i in weight_pairs:
+				dist = np.linalg.norm(w-w_i)
+				if dist < np.linalg.norm(w-min_dist_w):
+					min_dist_w = w_i
 
-            init_waypts = np.array(self.traj_cache[min_dist_w])
+			init_waypts = np.array(self.traj_cache[min_dist_w])
 
-			#print "init_waypts: " + str(init_waypts)
-			#print "start config: " + str(start)
+		#print "init_waypts: " + str(init_waypts)
+		#print "start config: " + str(start)
 
 		request = {
 			"basic_info": {
@@ -608,18 +610,17 @@ class DiscretePlanner(object):
 		prob = trajoptpy.ConstructProblem(s, self.env)
 
 		for t in range(1,self.num_waypts_plan):
-			prob.AddCost(self.coffee_cost, [(t,j) for j in range(7)], "coffee%i"%t)
-            if 'coffee' in self.feat_list:
-                prob.AddCost(self.coffee_cost, [(t,j) for j in range(7)], "coffee%i"%t)
-            if 'table' in self.feat_list:
+			if 'coffee' in self.feat_list:
+				prob.AddCost(self.coffee_cost, [(t,j) for j in range(7)], "coffee%i"%t)
+			if 'table' in self.feat_list:
 				prob.AddCost(self.table_cost, [(t,j) for j in range(7)], "table%i"%t)
-            if 'laptop' in self.feat_list:
-                prob.AddErrorCost(self.laptop_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "HINGE", "laptop%i"%t)
-                prob.AddCost(self.laptop_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "laptop%i"%t)
-            if 'origin' in self.feat_list:
-                prob.AddCost(self.origin_cost, [(t,j) for j in range(7)], "origin%i"%t)
-            if 'human' in self.feat_list:
-                prob.AddCost(self.human_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "human%i"%t)
+			if 'laptop' in self.feat_list:
+				prob.AddErrorCost(self.laptop_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "HINGE", "laptop%i"%t)
+				prob.AddCost(self.laptop_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "laptop%i"%t)
+			if 'origin' in self.feat_list:
+				prob.AddCost(self.origin_cost, [(t,j) for j in range(7)], "origin%i"%t)
+			if 'human' in self.feat_list:
+				prob.AddCost(self.human_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "human%i"%t)
 
 
 		for t in range(1,self.num_waypts_plan - 1):
@@ -649,28 +650,28 @@ class DiscretePlanner(object):
 		if waypts_deform != None:
 			new_features = self.featurize(waypts_deform)
 			old_features = self.featurize(waypts_prev)
-            Phi_p = np.array([new_features[0]] + [sum(x) for x in new_features[1:]])
-            Phi = np.array([old_features[0]] + [sum(x) for x in old_features[1:]])
+			Phi_p = np.array([new_features[0]] + [sum(x) for x in new_features[1:]])
+			Phi = np.array([old_features[0]] + [sum(x) for x in old_features[1:]])
 
 			self.prev_features = Phi_p
 			self.curr_features = Phi
 
 			# Determine alpha and max theta
-            update_gains = [0.0] * self.num_features
-            max_weights = [0.0] * self.num_features
-            feat_range = [0.0] * self.num_features
-            for feat in range(0, self.num_features):
-                update_gains[feat] = UPDATE_GAINS[self.feat_list[feat]]
-                max_weights[feat] = MAX_WEIGHTS[self.feat_list[feat]]
-                feat_range[feat] = FEAT_RANGE[self.feat_list[feat]]
+			update_gains = [0.0] * self.num_features
+			max_weights = [0.0] * self.num_features
+			feat_range = [0.0] * self.num_features
+			for feat in range(0, self.num_features):
+				update_gains[feat] = UPDATE_GAINS[self.feat_list[feat]]
+				max_weights[feat] = MAX_WEIGHTS[self.feat_list[feat]]
+				feat_range[feat] = FEAT_RANGE[self.feat_list[feat]]
 			update = Phi_p - Phi
 
 			if self.feat_method == ALL:
 				# update all weights 
-                curr_weight = self.weights - np.dot(update_gains, update[1:])
+				curr_weight = self.weights - np.dot(update_gains, update[1:])
 			elif self.feat_method == MAX:
 				print "updating max weight"
-                change_in_features = np.divide(update[1:], feat_range)
+				change_in_features = np.divide(update[1:], feat_range)
 
 				# get index of maximal change
 				max_idx = np.argmax(np.fabs(change_in_features))
@@ -678,56 +679,52 @@ class DiscretePlanner(object):
 				# update only weight of feature with maximal change
 				curr_weight = [self.weights[i] for i in range(len(self.weights))]
 				curr_weight[max_idx] = curr_weight[max_idx] - update_gains[max_idx]*update[max_idx+1]
-            elif self.feat_method == BETA:
-                P_xi = np.zeros((self.num_betas, self.num_weights))
-                for weight_i in range(self.num_weights):
-                    for beta_i in range(self.num_betas):
-                        weight = self.weights_dict(weight_i)
-                        beta = self.betas_dict(beta_i)
+			elif self.feat_method == BETA:
+				P_xi = np.zeros((self.num_betas, self.num_weights))
+				for (weight_i, weight) in enumerate(self.weights_dict):
+					for (beta_i, beta) in enumerate(self.betas_dict):
+						# Compute -beta*(weight^T*Phi(xi_H))
+						numerator = -beta * np.dot([1] + weight, Phi_p)
 
-                        # Compute -beta*(weight^T*Phi(xi_H))
-                        numerator = -beta * np.dot([1] + weight, Phi_p)
+						# Calculate the integral in log space
+						num_trajs = self.traj_rand.shape[0]
+						logdenom = np.zeros((1, num_trajs))
 
-                        # Calculate the integral in log space
-                        num_trajs = self.traj_rand.shape[0]
-                        logdenom = np.zeros((1, num_trajs))
+						# Compute costs for each of the random trajectories
+						for rand_i in range(num_trajs):
+							curr_traj = self.traj_rand[rand_i]
+							rand_features = self.featurize(curr_traj)
+							Phi_rand = np.array([rand_features[0]] + [sum(x) for x in rand_features[1:]])
+							# Compute each denominator log
+							logdenom[rand_i] = -beta * np.dot([1] + weight, Phi_rand)
 
-                        # Compute costs for each of the random trajectories
-                        for rand_i in range(num_trajs):
-                            curr_traj = self.traj_rand[rand_i]
-                            rand_features = self.featurize(curr_traj)
-                            Phi_rand = np.array([rand_features[0]] + [sum(x) for x in rand_features[1:]])
-                            # Compute each denominator log
-                            logdenom[rand_i] = -beta * np.dot([1] + weight, Phi_rand)
+						# Compute the sum in log space
+						A_max = max(logdenom)
+						expdif = logdenom - A_max
+						denom = A + log(sum(exp(expdif)))
 
-                        # Compute the sum in log space
-                        A_max = max(logdenom)
-                        expdif = logdenom - A_max
-                        denom = A + log(sum(exp(expdif))
+						# Get P(xi_H | beta, weight) by dividing them
+						P_xi[beta_i][weight_i] = np.exp(numerator - denom)
+				P_obs = P_xi / sum(P_xi)
 
-                        # Get P(xi_H | beta, weight) by dividing them
-                        P_xi[beta_i, weight_i] = np.exp(numerator - denom)
+				# Compute P(weight, beta | xi_H) via Bayes rule
+				posterior = np.multiply(P_obs, self.P_bt)
 
-                P_obs = P_xi / sum(P_xi)
+				# Normalize posterior
+				posterior = posterior / sum(posterior)
 
-                # Compute P(weight, beta | xi_H) via Bayes rule
-                posterior = np.multiply(P_obs, self.P_bt)
+				# Get optimal weight and beta by doing argmax
+				#(best_beta_i, best_weight_i) = np.unravel_index(np.argmax(posterior), posterior.shape)
+				# Compute optimal expected weight
+				P_weight = sum(posterior, 0)
+				curr_weight = np.sum(np.transpose(weights_dict)*P_weight, 1)
 
-                # Normalize posterior
-                posterior = posterior / sum(posterior)
+				# Another method uses beta-weighted expected weight
+				#P_weight = np.matmul(np.transpose(posterior), betas_dict)
+				#P_weight = P_weight / sum(P_weight,0)
+				#curr_weight = np.transpose(P_weight) * weights_dict
 
-                # Get optimal weight and beta by doing argmax
-                #(best_beta_i, best_weight_i) = np.unravel_index(np.argmax(posterior), posterior.shape)
-                # Compute optimal expected weight
-                P_weight = sum(posterior, 0)
-                curr_weight = np.sum(np.transpose(weights_dict)*P_weight, 1)
-
-                # Another method uses beta-weighted expected weight
-                #P_weight = np.matmul(np.transpose(posterior), betas_dict)
-                #P_weight = P_weight / sum(P_weight,0)
-                #curr_weight = np.transpose(P_weight) * weights_dict
-
-                self.P_bt = posterior
+				self.P_bt = posterior
 
 			#print "curr_weight after = " + str(curr_weight)
 
@@ -780,8 +777,8 @@ class DiscretePlanner(object):
 		if 'coffee' in self.feat_list:
 			place_pose = [-0.46513, 0.29041, 0.69497]
 			self.trajOptPose(start, goal, place_pose)
-        else:
-            self.trajOpt(start, goal, traj_seed=seed)
+		else:
+			self.trajOpt(start, goal, traj_seed=seed)
 
         #print "waypts_plan after trajopt: " + str(self.waypts_plan)
 		self.upsample(step_time)
