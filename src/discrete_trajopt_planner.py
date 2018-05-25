@@ -37,13 +37,24 @@ ALL = "ALL"					# updates all features
 MAX = "MAX"					# updates only feature that changed the most
 BETA = "BETA"				# updates beta-adaptive features 
 
-class Planner(object):
+class DiscretePlanner(object):
 	"""
 	This class plans a trajectory from start to goal
 	with TrajOpt.
 	"""
 
-	def __init__(self, feat_method, feat_list, traj_cache=None):
+	def __init__(self, feat_method, feat_list, traj_cache=None, traj_rand=None, traj_optimal=None):
+
+        # ---- important discrete variables ---- #
+        self.weights_dict = [[0.5,0], [0,0], [-0.5,0]]
+        self.betas_dict = [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1]
+
+        self.num_betas = len(betas_dict)
+        self.num_weights = len(weights_dict)
+
+        # Construct uninformed prior
+        P_bt = np.ones((num_betas, num_weights))
+        self.P_bt = 1.0/num_betas * P_bt
 
 		# ---- important internal variables ---- #
 		self.feat_method = feat_method	# can be ALL, MAX, or BETA
@@ -63,6 +74,12 @@ class Planner(object):
         if traj_cache is not None:
             here = os.path.dirname(os.path.realpath(__file__))
             self.traj_cache = pickle.load( open( here + traj_cache, "rb" ) )
+        if traj_rand is not None:
+            here = os.path.dirname(os.path.realpath(__file__))
+            self.traj_rand = pickle.load( open( here + traj_rand, "rb" ) )
+        if traj_optimal is not None:
+            here = os.path.dirname(os.path.realpath(__file__))
+            self.traj_optimal = pickle.load( open( here + traj_optimal, "rb" ) )
 
 		# these variables are for the upsampled trajectory
 		self.waypts = None
@@ -623,12 +640,12 @@ class Planner(object):
 	def learnWeights(self, u_h):
 		"""
 		Deforms the trajectory given human force, u_h, and
-		updates features by computing difference between 
+		updates features by computing difference between
 		features of new trajectory and old trajectory
 		---
-		input is human force and returns updated weights 
+		input is human force and returns updated weights
 		"""
-		(waypts_deform, waypts_prev) = self.deform(u_h)	
+		(waypts_deform, waypts_prev) = self.deform(u_h)
 		if waypts_deform != None:
 			new_features = self.featurize(waypts_deform)
 			old_features = self.featurize(waypts_prev)
@@ -648,10 +665,10 @@ class Planner(object):
                 feat_range[feat] = FEAT_RANGE[self.feat_list[feat]]
 			update = Phi_p - Phi
 
-			if self.featMethod == ALL:
+			if self.feat_method == ALL:
 				# update all weights 
                 curr_weight = self.weights - np.dot(update_gains, update[1:])
-			elif self.featMethod == MAX:
+			elif self.feat_method == MAX:
 				print "updating max weight"
                 change_in_features = np.divide(update[1:], feat_range)
 
@@ -661,6 +678,50 @@ class Planner(object):
 				# update only weight of feature with maximal change
 				curr_weight = [self.weights[i] for i in range(len(self.weights))]
 				curr_weight[max_idx] = curr_weight[max_idx] - update_gains[max_idx]*update[max_idx+1]
+            elif self.feat_method == BETA:
+                P_xi = np.zeros((self.num_betas, self.num_weights))
+                for weight_i in range(self.num_weights):
+                    for beta_i in range(self.num_betas):
+                        weight = self.weights_dict(weight_i)
+                        beta = self.betas_dict(beta_i)
+
+                        # Compute -beta*(weight^T*Phi(xi_H))
+                        numerator = -beta * np.dot([1] + weight, Phi_p)
+
+                        # Calculate the integral in log space
+                        num_trajs = self.traj_rand.shape[0]
+                        logdenom = np.zeros((1, num_trajs))
+
+                        # Compute costs for each of the random trajectories
+                        for rand_i in range(num_trajs):
+                            curr_traj = self.traj_rand[rand_i]
+                            rand_features = self.featurize(curr_traj)
+                            Phi_rand = np.array([rand_features[0]] + [sum(x) for x in rand_features[1:]])
+                            # Compute each denominator log
+                            logdenom[rand_i] = -beta * np.dot([1] + weight, Phi_rand)
+
+                        # Compute the sum in log space
+                        A_max = max(logdenom)
+                        expdif = logdenom - A_max
+                        denom = A + log(sum(exp(expdif))
+
+                        # Get P(xi_H | beta, weight) by dividing them
+                        P_xi[beta_i, weight_i] = np.exp(numerator - denom)
+
+                P_obs = P_xi / sum(P_xi)
+
+                # Compute P(weight, beta | xi_H) via Bayes rule
+                posterior = np.multiply(P_obs, self.P_bt)
+
+                # Normalize posterior
+                posterior = posterior / sum(posterior)
+
+                # Get optimal weight and beta by doing argmax
+                #(best_beta_i, best_weight_i) = np.unravel_index(np.argmax(posterior), posterior.shape)
+                # Compute optimal expected weight
+                P_weight = sum(posterior, 0)
+                curr_weight = np.sum(np.transpose(weights_dict)*P_weight, 1)
+                self.P_bt = posterior
 
 			#print "curr_weight after = " + str(curr_weight)
 
@@ -801,7 +862,7 @@ class Planner(object):
 		#plt.plot(self.update_time,self.weight_update.T[2],linewidth=4.0,label='Laptop')
 		plt.legend()
 		plt.title("Weight (for features) changes over time")
-		plt.show()
+		plt.show()		
 
 	def plot_feature_update(self):
 		"""
@@ -814,7 +875,7 @@ class Planner(object):
 		#plt.plot(self.update_time2,self.feature_update.T[3],linewidth=4.0,label='Laptop')
 		plt.legend()
 		plt.title("Feature changes over time")
-		plt.show()
+		plt.show()		
 
 	def kill_planner(self):
 		"""
@@ -838,8 +899,8 @@ if __name__ == '__main__':
 	#place_pose = [-0.58218719,  0.33018986,  0.10592141] # x, y, z for pick_lower_EEtilt
 
 	# initialize start/goal based on task 
-	pick = pick_basic_EEtilt
-	place = place_lower
+	pick = pick_basic_EEtilt #pick_basic
+	place = place_lower #place_lower 
 
 	start = np.array(pick)*(math.pi/180.0)
 	goal = np.array(place)*(math.pi/180.0)
@@ -848,8 +909,8 @@ if __name__ == '__main__':
 	T = 20.0
 
 	feat_method = "ALL"
-	feat_list = "table,coffee"
-	planner = Planner(feat_method, feal_list)
+	numFeat = 2
+	planner = Planner(2, False, featMethod, numFeat)
 
 	"""
 	if len(goal) < 10:

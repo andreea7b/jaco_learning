@@ -64,7 +64,7 @@ HAPTIC_FEEDBACK = 'B'
 
 ALL = "ALL"						# updates all features
 MAX = "MAX"						# updates only feature that changed the most
-BETA = "BETA"					# updates the most likely feature 
+BETA = "BETA"					# updates beta-adaptive
 
 class PIDVelJaco(object):
 	"""
@@ -180,8 +180,7 @@ class PIDVelJaco(object):
 		self.curr_pos = None
 
 		# create the trajopt planner and plan from start to goal
-		self.planner = trajopt_planner.Planner(self.task, self.demo,
-                                         self.featMethod, self.featList)
+		self.planner = trajopt_planner.Planner(self.featMethod, self.featList)
 
 		# stores the current trajectory we are tracking, produced by planner
 		self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=None)
@@ -200,9 +199,9 @@ class PIDVelJaco(object):
 		self.reached_goal = False
 
 		# keeps running time since beginning of program execution
-		self.process_start_T = time.time() 
+		self.process_start_T = time.time()
 		# keeps running time since beginning of path
-		self.path_start_T = None 
+		self.path_start_T = None
 
 		# ----- Controller Setup ----- #
 
@@ -241,7 +240,7 @@ class PIDVelJaco(object):
 		rospy.Subscriber(prefix + '/out/joint_torques', kinova_msgs.msg.JointTorque, self.joint_torques_callback, queue_size=1)
 
 		# publish to ROS at 100hz
-		r = rospy.Rate(100) 
+		r = rospy.Rate(100)
 
 		print "----------------------------------"
 		print "Moving robot, press ENTER to quit:"
@@ -268,6 +267,8 @@ class PIDVelJaco(object):
 				method = "A"
 			elif featMethod == MAX:
 				method = "B"
+            elif featMethod == BETA:
+                method = "C"
 
 			weights_filename = "weights" + str(ID) + str(numFeat) + method
 			force_filename = "force" + str(ID) + str(numFeat) + method
