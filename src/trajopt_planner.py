@@ -665,7 +665,7 @@ class Planner(object):
             elif self.feat_method == BETA:
 
                 # Define minimization function
-                def u_minimizer(u, update):
+                def u_minimizer(u):
                     lambda1 = 1
                     (waypts_deform_p, waypts_prev) = self.deform(u)
                     H_features = self.featurize(waypts_deform_p)
@@ -675,12 +675,12 @@ class Planner(object):
                     cost = norm(u)^2 + lambda1 * sum((Phi_H[1:] - Phi_R[1:] - update)^2)
                     return cost
 
-                # TODO
                 # First compute what the optimal action would have been
-                u_H_star = u_H
+                u_H_star = minimize(u_minimizer, u_H)
 
                 # Compute beta
                 beta = 1/(norm(u_H)^2 - norm(u_H_star)^2)
+                beta = min(1, beta)
 
                 # Compute new weights
                 curr_weight = self.weights - beta * np.dot(update_gains, update[1:])
