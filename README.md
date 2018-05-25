@@ -1,6 +1,6 @@
-# iact_control: InterACTive Control
+# beta_adaptive_pHRI: Adaptive Physical HRI
 
-Implementation of traditional and interactive control schemes for a Kinova 7DOF Jaco robotic arm. 
+Implementation of traditional, interactive, and adaptive control schemes for a Kinova 7DOF Jaco robotic arm. 
 ROS, Python, and Kinova API. Testing interaction integrated into planning. 
 
 ## Running the Controllers
