@@ -42,4 +42,6 @@ if __name__ == '__main__':
 	print traj_rand
 	#print "-------"
 
-	pickle.dump(traj_rand, open( "traj_rand.p", "wb" ) )
+    savestr = "_".join(feat_list)
+    savefile = "traj_rand_"+savestr+".p"
+	pickle.dump(traj_rand, open( savefile, "wb" ) )

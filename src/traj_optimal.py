@@ -37,4 +37,8 @@ if __name__ == '__main__':
 	print traj_optimal
 	#print "-------"
 
-	pickle.dump(traj_optimal, open( "traj_optimal.p", "wb" ) )
+    feat_list = [x.strip() for x in feat_list.split(',')]
+    savestr = "_".join(feat_list)
+    savefile = "traj_optimal_"+savestr+".p"
+
+	pickle.dump(traj_optimal, open( savefile, "wb" ) )

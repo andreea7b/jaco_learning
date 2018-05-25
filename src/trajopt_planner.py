@@ -8,6 +8,7 @@ import json
 
 from sympy import symbols
 from sympy import lambdify
+from scipy.optimize import minimize
 
 import trajoptpy
 import or_trajopt
@@ -648,10 +649,10 @@ class Planner(object):
                 feat_range[feat] = FEAT_RANGE[self.feat_list[feat]]
 			update = Phi_p - Phi
 
-			if self.featMethod == ALL:
+			if self.feat_method == ALL:
 				# update all weights 
                 curr_weight = self.weights - np.dot(update_gains, update[1:])
-			elif self.featMethod == MAX:
+			elif self.feat_method == MAX:
 				print "updating max weight"
                 change_in_features = np.divide(update[1:], feat_range)
 
@@ -661,8 +662,28 @@ class Planner(object):
 				# update only weight of feature with maximal change
 				curr_weight = [self.weights[i] for i in range(len(self.weights))]
 				curr_weight[max_idx] = curr_weight[max_idx] - update_gains[max_idx]*update[max_idx+1]
+            elif self.feat_method == BETA:
 
-			#print "curr_weight after = " + str(curr_weight)
+                # Define minimization function
+                def u_minimizer(u, update):
+                    lambda1 = 1
+                    (waypts_deform_p, waypts_prev) = self.deform(u)
+                    H_features = self.featurize(waypts_deform_p)
+                    R_features = self.featurize(waypts_prev)
+                    Phi_H = np.array([H_features[0]] + [sum(x) for x in H_features[1:]])
+                    Phi_R = np.array([R_features[0]] + [sum(x) for x in R_features[1:]])
+                    cost = norm(u)^2 + lambda1 * sum((Phi_H[1:] - Phi_R[1:] - update)^2)
+                    return cost
+
+                # TODO
+                # First compute what the optimal action would have been
+                u_H_star = u_H
+
+                # Compute beta
+                beta = 1/(norm(u_H)^2 - norm(u_H_star)^2)
+
+                # Compute new weights
+                curr_weight = self.weights - beta * np.dot(update_gains, update[1:])
 
 			# clip values at max and min allowed weights
 			for i in range(self.num_features):

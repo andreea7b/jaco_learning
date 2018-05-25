@@ -721,6 +721,12 @@ class DiscretePlanner(object):
                 # Compute optimal expected weight
                 P_weight = sum(posterior, 0)
                 curr_weight = np.sum(np.transpose(weights_dict)*P_weight, 1)
+
+                # Another method uses beta-weighted expected weight
+                #P_weight = np.matmul(np.transpose(posterior), betas_dict)
+                #P_weight = P_weight / sum(P_weight,0)
+                #curr_weight = np.transpose(P_weight) * weights_dict
+
                 self.P_bt = posterior
 
 			#print "curr_weight after = " + str(curr_weight)
