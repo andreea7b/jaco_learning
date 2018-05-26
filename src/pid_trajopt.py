@@ -17,9 +17,8 @@ import argparse
 import actionlib
 import time
 import trajopt_planner
-import traj
 import ros_utils
-import experiment_utils
+import exp_utils.experiment_utils
 
 import kinova_msgs.msg
 import geometry_msgs.msg
@@ -49,7 +48,8 @@ place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 
 epsilon = 0.10							# epislon for when robot think it's at goal
 MAX_CMD_TORQUE = 40.0					# max command robot can send
-INTERACTION_TORQUE_THRESHOLD = 8.0		# threshold when interaction is measured 
+INTERACTION_TORQUE_THRESHOLD = [5, 20, 1, 8, 1, 3, 1]		# threshold when interaction is measured 
+MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
 
 #HUMAN_TASK = 0
 #COFFEE_TASK = 1 
@@ -91,7 +91,7 @@ class PIDVelJaco(object):
 		sim_flag                  - flag for if in simulation or not
 	"""
 
-	def __init__(self, ID, task, methodType, demo, record, featMethod, featList):
+	def __init__(self, ID, task, method_type, demo, record, feat_method, feat_list):
 		"""
 		Setup of the ROS node. Publishing computed torques happens at 100Hz.
 		"""
@@ -103,14 +103,14 @@ class PIDVelJaco(object):
 			self.task = EXP_TASK
 
 		# method type - A=IMPEDANCE, B=LEARNING, C=DEMONSTRATION
-		self.methodType = methodType
+		self.method_type = method_type
 
 		# can be ALL, MAX, or BETA
-		self.featMethod = featMethod
+		self.feat_method = feat_method
 
 		# can be strings 'table', 'coffee', 'human', 'origin', 'laptop'
-		self.featList = featList
-        self.numFeats = len(self.featList)
+		self.feat_list = feat_list
+		self.num_feats = len(self.feat_list)
 
 		# optimal demo mode
 		if demo == "F" or demo == "f":
@@ -148,18 +148,19 @@ class PIDVelJaco(object):
 		# initialize trajectory weights
 
 		# TODO THIS IS EXPERIMENTAL - CHANGE BACK TO ALL 0
-		self.weights = [0.0]*self.numFeats
+		self.weights = [0.0]*self.num_feats
 
 		# if in demo mode, then set the weights to be optimal
 		if self.demo:
-			self.weights = [1.0]*self.numFeats
+			for feat in range(0,self.num_feats):
+				self.weights[feat] = MAX_WEIGHTS[feat_list[feat]]
 
 		# initialize start/goal based on task 
-        # TODO: Need to change this for my purposes
+		# TODO: Need to change this for my purposes
 		if self.task == FAM_TASK:
 			pick = pick_shelf
 		else:
-            if 'coffee' in self.featList:
+			if 'coffee' in self.feat_list:
 				pick = pick_basic_EEtilt
 			else:
 				pick = pick_basic
@@ -180,7 +181,7 @@ class PIDVelJaco(object):
 		self.curr_pos = None
 
 		# create the trajopt planner and plan from start to goal
-		self.planner = trajopt_planner.Planner(self.featMethod, self.featList)
+		self.planner = trajopt_planner.Planner(self.feat_method, self.feat_list)
 
 		# stores the current trajectory we are tracking, produced by planner
 		self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=None)
@@ -223,7 +224,7 @@ class PIDVelJaco(object):
 
 		# ---- Experimental Utils ---- #
 
-		self.expUtil = experiment_utils.ExperimentUtils()
+		self.expUtil = exp_utils.experiment_utils.ExperimentUtils()
 		# update the list of replanned trajectories with new trajectory
 		self.expUtil.update_replanned_trajList(0.0, self.traj)
 
@@ -263,12 +264,12 @@ class PIDVelJaco(object):
 		# save experimental data (only if experiment started)
 		if self.record and self.reached_start:
 			print "Saving experimental data to file..."
-			if featMethod == ALL:
+			if feat_method == ALL:
 				method = "A"
-			elif featMethod == MAX:
+			elif feat_method == MAX:
 				method = "B"
-            elif featMethod == BETA:
-                method = "C"
+			elif feat_method == BETA:
+				method = "C"
 
 			weights_filename = "weights" + str(ID) + str(numFeat) + method
 			force_filename = "force" + str(ID) + str(numFeat) + method
@@ -328,11 +329,7 @@ class PIDVelJaco(object):
 		#print "Current torque: " + str(torque_curr)
 		self.interaction = False
 		for i in range(7):
-			THRESHOLD = INTERACTION_TORQUE_THRESHOLD
-			if self.reached_start and i == 3:
-				THRESHOLD = 2.5
-			if self.reached_start and i > 3:
-				THRESHOLD = 1.0
+			THRESHOLD = INTERACTION_TORQUE_THRESHOLD[i]
 			if np.fabs(torque_curr[i][0]) > THRESHOLD:
 				self.interaction = True
 			else:
@@ -342,8 +339,8 @@ class PIDVelJaco(object):
 
 		# if experienced large enough interaction force, then deform traj
 		if self.interaction:
-			#print "--- INTERACTION ---"
-			#print "u_h: " + str(torque_curr)
+			print "--- INTERACTION ---"
+			print "u_h: " + str(torque_curr)
 			if self.reached_start and not self.reached_goal:
 				timestamp = time.time() - self.path_start_T
 				self.expUtil.update_tauH(timestamp, torque_curr)
@@ -467,16 +464,16 @@ class PIDVelJaco(object):
 
 if __name__ == '__main__':
 	if len(sys.argv) < 7:
-		print "ERROR: Not enough arguments. Specify ID, task, methodType, demo, record, featMethod, featList"
+		print "ERROR: Not enough arguments. Specify ID, task, method_type, demo, record, feat_method, feat_list"
 	else:
-        ID = int(sys.argv[1])
-        task = sys.argv[2]
-        methodType = sys.argv[3]
-        demo = sys.argv[4]
-        record = sys.argv[5]
-        featMethod = sys.argv[6]
-        featList = [x.strip() for x in sys.argv[7].split(',')]
+		ID = int(sys.argv[1])
+		task = sys.argv[2]
+		method_type = sys.argv[3]
+		demo = sys.argv[4]
+		record = sys.argv[5]
+		feat_method = sys.argv[6]
+		feat_list = [x.strip() for x in sys.argv[7].split(',')]
 
-	PIDVelJaco(ID,task,methodType,demo,record,featMethod,featList)
+	PIDVelJaco(ID,task,method_type,demo,record,feat_method,feat_list)
 
 

@@ -438,7 +438,7 @@ class Planner(object):
 			min_dist_w = [None]*self.num_features
 			for feat in range(0,self.num_features):
 				limit = MAX_WEIGHTS[self.feat_list[feat]]
-				weights_span[feat] = range(-limit, limit+1, limit/2)
+				weights_span[feat] = list(np.arange(-limit, limit+.1, limit/2))
 				min_dist_w[feat] = -limit
 
 			weight_pairs = list(itertools.product(*weights_span))
@@ -549,7 +549,7 @@ class Planner(object):
 			min_dist_w = [None]*self.num_features
 			for feat in range(0,self.num_features):
 				limit = MAX_WEIGHTS[self.feat_list[feat]]
-				weights_span[feat] = range(-limit, limit+1, limit/2)
+				weights_span[feat] = list(np.arange(-limit, limit+.1, limit/2))
 				min_dist_w[feat] = -limit
 
 			weight_pairs = list(itertools.product(*weights_span))
@@ -631,7 +631,7 @@ class Planner(object):
 		input is human force and returns updated weights 
 		"""
 		(waypts_deform, waypts_prev) = self.deform(u_h)	
-		if waypts_deform != None:
+		if waypts_deform is not None:
 			new_features = self.featurize(waypts_deform)
 			old_features = self.featurize(waypts_prev)
 			Phi_p = np.array([new_features[0]] + [sum(x) for x in new_features[1:]])

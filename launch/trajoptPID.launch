@@ -22,7 +22,7 @@
 	<arg name="featList" default="table"/>
 
 	<!-- velocity-based with trajopt planning PID -->
-	<node name="pid_trajopt" pkg="iact_control" type="pid_trajopt.py"
+	<node name="pid_trajopt" pkg="beta_adaptive_pHRI" type="pid_trajopt.py"
     args="$(arg ID) $(arg task) $(arg methodType) $(arg demo) $(arg record)
     $(arg featMethod) $(arg featList)" output="screen"/>
 

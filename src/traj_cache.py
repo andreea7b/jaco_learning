@@ -17,32 +17,31 @@ if __name__ == '__main__':
 
 	T = 20.0
 
-	featMethod = "ALL"
-	numFeat = 1
-	planner = Planner(2, False, featMethod, numFeat)
+	feat_method = "ALL"
+	feat_list = "table"
+	planner = Planner(feat_method, feat_list)
 
 	traj_cache = {}
+	MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0}
 
-	cup_weights = np.arange(-1.0, 1.1, 0.5)
-	table_weights = np.arange(-1.0, 1.1, 0.5)
-	#laptop_weights = np.arange(-10.0, 11.0, 5.0)
+	feat_list = [x.strip() for x in feat_list.split(',')]
+	num_features = len(feat_list)
 
-	for cup in cup_weights:
-		for table in table_weights:
-			weights = [cup, table]
-			traj = planner.replan(start, goal, weights, 0.0, T, 0.5)	
+	weights_span = [None]*num_features
+	for feat in range(0,num_features):
+		limit = MAX_WEIGHTS[feat_list[feat]]
+		weights_span[feat] = list(np.arange(-limit, limit+.1, limit/2))
 
-			if cup not in traj_cache:
-				traj_cache[cup] = {}
-			if table not in traj_cache[cup]:
-				traj_cache[cup][table] = traj
-
-			#if laptop not in traj_cache[cup][table]:
-			#	traj_cache[cup][table][laptop] = traj
+	weight_pairs = list(itertools.product(*weights_span))
 
 
+	for (w_i, w) in enumerate(weight_pairs):
+		traj = planner.replan(start, goal, w, 0.0, T, 0.5)	
+		traj_cache[w] = traj
+
+	traj_cache = np.array(traj_cache)
 	print traj_cache
-	#print "-------"
 
-	pickle.dump(traj_cache, open( "traj_cache_1feat.p", "wb" ) )
-	#pickle.dump(traj_cache, open( "traj_cache_2feat.p", "wb" ) )
+	savestr = "_".join(feat_list)
+	savefile = "traj_cache_"+savestr+".p"
+	pickle.dump(traj_cache, open( savefile, "wb" ) )

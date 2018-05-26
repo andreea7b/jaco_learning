@@ -89,7 +89,7 @@ class ExperimentUtils(object):
 		if new_weight is None:
 			print "in update_weights: new_weights are None..."
 			return 
-		new_w = np.array([timestamp, new_weight[0], new_weight[1]])
+		new_w = np.array([timestamp] + new_weight)
 		if self.weights is None:
 			self.weights = np.array([new_w])
 		else:
