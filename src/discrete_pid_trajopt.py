@@ -2,7 +2,7 @@
 """
 This node demonstrates velocity-based PID control by moving the Jaco
 so that it maintains a fixed distance to a target. 
-Author: Andrea Bajcsy (abajcsy@eecs.berkeley.edu)
+Author: Andreea Bobu (abobu@eecs.berkeley.edu)
 Based on: https://w3.cs.jmu.edu/spragunr/CS354_S15/labs/pid_lab/pid_lab.shtml
 """
 import roslib; roslib.load_manifest('kinova_demo')
@@ -17,7 +17,6 @@ import argparse
 import actionlib
 import time
 import discrete_trajopt_planner
-import traj
 import ros_utils
 import experiment_utils
 
@@ -47,18 +46,10 @@ place_higher = [210.5,118.5,192.5,105.4,229.15,245.47,316.4]
 place_lower_EEtilt = [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 400.0]
 place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 
-epsilon = 0.10							# epislon for when robot think it's at goal
+epsilon = 0.20							# epislon for when robot think it's at goal
 MAX_CMD_TORQUE = 40.0					# max command robot can send
-INTERACTION_TORQUE_THRESHOLD = [5, 20, 1, 8, 1, 3, 1] # threshold when interaction is measured 
+INTERACTION_TORQUE_THRESHOLD = [5, 21, 2, 8, 2, 5, 2] # threshold when interaction is measured 
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
-
-#HUMAN_TASK = 0
-#COFFEE_TASK = 1 
-#TABLE_TASK = 2
-#LAPTOP_TASK = 3
-
-FAM_TASK = 1
-EXP_TASK = 2
 
 IMPEDANCE = 'A'
 LEARNING = 'B'
@@ -93,16 +84,10 @@ class PIDVelJaco(object):
 		sim_flag                  - flag for if in simulation or not
 	"""
 
-	def __init__(self, ID, task, method_type, demo, record, feat_method, feat_list, traj_cache=None, traj_rand=None, traj_optimal=None):
+	def __init__(self, ID, method_type, demo, record, feat_method, feat_list, traj_cache=None, traj_rand=None, traj_optimal=None):
 		"""
 		Setup of the ROS node. Publishing computed torques happens at 100Hz.
 		"""
-
-		# task type - experimental (table) or familiarization (cup)
-		if task == "FAM" or task == "fam":
-			self.task = FAM_TASK
-		elif task == "EXP" or task == "exp":
-			self.task = EXP_TASK
 
 		# method type - A=IMPEDANCE, B=LEARNING, C=DEMONSTRATION
 		self.method_type = method_type
@@ -140,13 +125,6 @@ class PIDVelJaco(object):
 		# start admittance control mode
 		self.start_admittance_mode()
 
-		#setup the interaction mode
-		self.interaction = False
-		self.no_interaction_count = 0
-		self.interaction_count = 0
-		self.admittance_mode = False
-		self.gravity_comp_mode = False
-
 		# ---- Trajectory Setup ---- #
 
 		# total time for trajectory
@@ -162,28 +140,21 @@ class PIDVelJaco(object):
 			for feat in range(0,self.num_feats):
 				self.weights[feat] = MAX_WEIGHTS[feat_list[feat]]
 
-		# initialize start/goal based on task 
-        # TODO: Need to change this for my purposes
-		if self.task == FAM_TASK:
+		# initialize start/goal based on features
+		# by default for table and laptop, these are the pick and place
+		pick = pick_basic
+		place = place_lower
+		if 'human' in self.feat_list:
 			pick = pick_shelf
-		else:
-            if 'coffee' in self.feat_list:
-				pick = pick_basic_EEtilt
-			else:
-				pick = pick_basic
-
-		if self.task == FAM_TASK:
 			place = place_higher
-		else:
-			place = place_lower
+		if 'coffee' in self.feat_list:
+			pick = pick_basic_EEtilt
+			place = place_pose
 
 		start = np.array(pick)*(math.pi/180.0)
 		goal = np.array(place)*(math.pi/180.0)
 		self.start = start
 		self.goal = goal
-
-		# TODO THIS IS EXPERIMENTAL
-		self.place_pose = place_pose
 
 		self.curr_pos = None
 
@@ -333,18 +304,17 @@ class PIDVelJaco(object):
 		# read the current joint torques from the robot
 		torque_curr = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
 
-		#print "Current torque: " + str(torque_curr)
-		self.interaction = False
+		interaction = False
 		for i in range(7):
 			THRESHOLD = INTERACTION_TORQUE_THRESHOLD[i]
-			if np.fabs(torque_curr[i][0]) > THRESHOLD:
-				self.interaction = True
+			if np.fabs(torque_curr[i][0]) > THRESHOLD and self.reached_start:
+				interaction = True
 			else:
 				# zero out torques below threshold for cleanliness
 				torque_curr[i][0] = 0.0
 
 		# if experienced large enough interaction force, then deform traj
-		if self.interaction:
+		if interaction:
 			print "--- INTERACTION ---"
 			print "u_h: " + str(torque_curr)
 			if self.reached_start and not self.reached_goal:
@@ -433,15 +403,12 @@ class PIDVelJaco(object):
 				timestamp = time.time() - self.path_start_T
 				#self.expUtil.update_weights(timestamp, self.weights)
 			else:
-				#print "NOT AT START"
+				print "NOT AT START"
 				# if not at start of trajectory yet, set starting position 
 				# of the trajectory as the current target position
 				self.target_pos = self.start_pos
 		else:
-			#print "REACHED START --> EXECUTING PATH"
-
 			t = time.time() - self.path_start_T
-			#print "t: " + str(t)
 
 			# get next target position from position along trajectory
 
@@ -449,7 +416,7 @@ class PIDVelJaco(object):
 
 			# check if the arm reached the goal, and restart path
 			if not self.reached_goal:
-
+				#print "REACHED START --> EXECUTING PATH"
 				dist_from_goal = -((curr_pos - self.goal_pos + math.pi)%(2*math.pi) - math.pi)
 				dist_from_goal = np.fabs(dist_from_goal)
 
@@ -468,21 +435,20 @@ class PIDVelJaco(object):
 				self.expUtil.set_endT(time.time())
 
 if __name__ == '__main__':
-	if len(sys.argv) < 8:
-		print "ERROR: Not enough arguments. Specify ID, task, method_type, demo, record, feat_method, feat_list"
+	if len(sys.argv) < 9:
+		print "ERROR: Not enough arguments. Specify ID, method_type, demo, record, feat_method, feat_list"
 	else:
-        ID = int(sys.argv[1])
-        task = sys.argv[2]
-        method_type = sys.argv[3]
-        demo = sys.argv[4]
-        record = sys.argv[5]
-        feat_method = sys.argv[6]
-        feat_list = [x.strip() for x in sys.argv[7].split(',')]
-        traj_cache = traj_rand = traj_optimal = None
-    if len(sys.argv) > 7
-        traj_cache = sys.argv[8]
-        traj_rand = sys.argv[9]
-        traj_optimal = sys.argv[10]
-	PIDVelJaco(ID,task,method_type,demo,record,feat_method,feat_list,traj_cache,traj_rand,traj_optimal)
+		ID = int(sys.argv[1])
+		method_type = sys.argv[2]
+		demo = sys.argv[3]
+		record = sys.argv[4]
+		feat_method = sys.argv[5]
+		feat_list = [x.strip() for x in sys.argv[6].split(',')]
+		traj_cache = traj_rand = traj_optimal = None
+	if len(sys.argv) > 9:
+        traj_cache = sys.argv[7]
+        traj_rand = sys.argv[8]
+        traj_optimal = sys.argv[9]
+	PIDVelJaco(ID,method_type,demo,record,feat_method,feat_list,traj_cache,traj_rand,traj_optimal)
 
 
