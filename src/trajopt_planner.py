@@ -26,7 +26,7 @@ import itertools
 import pickle
 
 # feature constacts (update gains and max weights)
-UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0}
+UPDATE_GAINS = {'table':1.0, 'coffee':1.0, 'laptop':100.0}
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0}
 FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554}
 
@@ -649,7 +649,7 @@ class Planner(object):
 				max_weights[feat] = MAX_WEIGHTS[self.feat_list[feat]]
 				feat_range[feat] = FEAT_RANGE[self.feat_list[feat]]
 			update = Phi_p - Phi
-
+			
 			if self.feat_method == ALL:
 				# update all weights 
 				curr_weight = self.weights - np.dot(update_gains, update[1:])
@@ -664,34 +664,39 @@ class Planner(object):
 				curr_weight = [self.weights[i] for i in range(len(self.weights))]
 				curr_weight[max_idx] = curr_weight[max_idx] - update_gains[max_idx]*update[max_idx+1]
 			elif self.feat_method == BETA:
-
 				# Define minimization function
+				lambda1 = 1
+				update = update[1:]
+				Phi_p = Phi_p[1:]
+				Phi = Phi[1:]
 				def u_minimizer(u):
-					lambda1 = 1
+					u = np.reshape(u, (7,1))
 					(waypts_deform_p, waypts_prev) = self.deform(u)
 					H_features = self.featurize(waypts_deform_p)
-					R_features = self.featurize(waypts_prev)
-					Phi_H = np.array([H_features[0]] + [sum(x) for x in H_features[1:]])
-					Phi_R = np.array([R_features[0]] + [sum(x) for x in R_features[1:]])
-					cost = norm(u)^2 + lambda1 * sum((Phi_H[1:] - Phi_R[1:] - update)^2)
+					Phi_H = np.array([sum(x) for x in H_features[1:]])
+					cost = np.linalg.norm(u)**2 + lambda1 * sum((Phi_H - Phi - update)**2)
 					return cost
-
+				
 				# First compute what the optimal action would have been
-				u_H_star = minimize(u_minimizer, u_H)
-
+				u_h_opt = minimize(u_minimizer, u_h)
+				u_h_star = np.reshape(u_h_opt.x, (7, 1)) 
+				
 				# Compute beta
-				beta = 1/(norm(u_H)^2 - norm(u_H_star)^2)
-				beta = min(1, beta)
+				(waypts_deform_p, waypts_prev) = self.deform(u_h_star)
+				H_star_features = self.featurize(waypts_deform_p)
+				Phi_star = np.array([sum(x) for x in H_star_features[1:]])
+				cost = lambda1 * (Phi_p - Phi_star) * (Phi_p + Phi_star - 2 * update - 2 * Phi)
+				beta = 1/(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2 + cost)
 
 				# Compute new weights
-				curr_weight = self.weights - beta * np.dot(update_gains, update[1:])
+				curr_weight = self.weights - beta * np.dot(update_gains, update)
 
 			# clip values at max and min allowed weights
 			for i in range(self.num_features):
 				curr_weight[i] = np.clip(curr_weight[i], -max_weights[i], max_weights[i])
 
-			#print "here are the old weights:", self.weights
-			#print "here are the new weights:", curr_weight
+			print "here are the old weights:", self.weights
+			print "here are the new weights:", curr_weight
 
 			self.weights = curr_weight
 			return self.weights
