@@ -732,7 +732,7 @@ class Planner(object):
 		---
 		input trajectory parameters, update raw and upsampled trajectories
 		"""
-		if weights == None:
+		if weights is None:
 			return
 		self.start_time = start_time
 		self.final_time = final_time

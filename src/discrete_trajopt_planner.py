@@ -25,7 +25,7 @@ import itertools
 import pickle
 
 # feature constacts (update gains and max weights)
-UPDATE_GAINS = {'table':1.0, 'coffee':1.0, 'laptop':100.0}
+UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0}
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0}
 FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554}
 
@@ -46,8 +46,8 @@ class DiscretePlanner(object):
 	def __init__(self, feat_method, feat_list, traj_cache=None, traj_rand=None, traj_optimal=None):
 
 		# ---- important discrete variables ---- #
-		self.weights_dict = [[0.5], [0], [-0.5]]
-		self.betas_dict = [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.]
+		self.weights_dict = [[-1.0, -1.0], [-1.0, 0.], [-1.0, 1.0], [0., -1.0], [0., 0.], [0., 1.0], [1.0, -1.0], [1.0, 0.], [1.0, 1.0]]
+		self.betas_dict = [0.001, 0.003, 0.01, 0.03, 0.1, 0.3]
 
 		self.num_betas = len(self.betas_dict)
 		self.num_weights = len(self.weights_dict)
@@ -448,6 +448,7 @@ class DiscretePlanner(object):
 		init_joint_target =  goal
 
 		init_waypts = np.zeros((self.num_waypts_plan,7))
+
 		for count in range(self.num_waypts_plan):
 			init_waypts[count,:] = start + count/(self.num_waypts_plan - 1.0)*(goal - start)
 
@@ -564,7 +565,6 @@ class DiscretePlanner(object):
 		else:
 			print "using traj seed!"
 			init_waypts = traj_seed
-			print init_waypts
 
 		if self.traj_cache is not None:
 			# choose seeding trajectory from cache if the weights match
@@ -687,11 +687,26 @@ class DiscretePlanner(object):
 				curr_weight = [self.weights[i] for i in range(len(self.weights))]
 				curr_weight[max_idx] = curr_weight[max_idx] - update_gains[max_idx]*update[max_idx+1]
 			elif self.feat_method == BETA:
+				# If we deform all optimals, first precmpute the deformations
+				if self.deform_method == "ALL":
+					traj_optimal_deform = [0] * self.num_weights
+					for weight_i in range(self.num_weights):
+						curr_timestep = self.waypts_time[self.curr_waypt_idx]
+						u_h_prime = (waypts_deform[curr_timestep] - self.traj_optimal[weight_i][curr_timestep])
+						(waypts_partial, _) = self.deform(u_h) # TODO: this isn't correct; yelp?
+						traj_optimal_deform = [waypts_prev[:curr_timestep]] + [waypts_partial]
+
+				# Now compute probabilities for each beta and theta in the dictionary
 				P_xi = np.zeros((self.num_betas, self.num_weights))
 				for (weight_i, weight) in enumerate(self.weights_dict):
 					for (beta_i, beta) in enumerate(self.betas_dict):
 						# Compute -beta*(weight^T*Phi(xi_H))
-						numerator = -beta * np.dot([1] + weight, Phi_p)
+						if self.deform_method == "ONE":
+							numerator = -beta * np.dot([1] + weight, Phi_p)
+						elif self.deform_method == "ALL":
+							curr_features = self.featurize(traj_optimal_deform[weight_i])
+							Phi_curr = np.array([curr_features[0]] + [sum(x) for x in curr_features[1:]])
+							numerator = -beta * np.dot([1] + weight, Phi_curr)
 
 						# Calculate the integral in log space
 						num_trajs = self.traj_rand.shape[0]
@@ -702,6 +717,7 @@ class DiscretePlanner(object):
 							curr_traj = self.traj_rand[rand_i]
 							rand_features = self.featurize(curr_traj)
 							Phi_rand = np.array([rand_features[0]] + [sum(x) for x in rand_features[1:]])
+
 							# Compute each denominator log
 							logdenom[rand_i] = -beta * np.dot([1] + weight, Phi_rand)
 						
@@ -736,15 +752,14 @@ class DiscretePlanner(object):
 					curr_weight = np.matmul(P_weight, self.weights_dict)
 
 				self.P_bt = posterior
+				print self.P_bt
+				print(sum(self.P_bt, 0))
 
 			print "curr_weight after = " + str(curr_weight)
-			print self.P_bt
+
 			# clip values at max and min allowed weights
 			for i in range(self.num_features):
 				curr_weight[i] = np.clip(curr_weight[i], -max_weights[i], max_weights[i])
-
-			#print "here are the old weights:", self.weights
-			#print "here are the new weights:", curr_weight
 
 			self.weights = curr_weight
 			return self.weights
@@ -777,7 +792,7 @@ class DiscretePlanner(object):
 		---
 		input trajectory parameters, update raw and upsampled trajectories
 		"""
-		if weights == None:
+		if weights is None:
 			return
 		self.start_time = start_time
 		self.final_time = final_time
@@ -791,10 +806,7 @@ class DiscretePlanner(object):
 		else:
 			self.trajOpt(start, goal, traj_seed=seed)
 
-		#print "waypts_plan after trajopt: " + str(self.waypts_plan)
 		self.upsample(step_time)
-		#print "waypts_plan after upsampling: " + str(self.waypts_plan)
-		#plotTraj(self.env,self.robot,self.bodies,self.waypts_plan, [0, 0, 1])
 
 		return self.waypts_plan
 

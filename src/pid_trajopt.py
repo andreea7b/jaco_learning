@@ -146,7 +146,6 @@ class PIDVelJaco(object):
 			place = place_higher
 		if 'coffee' in self.feat_list:
 			pick = pick_basic_EEtilt
-			place = place_pose
 
 		start = np.array(pick)*(math.pi/180.0)
 		goal = np.array(place)*(math.pi/180.0)

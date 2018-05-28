@@ -149,7 +149,6 @@ class PIDVelJaco(object):
 			place = place_higher
 		if 'coffee' in self.feat_list:
 			pick = pick_basic_EEtilt
-			place = place_pose
 
 		start = np.array(pick)*(math.pi/180.0)
 		goal = np.array(place)*(math.pi/180.0)
@@ -315,8 +314,8 @@ class PIDVelJaco(object):
 
 		# if experienced large enough interaction force, then deform traj
 		if interaction:
-			print "--- INTERACTION ---"
-			print "u_h: " + str(torque_curr)
+			#print "--- INTERACTION ---"
+			#print "u_h: " + str(torque_curr)
 			if self.reached_start and not self.reached_goal:
 				timestamp = time.time() - self.path_start_T
 				self.expUtil.update_tauH(timestamp, torque_curr)

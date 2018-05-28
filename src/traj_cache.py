@@ -7,10 +7,11 @@ if __name__ == '__main__':
 	place_lower = [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 322.0]
 
 	pick_basic_EEtilt = [104.2, 151.6, 183.8, 101.8, 224.2, 216.9, 200.0]
+	place_pose = [-0.46513, 0.29041, 0.69497]
 
 	# initialize start/goal based on task 
-	pick = pick_basic # pick_basic_EEtilt  
-	place = place_lower #place_lower 
+	pick = pick_basic_EEtilt  
+	place = place_lower
 
 	start = np.array(pick)*(math.pi/180.0)
 	goal = np.array(place)*(math.pi/180.0)
@@ -18,13 +19,11 @@ if __name__ == '__main__':
 	T = 20.0
 
 	feat_method = "ALL"
-	feat_list = "table"
-	planner = Planner(feat_method, feat_list)
-
-	MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0}
-
+	feat_list = "table,coffee"
 	feat_list = [x.strip() for x in feat_list.split(',')]
 	num_features = len(feat_list)
+	planner = Planner(feat_method, feat_list)
+	MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0}
 
 	weights_span = [None]*num_features
 	for feat in range(0,num_features):

@@ -12,9 +12,10 @@ if __name__ == '__main__':
 
     # This is in case you care about coffee feature too
 	pick_basic_EEtilt = [104.2, 151.6, 183.8, 101.8, 224.2, 216.9, 200.0]
+	place_pose = [-0.46513, 0.29041, 0.69497]
 
 	# initialize start/goal based on task 
-	pick = pick_basic
+	pick = pick_basic_EEtilt
 	place = place_lower
 
 	start = np.array(pick)*(math.pi/180.0)
@@ -23,15 +24,14 @@ if __name__ == '__main__':
 	T = 20.0
 
 	feat_method = "ALL"
-	feat_list = "table"
-	planner = DiscretePlanner(feat_method, feat_list)
-
+	feat_list = "table,coffee"
 	feat_list = [x.strip() for x in feat_list.split(',')]
 	num_features = len(feat_list)
+	planner = DiscretePlanner(feat_method, feat_list)
 
-	rand_thetas = [-0.5, 0, 0.5]
-	weights_span = num_features * [rand_thetas]
-	weights_pairs = list(itertools.product(*weights_span))
+	#rand_thetas = [-0.5, 0, 0.5]
+	#weights_span = num_features * [rand_thetas]
+	#weights_pairs = list(itertools.product(*weights_span))
 	weights_pairs = planner.weights_dict #might want this instead
 	num_trajs = len(weights_pairs)
 	traj_rand = [0] * num_trajs
