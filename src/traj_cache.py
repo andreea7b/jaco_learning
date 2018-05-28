@@ -21,7 +21,6 @@ if __name__ == '__main__':
 	feat_list = "table"
 	planner = Planner(feat_method, feat_list)
 
-	traj_cache = {}
 	MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0}
 
 	feat_list = [x.strip() for x in feat_list.split(',')]
@@ -33,11 +32,12 @@ if __name__ == '__main__':
 		weights_span[feat] = list(np.arange(-limit, limit+.1, limit/2))
 
 	weight_pairs = list(itertools.product(*weights_span))
-
-
+	num_trajs = len(weight_pairs)
+	traj_cache = [0] * num_trajs
+	
 	for (w_i, w) in enumerate(weight_pairs):
 		traj = planner.replan(start, goal, w, 0.0, T, 0.5)	
-		traj_cache[w] = traj
+		traj_cache[w_i] = traj
 
 	traj_cache = np.array(traj_cache)
 	print traj_cache

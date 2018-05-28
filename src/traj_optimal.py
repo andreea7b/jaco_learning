@@ -31,7 +31,8 @@ if __name__ == '__main__':
 	traj_optimal = [0] * num_trajs
 
 	for (w_i, weights) in enumerate(weights_pairs):
-		traj = planner.replan(start, goal, weights, 0.0, T, 0.5)
+		planner.replan(start, goal, weights, 0.0, T, 0.5)
+		traj = planner.waypts
 		traj_optimal[w_i] = traj
 
 	traj_optimal = np.array(traj_optimal)

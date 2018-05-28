@@ -1,4 +1,4 @@
-from trajopt_planner import *
+from discrete_trajopt_planner import *
 import pickle
 import numpy as np
 import itertools
@@ -24,7 +24,7 @@ if __name__ == '__main__':
 
 	feat_method = "ALL"
 	feat_list = "table"
-	planner = Planner(feat_method, feat_list)
+	planner = DiscretePlanner(feat_method, feat_list)
 
 	feat_list = [x.strip() for x in feat_list.split(',')]
 	num_features = len(feat_list)
@@ -32,11 +32,13 @@ if __name__ == '__main__':
 	rand_thetas = [-0.5, 0, 0.5]
 	weights_span = num_features * [rand_thetas]
 	weights_pairs = list(itertools.product(*weights_span))
+	weights_pairs = planner.weights_dict #might want this instead
 	num_trajs = len(weights_pairs)
 	traj_rand = [0] * num_trajs
 
 	for (w_i, weights) in enumerate(weights_pairs):
-		traj = planner.replan(start, goal, weights, 0.0, T, 0.5)
+		planner.replan(start, goal, weights, 0.0, T, 0.5)
+		traj = planner.waypts
  		traj_rand[w_i] = traj
 
 	traj_rand = np.array(traj_rand)

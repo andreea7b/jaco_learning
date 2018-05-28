@@ -25,7 +25,7 @@ import itertools
 import pickle
 
 # feature constacts (update gains and max weights)
-UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0}
+UPDATE_GAINS = {'table':1.0, 'coffee':1.0, 'laptop':100.0}
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0}
 FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554}
 
@@ -46,8 +46,8 @@ class DiscretePlanner(object):
 	def __init__(self, feat_method, feat_list, traj_cache=None, traj_rand=None, traj_optimal=None):
 
 		# ---- important discrete variables ---- #
-		self.weights_dict = [[0.5,0], [0,0], [-0.5,0]]
-		self.betas_dict = [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1]
+		self.weights_dict = [[0.5], [0], [-0.5]]
+		self.betas_dict = [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.]
 
 		self.num_betas = len(self.betas_dict)
 		self.num_weights = len(self.weights_dict)
@@ -55,6 +55,10 @@ class DiscretePlanner(object):
 		# Construct uninformed prior
 		P_bt = np.ones((self.num_betas, self.num_weights))
 		self.P_bt = 1.0/self.num_betas * P_bt
+
+		# Decide on planning and deformation
+		self.replan_weights = "WEIGHTED"    # can be ARGMAX, MEAN or WEIGHTED
+		self.deform_method = "ONE"		# can be ONE or ALL
 
 		# ---- important internal variables ---- #
 		self.feat_method = feat_method	# can be ALL, MAX, or BETA
@@ -453,19 +457,22 @@ class DiscretePlanner(object):
 			min_dist_w = [None]*self.num_features
 			for feat in range(0,self.num_features):
 				limit = MAX_WEIGHTS[self.feat_list[feat]]
-				weights_span[feat] = range(-limit, limit+1, limit/2)
+				weights_span[feat] = list(np.arange(-limit, limit+.1, limit/2))
 				min_dist_w[feat] = -limit
 
 			weight_pairs = list(itertools.product(*weights_span))
+			weight_pairs = [np.array(i) for i in weight_pairs]
 
 			# current weights
-			w = self.weights
-			for w_i in weight_pairs:
-				dist = np.linalg.norm(w-w_i)
-				if dist < np.linalg.norm(w-min_dist_w):
-					min_dist_w = w_i
+			cur_w = np.array(self.weights)
+			min_dist_idx = 0
+			for (w_i, w) in enumerate(weight_pairs):
+				dist = np.linalg.norm(cur_w - w)
+				if dist < np.linalg.norm(cur_w - min_dist_w):
+					min_dist_w = w
+					min_dist_idx = w_i
 
-		init_waypts = np.array(self.traj_cache[min_dist_w])
+			init_waypts = np.array(self.traj_cache[min_dist_idx])
 
 		request = {
 			"basic_info": {
@@ -565,22 +572,22 @@ class DiscretePlanner(object):
 			min_dist_w = [None]*self.num_features
 			for feat in range(0,self.num_features):
 				limit = MAX_WEIGHTS[self.feat_list[feat]]
-				weights_span[feat] = range(-limit, limit+1, limit/2)
+				weights_span[feat] = list(np.arange(-limit, limit+.1, limit/2))
 				min_dist_w[feat] = -limit
 
 			weight_pairs = list(itertools.product(*weights_span))
+			weight_pairs = [np.array(i) for i in weight_pairs]
 
 			# current weights
-			w = self.weights
-			for w_i in weight_pairs:
-				dist = np.linalg.norm(w-w_i)
-				if dist < np.linalg.norm(w-min_dist_w):
-					min_dist_w = w_i
+			cur_w = np.array(self.weights)
+			min_dist_idx = 0
+			for (w_i, w) in enumerate(weight_pairs):
+				dist = np.linalg.norm(cur_w - w)
+				if dist < np.linalg.norm(cur_w - min_dist_w):
+					min_dist_w = w
+					min_dist_idx = w_i
 
-			init_waypts = np.array(self.traj_cache[min_dist_w])
-
-		#print "init_waypts: " + str(init_waypts)
-		#print "start config: " + str(start)
+			init_waypts = np.array(self.traj_cache[min_dist_idx])
 
 		request = {
 			"basic_info": {
@@ -647,7 +654,7 @@ class DiscretePlanner(object):
 		input is human force and returns updated weights
 		"""
 		(waypts_deform, waypts_prev) = self.deform(u_h)
-		if waypts_deform != None:
+		if waypts_deform is not None:
 			new_features = self.featurize(waypts_deform)
 			old_features = self.featurize(waypts_prev)
 			Phi_p = np.array([new_features[0]] + [sum(x) for x in new_features[1:]])
@@ -688,7 +695,7 @@ class DiscretePlanner(object):
 
 						# Calculate the integral in log space
 						num_trajs = self.traj_rand.shape[0]
-						logdenom = np.zeros((1, num_trajs))
+						logdenom = np.zeros((num_trajs,1))
 
 						# Compute costs for each of the random trajectories
 						for rand_i in range(num_trajs):
@@ -697,37 +704,41 @@ class DiscretePlanner(object):
 							Phi_rand = np.array([rand_features[0]] + [sum(x) for x in rand_features[1:]])
 							# Compute each denominator log
 							logdenom[rand_i] = -beta * np.dot([1] + weight, Phi_rand)
-
+						
 						# Compute the sum in log space
 						A_max = max(logdenom)
 						expdif = logdenom - A_max
-						denom = A + log(sum(exp(expdif)))
+						denom = A_max + np.log(sum(np.exp(expdif)))
 
 						# Get P(xi_H | beta, weight) by dividing them
 						P_xi[beta_i][weight_i] = np.exp(numerator - denom)
-				P_obs = P_xi / sum(P_xi)
+
+				P_obs = P_xi / sum(sum(P_xi))
 
 				# Compute P(weight, beta | xi_H) via Bayes rule
 				posterior = np.multiply(P_obs, self.P_bt)
 
 				# Normalize posterior
-				posterior = posterior / sum(posterior)
+				posterior = posterior / sum(sum(posterior))
 
-				# Get optimal weight and beta by doing argmax
-				#(best_beta_i, best_weight_i) = np.unravel_index(np.argmax(posterior), posterior.shape)
-				# Compute optimal expected weight
-				P_weight = sum(posterior, 0)
-				curr_weight = np.sum(np.transpose(weights_dict)*P_weight, 1)
-
-				# Another method uses beta-weighted expected weight
-				#P_weight = np.matmul(np.transpose(posterior), betas_dict)
-				#P_weight = P_weight / sum(P_weight,0)
-				#curr_weight = np.transpose(P_weight) * weights_dict
+				if self.replan_weights == "ARGMAX":
+					# Get optimal weight and beta by doing argmax
+					(best_beta_i, best_weight_i) = np.unravel_index(np.argmax(posterior), posterior.shape)
+					curr_weight = self.weights_dict[best_weight_i]
+				elif self.replan_weights == "MEAN":
+					# Compute optimal expected weight
+					P_weight = sum(posterior, 0)
+					curr_weight = np.sum(np.transpose(self.weights_dict)*P_weight, 1)
+				elif self.replan_weights == "WEIGHTED":
+					# Another method uses beta-weighted expected weight
+					P_weight = np.matmul(np.transpose(posterior), self.betas_dict)
+					P_weight = P_weight / sum(P_weight,0)
+					curr_weight = np.matmul(P_weight, self.weights_dict)
 
 				self.P_bt = posterior
 
-			#print "curr_weight after = " + str(curr_weight)
-
+			print "curr_weight after = " + str(curr_weight)
+			print self.P_bt
 			# clip values at max and min allowed weights
 			for i in range(self.num_features):
 				curr_weight[i] = np.clip(curr_weight[i], -max_weights[i], max_weights[i])
@@ -780,7 +791,7 @@ class DiscretePlanner(object):
 		else:
 			self.trajOpt(start, goal, traj_seed=seed)
 
-        #print "waypts_plan after trajopt: " + str(self.waypts_plan)
+		#print "waypts_plan after trajopt: " + str(self.waypts_plan)
 		self.upsample(step_time)
 		#print "waypts_plan after upsampling: " + str(self.waypts_plan)
 		#plotTraj(self.env,self.robot,self.bodies,self.waypts_plan, [0, 0, 1])

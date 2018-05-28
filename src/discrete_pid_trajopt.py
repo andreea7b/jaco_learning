@@ -18,7 +18,7 @@ import actionlib
 import time
 import discrete_trajopt_planner
 import ros_utils
-import experiment_utils
+import exp_utils.experiment_utils
 
 import kinova_msgs.msg
 import geometry_msgs.msg
@@ -97,12 +97,12 @@ class PIDVelJaco(object):
 
 		# can be strings 'table', 'coffee', 'human', 'origin', 'laptop'
 		self.feat_list = feat_list
-        self.num_feats = len(self.feat_list)
+		self.num_feats = len(self.feat_list)
 
-        # trajectory paths
-        self.traj_cache = traj_cache
-        self.traj_optimal = traj_optimal
-        self.traj_rand = traj_rand
+		# trajectory paths
+		self.traj_cache = traj_cache
+		self.traj_optimal = traj_optimal
+		self.traj_rand = traj_rand
 
 		# optimal demo mode
 		if demo == "F" or demo == "f":
@@ -202,7 +202,7 @@ class PIDVelJaco(object):
 
 		# ---- Experimental Utils ---- #
 
-		self.expUtil = experiment_utils.ExperimentUtils()
+		self.expUtil = exp_utils.experiment_utils.ExperimentUtils()
 		# update the list of replanned trajectories with new trajectory
 		self.expUtil.update_replanned_trajList(0.0, self.traj)
 
@@ -246,8 +246,8 @@ class PIDVelJaco(object):
 				method = "A"
 			elif self.feat_method == MAX:
 				method = "B"
-            elif self.feat_method == BETA:
-                method = "C"
+			elif self.feat_method == BETA:
+				method = "C"
 
 			weights_filename = "weights" + str(ID) + str(self.num_feat) + method
 			force_filename = "force" + str(ID) + str(self.num_feat) + method
@@ -321,23 +321,23 @@ class PIDVelJaco(object):
 				timestamp = time.time() - self.path_start_T
 				self.expUtil.update_tauH(timestamp, torque_curr)
 
-                if self.method_type == LEARNING:
-                    self.weights = self.planner.learnWeights(torque_curr)
+				if self.method_type == LEARNING:
+					self.weights = self.planner.learnWeights(torque_curr)
 
-                    print "in joint torques callback: going to plan..."
-                    self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=self.traj)
-                    print "in joint torques callback: finished planning -- self.traj = " + str(self.traj)
+					print "in joint torques callback: going to plan..."
+					self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=self.traj)
+					print "in joint torques callback: finished planning -- self.traj = " + str(self.traj)
 
-                    # update the experimental data with new weights
-			        timestamp = time.time() - self.path_start_T
-				    self.expUtil.update_weights(timestamp, self.weights)
+					# update the experimental data with new weights
+					timestamp = time.time() - self.path_start_T
+					self.expUtil.update_weights(timestamp, self.weights)
 
-				    # update the list of replanned trajectories with new trajectory
-				    self.expUtil.update_replanned_trajList(timestamp, self.traj)
+					# update the list of replanned trajectories with new trajectory
+					self.expUtil.update_replanned_trajList(timestamp, self.traj)
 
-				    # store deformed trajectory
-				    deformed_traj = self.planner.get_waypts_plan()
-				    self.expUtil.update_deformed_traj(deformed_traj)
+					# store deformed trajectory
+					deformed_traj = self.planner.get_waypts_plan()
+					self.expUtil.update_deformed_traj(deformed_traj)
 
 	def joint_angles_callback(self, msg):
 		"""
@@ -429,7 +429,7 @@ class PIDVelJaco(object):
 				if is_at_goal:
 					self.reached_goal = True
 			else:
-				print "REACHED GOAL! Holding position at goal."
+				#print "REACHED GOAL! Holding position at goal."
 				self.target_pos = self.goal_pos
 				# TODO: this should only set it once!
 				self.expUtil.set_endT(time.time())
@@ -445,10 +445,18 @@ if __name__ == '__main__':
 		feat_method = sys.argv[5]
 		feat_list = [x.strip() for x in sys.argv[6].split(',')]
 		traj_cache = traj_rand = traj_optimal = None
-	if len(sys.argv) > 9:
-        traj_cache = sys.argv[7]
-        traj_rand = sys.argv[8]
-        traj_optimal = sys.argv[9]
+		if sys.argv[7] == 'None':
+			traj_cache = None
+		else:
+			traj_cache = sys.argv[7]
+		if sys.argv[8] == 'None':
+			traj_rand = None
+		else:
+			traj_rand = sys.argv[8]
+		if sys.argv[9] == 'None':
+			traj_optimal = None
+		else:
+			traj_optimal = sys.argv[9]
 	PIDVelJaco(ID,method_type,demo,record,feat_method,feat_list,traj_cache,traj_rand,traj_optimal)
 
 

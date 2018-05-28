@@ -426,7 +426,7 @@ class PIDVelJaco(object):
 				if is_at_goal:
 					self.reached_goal = True
 			else:
-				#print "REACHED GOAL! Holding position at goal."
+				print "REACHED GOAL! Holding position at goal."
 				self.target_pos = self.goal_pos
 				# TODO: this should only set it once!
 				self.expUtil.set_endT(time.time())
@@ -441,9 +441,10 @@ if __name__ == '__main__':
 		record = sys.argv[4]
 		feat_method = sys.argv[5]
 		feat_list = [x.strip() for x in sys.argv[6].split(',')]
-		traj_cache = None
-	if len(sys.argv) > 9:
-		traj_cache = sys.argv[7]
+		if sys.argv[7] == 'None':
+			traj_cache = None
+		else:
+			traj_cache = sys.argv[7]
 	PIDVelJaco(ID,method_type,demo,record,feat_method,feat_list,traj_cache)
 
 

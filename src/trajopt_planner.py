@@ -442,15 +442,18 @@ class Planner(object):
 				min_dist_w[feat] = -limit
 
 			weight_pairs = list(itertools.product(*weights_span))
+			weight_pairs = [np.array(i) for i in weight_pairs]
 
 			# current weights
-			w = self.weights
-			for w_i in weight_pairs:
-				dist = np.linalg.norm(w-w_i)
-				if dist < np.linalg.norm(w-min_dist_w):
-					min_dist_w = w_i
+			cur_w = np.array(self.weights)
+			min_dist_idx = 0
+			for (w_i, w) in enumerate(weight_pairs):
+				dist = np.linalg.norm(cur_w - w)
+				if dist < np.linalg.norm(cur_w - min_dist_w):
+					min_dist_w = w
+					min_dist_idx = w_i
 
-			init_waypts = np.array(self.traj_cache[min_dist_w])
+			init_waypts = np.array(self.traj_cache[min_dist_idx])
 
 		request = {
 			"basic_info": {
@@ -553,18 +556,18 @@ class Planner(object):
 				min_dist_w[feat] = -limit
 
 			weight_pairs = list(itertools.product(*weights_span))
+			weight_pairs = [np.array(i) for i in weight_pairs]
 
 			# current weights
-			w = self.weights
-			for w_i in weight_pairs:
-				dist = np.linalg.norm(w-w_i)
-				if dist < np.linalg.norm(w-min_dist_w):
-					min_dist_w = w_i
+			cur_w = np.array(self.weights)
+			min_dist_idx = 0
+			for (w_i, w) in enumerate(weight_pairs):
+				dist = np.linalg.norm(cur_w - w)
+				if dist < np.linalg.norm(cur_w - min_dist_w):
+					min_dist_w = w
+					min_dist_idx = w_i
 
-			init_waypts = np.array(self.traj_cache[min_dist_w])
-
-			#print "init_waypts: " + str(init_waypts)
-			#print "start config: " + str(start)
+			init_waypts = np.array(self.traj_cache[min_dist_idx])
 
 		request = {
 			"basic_info": {
