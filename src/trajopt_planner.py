@@ -32,6 +32,8 @@ FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554}
 
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [0.0, 0.2, 0.0]
+INTERACTION_TORQUE_THRESHOLD = [5, 21, 2, 8, 2, 5, 2] # threshold when interaction is measured 
+MAX_CMD_TORQUE = 40.0								  # max command robot can send
 
 # feature learning methods
 ALL = "ALL"					# updates all features
@@ -672,32 +674,44 @@ class Planner(object):
 				update = update[1:]
 				Phi_p = Phi_p[1:]
 				Phi = Phi[1:]
+
+				# Set up the optimization problem:
 				def u_minimizer(u):
+					u = np.fmax(np.fabs(u), INTERACTION_TORQUE_THRESHOLD) - INTERACTION_TORQUE_THRESHOLD
 					u = np.reshape(u, (7,1))
 					(waypts_deform_p, waypts_prev) = self.deform(u)
 					H_features = self.featurize(waypts_deform_p)
 					Phi_H = np.array([sum(x) for x in H_features[1:]])
-					cost = np.linalg.norm(u)**2 + lambda1 * sum((Phi_H - Phi - update)**2)
+					cost = np.linalg.norm(u)**2 
 					return cost
-				
-				# First compute what the optimal action would have been
-				u_h_opt = minimize(u_minimizer, u_h)
-				u_h_star = np.reshape(u_h_opt.x, (7, 1)) 
-				
-				# Compute beta
-				(waypts_deform_p, waypts_prev) = self.deform(u_h_star)
-				H_star_features = self.featurize(waypts_deform_p)
-				Phi_star = np.array([sum(x) for x in H_star_features[1:]])
-				cost = lambda1 * (Phi_p - Phi_star) * (Phi_p + Phi_star - 2 * update - 2 * Phi)
-				beta = 1/(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2 + cost)
 
+				# Set up the constraints:
+				def u_constraint(u):
+					u = np.reshape(u, (7,1))
+					(waypts_deform_p, waypts_prev) = self.deform(u)
+					H_features = self.featurize(waypts_deform_p)
+					Phi_H = np.array([sum(x) for x in H_features[1:]])
+					cost = lambda1 * sum((Phi_H - Phi - update)**2)
+					return cost
+
+				# First compute what the optimal action would have been
+				u_h_opt = minimize(u_minimizer, u_h, method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 1e5, 'disp': True})
+				#u_h_opt = minimize(u_minimizer, u_h, options={'maxiter': 1e5, 'disp': True})
+				#u_h_star = np.fmax(u_h_opt.x, INTERACTION_TORQUE_THRESHOLD) - INTERACTION_TORQUE_THRESHOLD
+				u_h_star = np.reshape(u_h_opt.x, (7, 1)) 
+
+				# Compute beta
+				beta = 1/(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2)
+				print "here is u_h and its norm:", u_h, np.linalg.norm(u_h)
+				print "here is optimal u_h and its norm:", u_h_star, np.linalg.norm(u_h_star)
+				print "here is beta:", beta
 				# Compute new weights
 				curr_weight = self.weights - beta * np.dot(update_gains, update)
 
 			# clip values at max and min allowed weights
 			for i in range(self.num_features):
 				curr_weight[i] = np.clip(curr_weight[i], -max_weights[i], max_weights[i])
-
+			print "here is the update:", update
 			print "here are the old weights:", self.weights
 			print "here are the new weights:", curr_weight
 
@@ -722,7 +736,6 @@ class Planner(object):
 		waypts_deform[deform_waypt_idx : self.n + deform_waypt_idx, :] += gamma
 		#plotTraj(self.env, self.robot, self.bodies, self.waypts_plan, [1, 0, 0])
 		return (waypts_deform, waypts_prev)
-
 
 	# ---- replanning, upsampling, and interpolating ---- #
 

@@ -311,8 +311,8 @@ class PIDVelJaco(object):
 
 		# if experienced large enough interaction force, then deform traj
 		if interaction:
-			print "--- INTERACTION ---"
-			print "u_h: " + str(torque_curr)
+			#print "--- INTERACTION ---"
+			#print "u_h: " + str(torque_curr)
 			if self.reached_start and not self.reached_goal:
 				timestamp = time.time() - self.path_start_T
 				self.expUtil.update_tauH(timestamp, torque_curr)
@@ -425,7 +425,7 @@ class PIDVelJaco(object):
 				if is_at_goal:
 					self.reached_goal = True
 			else:
-				print "REACHED GOAL! Holding position at goal."
+				#print "REACHED GOAL! Holding position at goal."
 				self.target_pos = self.goal_pos
 				# TODO: this should only set it once!
 				self.expUtil.set_endT(time.time())
