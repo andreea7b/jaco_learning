@@ -31,6 +31,7 @@ FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554}
 
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [0.0, 0.2, 0.0]
+INTERACTION_TORQUE_THRESHOLD = [0, 18.0, -0.5, 5.0, -1.0, 0.0, 0.5]
 
 # feature learning methods
 ALL = "ALL"					# updates all features
@@ -96,6 +97,7 @@ class DiscretePlanner(object):
 
 		self.weights = [0.0]*self.num_features
 		self.waypts_prev = None
+		self.waypts_deform = None
 
 		# ---- Plotting weights & features over time ---- #
 		self.weight_update = None
@@ -638,9 +640,6 @@ class DiscretePlanner(object):
 		self.waypts_plan = result.GetTraj()
 		self.step_time_plan = (self.final_time - self.start_time)/(self.num_waypts_plan - 1)
 
-		#plotTraj(self.env,self.robot,self.bodies,self.waypts_plan, size=10,color=[0, 0, 1])
-		#plotCupTraj(self.env,self.robot,self.bodies,self.waypts_plan,color=[0,1,0])
-
 		return self.waypts_plan
 
 
@@ -656,6 +655,7 @@ class DiscretePlanner(object):
 		"""
 		(waypts_deform, waypts_prev) = self.deform(u_h)
 		if waypts_deform is not None:
+			self.waypts_deform = waypts_deform
 			new_features = self.featurize(waypts_deform)
 			old_features = self.featurize(waypts_prev)
 			Phi_p = np.array([new_features[0]] + [sum(x) for x in new_features[1:]])
@@ -696,7 +696,7 @@ class DiscretePlanner(object):
 						u_h_p = np.reshape(waypts_deform[curr_timestep] - self.traj_optimal[weight_i][curr_timestep], (7,1))
 						(waypts_partial, _) = self.deform_given_waypts(self.traj_optimal[weight_i], u_h_p)
 						traj_optimal_deform[weight_i] = np.concatenate((waypts_prev[:curr_timestep+1], waypts_partial[curr_timestep+1:]))
-
+					import pdb; pdb.set_trace()
 				# Now compute probabilities for each beta and theta in the dictionary
 				P_xi = np.zeros((self.num_betas, self.num_weights))
 				for (weight_i, weight) in enumerate(self.weights_dict):
@@ -782,6 +782,9 @@ class DiscretePlanner(object):
 			return (waypts_prev, waypts_prev)
 
 		for joint in range(7):
+			# zero-center the torque
+			if u_h[joint] != 0:
+				u_h[joint] -= INTERACTION_TORQUE_THRESHOLD[joint]
 			gamma[:,joint] = self.alpha*np.dot(self.H, u_h[joint])
 		waypts_deform[deform_waypt_idx : self.n + deform_waypt_idx, :] += gamma
 		return (waypts_deform, waypts_prev)
@@ -803,6 +806,9 @@ class DiscretePlanner(object):
 			return (waypts_prev, waypts_prev)
 
 		for joint in range(7):
+			# zero-center the torque
+			if u_h[joint] != 0:
+				u_h[joint] -= INTERACTION_TORQUE_THRESHOLD[joint]
 			gamma[:,joint] = self.alpha*np.dot(self.H, u_h[joint])
 		waypts_deform[deform_waypt_idx : self.n + deform_waypt_idx, :] += gamma
 		return (waypts_deform, waypts_prev)

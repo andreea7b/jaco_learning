@@ -15,7 +15,7 @@ if __name__ == '__main__':
 	place_pose = [-0.46513, 0.29041, 0.69497]
 
 	# initialize start/goal based on task 
-	pick = pick_basic_EEtilt
+	pick = pick_basic
 	place = place_lower
 
 	start = np.array(pick)*(math.pi/180.0)
@@ -24,7 +24,7 @@ if __name__ == '__main__':
 	T = 20.0
 
 	feat_method = "ALL"
-	feat_list = "table,coffee"
+	feat_list = "table"
 	feat_list = [x.strip() for x in feat_list.split(',')]
 	planner = DiscretePlanner(feat_method, feat_list)
 

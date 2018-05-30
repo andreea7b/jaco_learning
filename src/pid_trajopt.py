@@ -47,11 +47,11 @@ place_higher = [210.5,118.5,192.5,105.4,229.15,245.47,316.4]
 place_lower_EEtilt = [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 400.0]
 place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 
-epsilon = 0.50							# epislon for when robot think it's at goal
+epsilon = 0.10							# epislon for when robot think it's at goal
 MAX_CMD_TORQUE = 40.0					# max command robot can send
-INTERACTION_TORQUE_THRESHOLD = [0, 19, -0.5, 5.0, -1.0, 0.0, 0.5] # threshold when interaction is measured 
-INTERACTION_TORQUE_BALANCE = [.3, .7, .7, .3, .3, 1.6, 0]
-INTERACTION_TORQUE_EPSILON = [4.0, 4.0, 3.0, 3.0, 2.0, 2.0, 1.0]
+INTERACTION_TORQUE_THRESHOLD = [0, 18.0, -0.5, 5.0, -1.0, 0.0, 0.5] # threshold when interaction is measured 
+#INTERACTION_TORQUE_BALANCE = [.3, .7, .7, .3, .3, 1.6, 0]
+INTERACTION_TORQUE_EPSILON = [4.0, 5.0, 3.0, 4.0, 2.0, 2.0, 1.0]
 
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
 
@@ -161,6 +161,7 @@ class PIDVelJaco(object):
 			place = place_higher
 		if 'coffee' in self.feat_list:
 			pick = pick_basic_EEtilt
+
 		start = np.array(pick)*(math.pi/180.0)
 		goal = np.array(place)*(math.pi/180.0)
 		self.start = start
@@ -178,7 +179,7 @@ class PIDVelJaco(object):
 
 		# If debug mode on, save the trajectory for future inspection
 		if self.debug:
-			self.traj_stored.append(self.traj)
+			self.traj_stored.append(self.planner.waypts)
 
 		# save intermediate target position from degrees (default) to radians 
 		self.target_pos = start.reshape((7,1))
@@ -331,7 +332,7 @@ class PIDVelJaco(object):
 		interaction = False
 		for i in range(7):
 			THRESHOLD = INTERACTION_TORQUE_THRESHOLD[i]
-			torque_curr[i][0] -= INTERACTION_TORQUE_BALANCE[i]
+			#torque_curr[i][0] -= INTERACTION_TORQUE_BALANCE[i]
 			if np.fabs(torque_curr[i][0] - THRESHOLD) > INTERACTION_TORQUE_EPSILON[i] and self.reached_start:
 				interaction = True
 			else:

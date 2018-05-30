@@ -31,6 +31,7 @@ from sympy import Point, Line
 import numpy as np
 from numpy import linalg
 import matplotlib.pyplot as plt
+import pickle
 
 prefix = 'j2s7s300_driver'
 
@@ -48,7 +49,9 @@ place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 
 epsilon = 0.10							# epislon for when robot think it's at goal
 MAX_CMD_TORQUE = 40.0					# max command robot can send
-INTERACTION_TORQUE_THRESHOLD = [5, 21, 2, 8, 2, 5, 2] # threshold when interaction is measured 
+INTERACTION_TORQUE_THRESHOLD = [0, 18.0, -0.5, 5.0, -1.0, 0.0, 0.5] # threshold when interaction is measured 
+INTERACTION_TORQUE_EPSILON = [4.0, 5.0, 3.0, 4.0, 2.0, 2.0, 1.0]
+
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
 
 IMPEDANCE = 'A'
@@ -128,6 +131,7 @@ class PIDVelJaco(object):
 		elif debug == "T" or debug == "t":
 			self.debug = True
 			self.traj_stored = []
+			self.traj_deformed = []
 		else:
 			print "Oopse - it is unclear if you want to debug. Not debuging."
 			self.debug = False
@@ -177,7 +181,7 @@ class PIDVelJaco(object):
 
 		# If debug mode on, save the trajectory for future inspection
 		if self.debug:
-			self.traj_stored.append(self.traj)
+			self.traj_stored.append(self.planner.waypts)
 
 		# save intermediate target position from degrees (default) to radians 
 		self.target_pos = start.reshape((7,1))
@@ -252,6 +256,17 @@ class PIDVelJaco(object):
 		#self.planner.plot_feature_update()
 		#self.planner.plot_weight_update()
 
+		# If debug mode is on, pickle the data
+		if self.debug:
+			savestr = "_".join(self.feat_list)
+			savefile = "/traj_dump/traj_stored_"+savestr+".p"
+			here = os.path.dirname(os.path.realpath(__file__))
+			pickle.dump(self.traj_stored, open( here + savefile, "wb" ) )
+
+			savefile = "/traj_dump/traj_deformed_"+savestr+".p"
+			pickle.dump(self.traj_deformed, open( here + savefile, "wb" ) )
+			self.debug = False
+
 		# save experimental data (only if experiment started)
 		if self.record and self.reached_start:
 			print "Saving experimental data to file..."
@@ -316,11 +331,10 @@ class PIDVelJaco(object):
 		"""
 		# read the current joint torques from the robot
 		torque_curr = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
-
 		interaction = False
 		for i in range(7):
 			THRESHOLD = INTERACTION_TORQUE_THRESHOLD[i]
-			if np.fabs(torque_curr[i][0]) > THRESHOLD and self.reached_start:
+			if np.fabs(torque_curr[i][0] - THRESHOLD) > INTERACTION_TORQUE_EPSILON[i] and self.reached_start:
 				interaction = True
 			else:
 				# zero out torques below threshold for cleanliness
@@ -328,8 +342,8 @@ class PIDVelJaco(object):
 
 		# if experienced large enough interaction force, then deform traj
 		if interaction:
-			#print "--- INTERACTION ---"
-			#print "u_h: " + str(torque_curr)
+			print "--- INTERACTION ---"
+			print "u_h: " + str(torque_curr)
 			if self.reached_start and not self.reached_goal:
 				timestamp = time.time() - self.path_start_T
 				self.expUtil.update_tauH(timestamp, torque_curr)
@@ -343,7 +357,8 @@ class PIDVelJaco(object):
 
 					# If debug mode on, save the trajectory for future inspection
 					if self.debug:
-						self.traj_stored.append(self.traj)
+						self.traj_stored.append(self.planner.waypts)
+						self.traj_deformed.append(self.planner.waypts_deform)
 
 					# update the experimental data with new weights
 					timestamp = time.time() - self.path_start_T
@@ -447,18 +462,10 @@ class PIDVelJaco(object):
 				if is_at_goal:
 					self.reached_goal = True
 			else:
-				print "REACHED GOAL! Holding position at goal."
+				#print "REACHED GOAL! Holding position at goal."
 				self.target_pos = self.goal_pos
 				# TODO: this should only set it once!
 				self.expUtil.set_endT(time.time())
-
-				# If debug mode is on, pickle the data
-				if self.debug:
-					savestr = "_".join(self.feat_list)
-					savefile = "/traj_dump/traj_stored_"+savestr+".p"
-					here = os.path.dirname(os.path.realpath(__file__))
-					pickle.dump(self.traj_stored, open( here + savefile, "wb" ) )
-					self.debug = False
 
 if __name__ == '__main__':
 	if len(sys.argv) < 10:

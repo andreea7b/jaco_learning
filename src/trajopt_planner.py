@@ -26,14 +26,13 @@ import itertools
 import pickle
 
 # feature constacts (update gains and max weights)
-UPDATE_GAINS = {'table':1.0, 'coffee':1.0, 'laptop':100.0}
+UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0}
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0}
 FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554}
 
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [0.0, 0.2, 0.0]
-INTERACTION_TORQUE_THRESHOLD = [5, 21, 2, 8, 2, 5, 2] # threshold when interaction is measured 
-MAX_CMD_TORQUE = 40.0								  # max command robot can send
+INTERACTION_TORQUE_THRESHOLD = [0, 18.0, -0.5, 5.0, -1.0, 0.0, 0.5]							  			  # max command robot can send
 
 # feature learning methods
 ALL = "ALL"					# updates all features
@@ -544,7 +543,6 @@ class Planner(object):
 		else:
 			print "using traj seed!"
 			init_waypts = traj_seed
-			print init_waypts
 
 		if self.traj_cache is not None:
 			# choose seeding trajectory from cache if the weights match
@@ -566,8 +564,7 @@ class Planner(object):
 				if dist < np.linalg.norm(cur_w - min_dist_w):
 					min_dist_w = w
 					min_dist_idx = w_i
-			print "Min dist idx:", min_dist_idx
-			print "Min dist w:", min_dist_w
+
 			init_waypts = np.array(self.traj_cache[min_dist_idx])
 
 		request = {
@@ -738,6 +735,9 @@ class Planner(object):
 			return (waypts_prev, waypts_prev)
 		
 		for joint in range(7):
+			# zero-center the torque
+			if u_h[joint] != 0:
+				u_h[joint] -= INTERACTION_TORQUE_THRESHOLD[joint]	
 			gamma[:,joint] = self.alpha*np.dot(self.H, u_h[joint])
 		waypts_deform[deform_waypt_idx : self.n + deform_waypt_idx, :] += gamma
 		return (waypts_deform, waypts_prev)
