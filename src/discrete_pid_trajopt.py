@@ -46,7 +46,7 @@ place_higher = [210.5,118.5,192.5,105.4,229.15,245.47,316.4]
 place_lower_EEtilt = [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 400.0]
 place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 
-epsilon = 0.20							# epislon for when robot think it's at goal
+epsilon = 0.10							# epislon for when robot think it's at goal
 MAX_CMD_TORQUE = 40.0					# max command robot can send
 INTERACTION_TORQUE_THRESHOLD = [5, 21, 2, 8, 2, 5, 2] # threshold when interaction is measured 
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
@@ -84,7 +84,7 @@ class PIDVelJaco(object):
 		sim_flag                  - flag for if in simulation or not
 	"""
 
-	def __init__(self, ID, method_type, demo, record, feat_method, feat_list, traj_cache=None, traj_rand=None, traj_optimal=None):
+	def __init__(self, ID, method_type, demo, record, debug, feat_method, feat_list, traj_cache=None, traj_rand=None, traj_optimal=None):
 		"""
 		Setup of the ROS node. Publishing computed torques happens at 100Hz.
 		"""
@@ -121,6 +121,16 @@ class PIDVelJaco(object):
 		else:
 			print "Oopse - it is unclear if you want to record data. Not recording data."
 			self.record = False
+
+		# debug mode 
+		if debug == "F" or debug == "f":
+			self.debug = False
+		elif debug == "T" or debug == "t":
+			self.debug = True
+			self.traj_stored = []
+		else:
+			print "Oopse - it is unclear if you want to debug. Not debuging."
+			self.debug = False
 
 		# start admittance control mode
 		self.start_admittance_mode()
@@ -164,6 +174,10 @@ class PIDVelJaco(object):
 		self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=None)
 
 		print "original traj: " + str(self.traj)
+
+		# If debug mode on, save the trajectory for future inspection
+		if self.debug:
+			self.traj_stored.append(self.traj)
 
 		# save intermediate target position from degrees (default) to radians 
 		self.target_pos = start.reshape((7,1))
@@ -327,6 +341,10 @@ class PIDVelJaco(object):
 					self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=self.traj)
 					print "in joint torques callback: finished planning -- self.traj = " + str(self.traj)
 
+					# If debug mode on, save the trajectory for future inspection
+					if self.debug:
+						self.traj_stored.append(self.traj)
+
 					# update the experimental data with new weights
 					timestamp = time.time() - self.path_start_T
 					self.expUtil.update_weights(timestamp, self.weights)
@@ -381,6 +399,7 @@ class PIDVelJaco(object):
 		- if robot is moving to start of desired trajectory or 
 		- if robot is moving along the desired trajectory 
 		"""
+		#print(curr_pos, self.start_pos, self.goal_pos)
 		# check if the arm is at the start of the path to execute
 		if not self.reached_start:
 
@@ -428,34 +447,37 @@ class PIDVelJaco(object):
 				if is_at_goal:
 					self.reached_goal = True
 			else:
-				#print "REACHED GOAL! Holding position at goal."
+				print "REACHED GOAL! Holding position at goal."
 				self.target_pos = self.goal_pos
 				# TODO: this should only set it once!
 				self.expUtil.set_endT(time.time())
 
+				# If debug mode is on, pickle the data
+				if self.debug:
+					savestr = "_".join(self.feat_list)
+					savefile = "/traj_dump/traj_stored_"+savestr+".p"
+					here = os.path.dirname(os.path.realpath(__file__))
+					pickle.dump(self.traj_stored, open( here + savefile, "wb" ) )
+					self.debug = False
+
 if __name__ == '__main__':
-	if len(sys.argv) < 9:
+	if len(sys.argv) < 10:
 		print "ERROR: Not enough arguments. Specify ID, method_type, demo, record, feat_method, feat_list"
 	else:
 		ID = int(sys.argv[1])
 		method_type = sys.argv[2]
 		demo = sys.argv[3]
 		record = sys.argv[4]
-		feat_method = sys.argv[5]
-		feat_list = [x.strip() for x in sys.argv[6].split(',')]
+		debug = sys.argv[5]
+		feat_method = sys.argv[6]
+		feat_list = [x.strip() for x in sys.argv[7].split(',')]
 		traj_cache = traj_rand = traj_optimal = None
-		if sys.argv[7] == 'None':
-			traj_cache = None
-		else:
-			traj_cache = sys.argv[7]
-		if sys.argv[8] == 'None':
-			traj_rand = None
-		else:
-			traj_rand = sys.argv[8]
-		if sys.argv[9] == 'None':
-			traj_optimal = None
-		else:
-			traj_optimal = sys.argv[9]
-	PIDVelJaco(ID,method_type,demo,record,feat_method,feat_list,traj_cache,traj_rand,traj_optimal)
+		if sys.argv[8] != 'None':
+			traj_cache = sys.argv[8]
+		if sys.argv[9] != 'None':
+			traj_rand = sys.argv[9]
+		if sys.argv[10] != 'None':
+			traj_optimal = sys.argv[10]
+	PIDVelJaco(ID,method_type,demo,record,debug,feat_method,feat_list,traj_cache,traj_rand,traj_optimal)
 
 

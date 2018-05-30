@@ -78,6 +78,7 @@ class Planner(object):
 
 		self.weights = [0.0]*self.num_features
 		self.waypts_prev = None
+		self.waypts_deform = None
 
 		# ---- Plotting weights & features over time ---- #
 		self.weight_update = None
@@ -225,6 +226,7 @@ class Planner(object):
 		self.robot.SetDOFValues(waypt)
 		coords = robotToCartesian(self.robot)
 		EEcoord_z = coords[6][2]
+		#print "EE z distance:", EEcoord_z
 		return EEcoord_z
 
 	def table_cost(self, waypt):
@@ -511,11 +513,7 @@ class Planner(object):
 
 		result = trajoptpy.OptimizeProblem(prob)
 		self.waypts_plan = result.GetTraj()
-		self.step_time_plan = (self.final_time - self.start_time)/(self.num_waypts_plan - 1)
-
-		# plot resulting trajectory
-		#plotTraj(self.env,self.robot,self.bodies,self.waypts_plan, size=10,color=[0, 0, 1])
-		#plotCupTraj(self.env,self.robot,self.bodies,self.waypts_plan, color=[0,1,0])		
+		self.step_time_plan = (self.final_time - self.start_time)/(self.num_waypts_plan - 1)	
 
 		print "I'm done with trajopt pose!"
 
@@ -568,7 +566,8 @@ class Planner(object):
 				if dist < np.linalg.norm(cur_w - min_dist_w):
 					min_dist_w = w
 					min_dist_idx = w_i
-
+			print "Min dist idx:", min_dist_idx
+			print "Min dist w:", min_dist_w
 			init_waypts = np.array(self.traj_cache[min_dist_idx])
 
 		request = {
@@ -619,9 +618,6 @@ class Planner(object):
 		self.waypts_plan = result.GetTraj()
 		self.step_time_plan = (self.final_time - self.start_time)/(self.num_waypts_plan - 1)
 
-		#plotTraj(self.env,self.robot,self.bodies,self.waypts_plan, size=10,color=[0, 0, 1])
-		#plotCupTraj(self.env,self.robot,self.bodies,self.waypts_plan,color=[0,1,0])
-
 		return self.waypts_plan
 
 
@@ -637,6 +633,7 @@ class Planner(object):
 		"""
 		(waypts_deform, waypts_prev) = self.deform(u_h)	
 		if waypts_deform is not None:
+			self.waypts_deform = waypts_deform
 			new_features = self.featurize(waypts_deform)
 			old_features = self.featurize(waypts_prev)
 			Phi_p = np.array([new_features[0]] + [sum(x) for x in new_features[1:]])
@@ -654,7 +651,7 @@ class Planner(object):
 				max_weights[feat] = MAX_WEIGHTS[self.feat_list[feat]]
 				feat_range[feat] = FEAT_RANGE[self.feat_list[feat]]
 			update = Phi_p - Phi
-			
+
 			if self.feat_method == ALL:
 				# update all weights 
 				curr_weight = self.weights - np.dot(update_gains, update[1:])
@@ -670,14 +667,13 @@ class Planner(object):
 				curr_weight[max_idx] = curr_weight[max_idx] - update_gains[max_idx]*update[max_idx+1]
 			elif self.feat_method == BETA:
 				# Define minimization function
-				lambda1 = 1
 				update = update[1:]
 				Phi_p = Phi_p[1:]
 				Phi = Phi[1:]
 
 				# Set up the optimization problem:
 				def u_minimizer(u):
-					u = np.fmax(np.fabs(u), INTERACTION_TORQUE_THRESHOLD) - INTERACTION_TORQUE_THRESHOLD
+					#u = np.fmax(np.fabs(u), INTERACTION_TORQUE_THRESHOLD) - INTERACTION_TORQUE_THRESHOLD
 					u = np.reshape(u, (7,1))
 					(waypts_deform_p, waypts_prev) = self.deform(u)
 					H_features = self.featurize(waypts_deform_p)
@@ -691,17 +687,23 @@ class Planner(object):
 					(waypts_deform_p, waypts_prev) = self.deform(u)
 					H_features = self.featurize(waypts_deform_p)
 					Phi_H = np.array([sum(x) for x in H_features[1:]])
-					cost = lambda1 * sum((Phi_H - Phi - update)**2)
+					cost = sum((Phi_H - Phi_p)**2)
 					return cost
 
+				# Set up bounds based on which entries are 0
+				u_bounds = []
+				for i in range(7):
+					if u_h[i] == 0.0:
+						u_bounds.append((0,0))
+					else:
+						u_bounds.append((None,None))
+
 				# First compute what the optimal action would have been
-				u_h_opt = minimize(u_minimizer, u_h, method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 1e5, 'disp': True})
-				#u_h_opt = minimize(u_minimizer, u_h, options={'maxiter': 1e5, 'disp': True})
-				#u_h_star = np.fmax(u_h_opt.x, INTERACTION_TORQUE_THRESHOLD) - INTERACTION_TORQUE_THRESHOLD
+				u_h_opt = minimize(u_minimizer, u_h, method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), bounds=u_bounds, options={'maxiter': 1e5, 'disp': True})
 				u_h_star = np.reshape(u_h_opt.x, (7, 1)) 
 
 				# Compute beta
-				beta = 1/(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2)
+				beta = 1/abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2)
 				print "here is u_h and its norm:", u_h, np.linalg.norm(u_h)
 				print "here is optimal u_h and its norm:", u_h_star, np.linalg.norm(u_h_star)
 				print "here is beta:", beta
@@ -716,6 +718,7 @@ class Planner(object):
 			print "here are the new weights:", curr_weight
 
 			self.weights = curr_weight
+
 			return self.weights
 
 	def deform(self, u_h):
@@ -725,16 +728,18 @@ class Planner(object):
 		---
 		input is human force, returns deformed and old waypts
 		"""
-		deform_waypt_idx = self.curr_waypt_idx + 1
-		if (deform_waypt_idx + self.n) > self.num_waypts:
-			return (None, None)
 		waypts_prev = copy.deepcopy(self.waypts)
 		waypts_deform = copy.deepcopy(self.waypts)
 		gamma = np.zeros((self.n,7))
+		deform_waypt_idx = self.curr_waypt_idx + 1
+		
+		if (deform_waypt_idx + self.n) > self.num_waypts:
+			print "Deforming too close to end. Returning same trajectory"
+			return (waypts_prev, waypts_prev)
+		
 		for joint in range(7):
 			gamma[:,joint] = self.alpha*np.dot(self.H, u_h[joint])
 		waypts_deform[deform_waypt_idx : self.n + deform_waypt_idx, :] += gamma
-		#plotTraj(self.env, self.robot, self.bodies, self.waypts_plan, [1, 0, 0])
 		return (waypts_deform, waypts_prev)
 
 	# ---- replanning, upsampling, and interpolating ---- #
@@ -759,10 +764,7 @@ class Planner(object):
 		else:
 			self.trajOpt(start, goal, traj_seed=seed)
 
-        #print "waypts_plan after trajopt: " + str(self.waypts_plan)
 		self.upsample(step_time)
-		#print "waypts_plan after upsampling: " + str(self.waypts_plan)
-		#plotTraj(self.env,self.robot,self.bodies,self.waypts_plan, [0, 0, 1])
 
 		return self.waypts_plan
 

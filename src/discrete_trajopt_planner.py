@@ -46,7 +46,8 @@ class DiscretePlanner(object):
 	def __init__(self, feat_method, feat_list, traj_cache=None, traj_rand=None, traj_optimal=None):
 
 		# ---- important discrete variables ---- #
-		self.weights_dict = [[-1.0, -1.0], [-1.0, 0.], [-1.0, 1.0], [0., -1.0], [0., 0.], [0., 1.0], [1.0, -1.0], [1.0, 0.], [1.0, 1.0]]
+		#self.weights_dict = [[-1.0, -1.0], [-1.0, 0.], [-1.0, 1.0], [0., -1.0], [0., 0.], [0., 1.0], [1.0, -1.0], [1.0, 0.], [1.0, 1.0]]
+		self.weights_dict = [[-0.5], [0.], [0.5]]
 		self.betas_dict = [0.001, 0.003, 0.01, 0.03, 0.1, 0.3]
 
 		self.num_betas = len(self.betas_dict)
@@ -58,7 +59,7 @@ class DiscretePlanner(object):
 
 		# Decide on planning and deformation
 		self.replan_weights = "WEIGHTED"    # can be ARGMAX, MEAN or WEIGHTED
-		self.deform_method = "ONE"		# can be ONE or ALL
+		self.deform_method = "ALL"		# can be ONE or ALL
 
 		# ---- important internal variables ---- #
 		self.feat_method = feat_method	# can be ALL, MAX, or BETA
@@ -214,7 +215,7 @@ class DiscretePlanner(object):
 		#plotSphere(self.env, self.bodies, [0,coords[6][1],0], size=20, color=[0,0,1])
 		#plotSphere(self.env, self.bodies, [0,0,coords[6][2]], size=20, color=[0,1,0])
 		#plotSphere(self.env, self.bodies, coords[6][0:3], size=20, color=[1,1,0])
-		print "EEcoord_y: " + str(EEcoord_y)
+		#print "EEcoord_y: " + str(EEcoord_y)
 		return EEcoord_y
 
 	def origin_cost(self, waypt):
@@ -687,14 +688,14 @@ class DiscretePlanner(object):
 				curr_weight = [self.weights[i] for i in range(len(self.weights))]
 				curr_weight[max_idx] = curr_weight[max_idx] - update_gains[max_idx]*update[max_idx+1]
 			elif self.feat_method == BETA:
-				# If we deform all optimals, first precmpute the deformations
+				# TODO: not working. If we deform all optimals, first precompute the deformations
 				if self.deform_method == "ALL":
 					traj_optimal_deform = [0] * self.num_weights
 					for weight_i in range(self.num_weights):
-						curr_timestep = self.waypts_time[self.curr_waypt_idx]
-						u_h_prime = (waypts_deform[curr_timestep] - self.traj_optimal[weight_i][curr_timestep])
-						(waypts_partial, _) = self.deform(u_h) # TODO: this isn't correct; yelp?
-						traj_optimal_deform = [waypts_prev[:curr_timestep]] + [waypts_partial]
+						curr_timestep = int(self.waypts_time[self.curr_waypt_idx])
+						u_h_p = np.reshape(waypts_deform[curr_timestep] - self.traj_optimal[weight_i][curr_timestep], (7,1))
+						(waypts_partial, _) = self.deform_given_waypts(self.traj_optimal[weight_i], u_h_p)
+						traj_optimal_deform[weight_i] = np.concatenate((waypts_prev[:curr_timestep+1], waypts_partial[curr_timestep+1:]))
 
 				# Now compute probabilities for each beta and theta in the dictionary
 				P_xi = np.zeros((self.num_betas, self.num_weights))
@@ -772,17 +773,39 @@ class DiscretePlanner(object):
 		input is human force, returns deformed and old waypts
 		"""
 		deform_waypt_idx = self.curr_waypt_idx + 1
-		if (deform_waypt_idx + self.n) > self.num_waypts:
-			return (None, None)
 		waypts_prev = copy.deepcopy(self.waypts)
 		waypts_deform = copy.deepcopy(self.waypts)
 		gamma = np.zeros((self.n,7))
+
+		if (deform_waypt_idx + self.n) > self.num_waypts:
+			print "Deforming too close to end. Returning same trajectory"
+			return (waypts_prev, waypts_prev)
+
 		for joint in range(7):
 			gamma[:,joint] = self.alpha*np.dot(self.H, u_h[joint])
 		waypts_deform[deform_waypt_idx : self.n + deform_waypt_idx, :] += gamma
-		#plotTraj(self.env, self.robot, self.bodies, self.waypts_plan, [1, 0, 0])
 		return (waypts_deform, waypts_prev)
 
+	def deform_given_waypts(self, waypts, u_h):
+		"""
+		Deforms the next n waypoints of the given upsampled trajectory
+		updates the upsampled trajectory, stores old given trajectory
+		---
+		input is trajectory and human force, returns deformed and old waypts
+		"""
+		deform_waypt_idx = self.curr_waypt_idx + 1
+		waypts_prev = copy.deepcopy(waypts)
+		waypts_deform = copy.deepcopy(waypts)
+		gamma = np.zeros((self.n,7))
+
+		if (deform_waypt_idx + self.n) > self.num_waypts:
+			print "Deforming too close to end. Returning same trajectory"
+			return (waypts_prev, waypts_prev)
+
+		for joint in range(7):
+			gamma[:,joint] = self.alpha*np.dot(self.H, u_h[joint])
+		waypts_deform[deform_waypt_idx : self.n + deform_waypt_idx, :] += gamma
+		return (waypts_deform, waypts_prev)
 
 	# ---- replanning, upsampling, and interpolating ---- #
 

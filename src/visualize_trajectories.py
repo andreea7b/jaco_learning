@@ -30,3 +30,6 @@ if __name__ == '__main__':
 
 	for waypts_plan in trajs:
 		plotTraj(env,robot,bodies,waypts_plan, size=10,color=[0, 0, 1])
+		raw_input("Press Enter to continue...")
+		bodies = []
+
