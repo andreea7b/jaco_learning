@@ -48,7 +48,7 @@ class DiscretePlanner(object):
 
 		# ---- important discrete variables ---- #
 		#self.weights_dict = [[-1.0, -1.0], [-1.0, 0.], [-1.0, 1.0], [0., -1.0], [0., 0.], [0., 1.0], [1.0, -1.0], [1.0, 0.], [1.0, 1.0]]
-		self.weights_dict = [[-0.5], [0.], [0.5]]
+		self.weights_dict = [[-1.0], [0.], [1.0]]
 		self.betas_dict = [0.001, 0.003, 0.01, 0.03, 0.1, 0.3]
 
 		self.num_betas = len(self.betas_dict)
@@ -60,7 +60,7 @@ class DiscretePlanner(object):
 
 		# Decide on planning and deformation
 		self.replan_weights = "WEIGHTED"    # can be ARGMAX, MEAN or WEIGHTED
-		self.deform_method = "ALL"		# can be ONE or ALL
+		self.deform_method = "ONE"		# can be ONE or ALL
 
 		# ---- important internal variables ---- #
 		self.feat_method = feat_method	# can be ALL, MAX, or BETA
@@ -127,8 +127,8 @@ class DiscretePlanner(object):
 
 		# ---- DEFORMATION Initialization ---- #
 
-		self.alpha = -0.01
-		self.n = 5
+		self.alpha = -0.1
+		self.n = 10
 		self.A = np.zeros((self.n+2, self.n))
 		np.fill_diagonal(self.A, 1)
 		for i in range(self.n):
@@ -696,7 +696,7 @@ class DiscretePlanner(object):
 						u_h_p = np.reshape(waypts_deform[curr_timestep] - self.traj_optimal[weight_i][curr_timestep], (7,1))
 						(waypts_partial, _) = self.deform_given_waypts(self.traj_optimal[weight_i], u_h_p)
 						traj_optimal_deform[weight_i] = np.concatenate((waypts_prev[:curr_timestep+1], waypts_partial[curr_timestep+1:]))
-					import pdb; pdb.set_trace()
+
 				# Now compute probabilities for each beta and theta in the dictionary
 				P_xi = np.zeros((self.num_betas, self.num_weights))
 				for (weight_i, weight) in enumerate(self.weights_dict):
@@ -753,8 +753,8 @@ class DiscretePlanner(object):
 					curr_weight = np.matmul(P_weight, self.weights_dict)
 
 				self.P_bt = posterior
-				print self.P_bt
-				print(sum(self.P_bt, 0))
+				print "posterior", self.P_bt
+				print "theta marginal:", sum(self.P_bt, 0)
 
 			print "curr_weight after = " + str(curr_weight)
 
@@ -806,9 +806,6 @@ class DiscretePlanner(object):
 			return (waypts_prev, waypts_prev)
 
 		for joint in range(7):
-			# zero-center the torque
-			if u_h[joint] != 0:
-				u_h[joint] -= INTERACTION_TORQUE_THRESHOLD[joint]
 			gamma[:,joint] = self.alpha*np.dot(self.H, u_h[joint])
 		waypts_deform[deform_waypt_idx : self.n + deform_waypt_idx, :] += gamma
 		return (waypts_deform, waypts_prev)
