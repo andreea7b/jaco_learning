@@ -6,9 +6,6 @@
 	<!-- Method type ('A'- impedance, 'B'- learning, 'C'- demonstration) -->
 	<arg name="method_type" default="A"/>
 
-	<!-- Demo mode ('T' - demo with optimal weights, 'F' - default weights) -->
-	<arg name="demo" default="F"/>
-
 	<!-- Record data mode -->
 	<arg name="record" default="F"/>
 
@@ -26,7 +23,7 @@
 
 	<!-- velocity-based with trajopt planning PID -->
 	<node name="pid_trajopt" pkg="beta_adaptive_pHRI" type="pid_trajopt.py"
-    args="$(arg ID) $(arg method_type) $(arg demo) $(arg record) $(arg debug)
+    args="$(arg ID) $(arg method_type) $(arg record) $(arg debug)
     $(arg feat_method) $(arg feat_list) $(arg traj_cache)" output="screen"/>
 
 </launch>

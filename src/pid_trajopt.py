@@ -88,7 +88,7 @@ class PIDVelJaco(object):
 		sim_flag                  - flag for if in simulation or not
 	"""
 
-	def __init__(self, ID, method_type, demo, record, debug, feat_method, feat_list, traj_cache=None):
+	def __init__(self, ID, method_type, record, debug, feat_method, feat_list, traj_cache=None):
 		"""
 		Setup of the ROS node. Publishing computed torques happens at 100Hz.
 		"""
@@ -104,15 +104,6 @@ class PIDVelJaco(object):
 
 		# traj_cache: None or path to trajectory cache
 		self.traj_cache = traj_cache
-
-		# optimal demo mode
-		if demo == "F" or demo == "f":
-			self.demo = False
-		elif demo == "T" or demo == "t":
-			self.demo = True
-		else:
-			print "Oopse - it is unclear if you want demo mode. Turning demo mode off."
-			self.demo = False
 
 		# record experimental data mode 
 		if record == "F" or record == "f":
@@ -149,7 +140,7 @@ class PIDVelJaco(object):
 		self.weights = [0.0]*self.num_feats
 
 		# if in demo mode, then set the weights to be optimal
-		if self.demo:
+		if self.method_type == DEMONSTRATION:
 			for feat in range(0,self.num_feats):
 				self.weights[feat] = MAX_WEIGHTS[feat_list[feat]]
 
@@ -480,18 +471,17 @@ class PIDVelJaco(object):
 
 if __name__ == '__main__':
 	if len(sys.argv) < 10:
-		print "ERROR: Not enough arguments. Specify ID, method_type, demo, record, debug, feat_method, feat_list"
+		print "ERROR: Not enough arguments. Specify ID, method_type, record, debug, feat_method, feat_list"
 	else:
 		ID = int(sys.argv[1])
 		method_type = sys.argv[2]
-		demo = sys.argv[3]
-		record = sys.argv[4]
-		debug = sys.argv[5]
-		feat_method = sys.argv[6]
-		feat_list = [x.strip() for x in sys.argv[7].split(',')]
+		record = sys.argv[3]
+		debug = sys.argv[4]
+		feat_method = sys.argv[5]
+		feat_list = [x.strip() for x in sys.argv[6].split(',')]
 		traj_cache = None
-		if sys.argv[8] != 'None':
-			traj_cache = sys.argv[8]
-	PIDVelJaco(ID,method_type,demo,record,debug,feat_method,feat_list,traj_cache)
+		if sys.argv[7] != 'None':
+			traj_cache = sys.argv[7]
+	PIDVelJaco(ID,method_type,record,debug,feat_method,feat_list,traj_cache)
 
 
