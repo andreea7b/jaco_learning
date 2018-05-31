@@ -28,9 +28,12 @@ if __name__ == '__main__':
 	here = os.path.dirname(os.path.realpath(__file__))
 	trajs = pickle.load( open( here + traj_path, "rb" ) )
 
-	for waypts_plan in trajs:
-		import pdb;pdb.set_trace()
-		plotTraj(env,robot,bodies,waypts_plan, size=10,color=[0, 0, 1])
+	if "final" in traj_path:
+		plotTraj(env,robot,bodies,trajs, size=10,color=[0, 0, 1])
 		raw_input("Press Enter to continue...")
-		bodies = []
+	else:
+		for waypts_plan in trajs:
+			plotTraj(env,robot,bodies,waypts_plan, size=10,color=[0, 0, 1])
+			raw_input("Press Enter to continue...")
+			bodies = []
 

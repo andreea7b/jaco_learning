@@ -122,6 +122,7 @@ class PIDVelJaco(object):
 			self.traj_stored = []
 			self.traj_deformed = []
 			self.traj_final = []
+			self.betas = []
 		else:
 			print "Oopse - it is unclear if you want to debug. Not debuging."
 			self.debug = False
@@ -262,6 +263,9 @@ class PIDVelJaco(object):
 
 			savefile = "/traj_dump/traj_final_"+savestr+".p"
 			pickle.dump(self.traj_final, open( here + savefile, "wb" ) )
+
+			savefile = "/traj_dump/betas_"+savestr+".p"
+			pickle.dump(self.betas, open( here + savefile, "wb" ) )
 			self.debug = False
 
 		# save experimental data (only if experiment started)
@@ -357,6 +361,7 @@ class PIDVelJaco(object):
 					if self.debug:
 						self.traj_stored.append(self.planner.waypts)
 						self.traj_deformed.append(self.planner.waypts_deform)
+						self.betas.append(self.planner.beta)
 
 					# update the experimental data with new weights
 					timestamp = time.time() - self.path_start_T
@@ -412,11 +417,6 @@ class PIDVelJaco(object):
 		- if robot is moving to start of desired trajectory or 
 		- if robot is moving along the desired trajectory 
 		"""
-		if self.debug:
-			# save the current position
-			import pdb;pdb.set_trace()
-			self.traj_final.append(curr_pos)
-
 		# check if the arm is at the start of the path to execute
 		if not self.reached_start:
 			dist_from_start = -((curr_pos - self.start_pos + math.pi)%(2*math.pi) - math.pi)
@@ -451,6 +451,10 @@ class PIDVelJaco(object):
 			# check if the arm reached the goal, and restart path
 			if not self.reached_goal:
 				#print "REACHED START --> EXECUTING PATH"
+				if self.debug:
+					# save the current position
+					self.traj_final.append(curr_pos)
+
 				dist_from_goal = -((curr_pos - self.goal_pos + math.pi)%(2*math.pi) - math.pi)
 				dist_from_goal = np.fabs(dist_from_goal)
 

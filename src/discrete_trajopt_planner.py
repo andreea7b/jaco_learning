@@ -96,6 +96,7 @@ class DiscretePlanner(object):
 		self.waypts_time = None
 
 		self.weights = [0.0]*self.num_features
+		self.beta = 1.0
 		self.waypts_prev = None
 		self.waypts_deform = None
 
@@ -752,6 +753,9 @@ class DiscretePlanner(object):
 					P_weight = P_weight / sum(P_weight,0)
 					curr_weight = np.matmul(P_weight, self.weights_dict)
 
+				P_beta = np.sum(posterior, axis=1)
+				self.beta = np.dot(self.betas_dict,P_beta)
+				
 				self.P_bt = posterior
 				print "posterior", self.P_bt
 				print "theta marginal:", sum(self.P_bt, 0)

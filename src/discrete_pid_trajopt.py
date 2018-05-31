@@ -87,7 +87,7 @@ class PIDVelJaco(object):
 		sim_flag                  - flag for if in simulation or not
 	"""
 
-	def __init__(self, ID, method_type, demo, record, debug, feat_method, feat_list, traj_cache=None, traj_rand=None, traj_optimal=None):
+	def __init__(self, ID, method_type, record, debug, feat_method, feat_list, traj_cache=None, traj_rand=None, traj_optimal=None):
 		"""
 		Setup of the ROS node. Publishing computed torques happens at 100Hz.
 		"""
@@ -107,15 +107,6 @@ class PIDVelJaco(object):
 		self.traj_optimal = traj_optimal
 		self.traj_rand = traj_rand
 
-		# optimal demo mode
-		if demo == "F" or demo == "f":
-			self.demo = False
-		elif demo == "T" or demo == "t":
-			self.demo = True
-		else:
-			print "Oopse - it is unclear if you want demo mode. Turning demo mode off."
-			self.demo = False
-
 		# record experimental data mode 
 		if record == "F" or record == "f":
 			self.record = False
@@ -132,6 +123,8 @@ class PIDVelJaco(object):
 			self.debug = True
 			self.traj_stored = []
 			self.traj_deformed = []
+			self.traj_final = []
+			self.betas = []
 		else:
 			print "Oopse - it is unclear if you want to debug. Not debuging."
 			self.debug = False
@@ -150,7 +143,7 @@ class PIDVelJaco(object):
 		self.weights = [0.0]*self.num_feats
 
 		# if in demo mode, then set the weights to be optimal
-		if self.demo:
+		if self.method_type == DEMONSTRATION:
 			for feat in range(0,self.num_feats):
 				self.weights[feat] = MAX_WEIGHTS[feat_list[feat]]
 
@@ -230,6 +223,9 @@ class PIDVelJaco(object):
 		# create joint-velocity publisher
 		self.vel_pub = rospy.Publisher(prefix + '/in/joint_velocity', kinova_msgs.msg.JointVelocity, queue_size=1)
 
+		# create a beta publisher
+		self.beta_pub = rospy.Publisher(prefix + '/in/beta', Float32, queue_size=1)
+
 		# create subscriber to joint_angles
 		rospy.Subscriber(prefix + '/out/joint_angles', kinova_msgs.msg.JointAngles, self.joint_angles_callback, queue_size=1)
 		# create subscriber to joint_torques
@@ -248,6 +244,7 @@ class PIDVelJaco(object):
 				break
 
 			self.vel_pub.publish(ros_utils.cmd_to_JointVelocityMsg(self.cmd))
+			self.beta_pub.publish(self.planner.beta)
 			r.sleep()
 
 		print "----------------------------------"
@@ -265,6 +262,12 @@ class PIDVelJaco(object):
 
 			savefile = "/traj_dump/traj_deformed_"+savestr+".p"
 			pickle.dump(self.traj_deformed, open( here + savefile, "wb" ) )
+
+			savefile = "/traj_dump/traj_final_"+savestr+".p"
+			pickle.dump(self.traj_final, open( here + savefile, "wb" ) )
+
+			savefile = "/traj_dump/betas_"+savestr+".p"
+			pickle.dump(self.betas, open( here + savefile, "wb" ) )
 			self.debug = False
 
 		# save experimental data (only if experiment started)
@@ -359,6 +362,7 @@ class PIDVelJaco(object):
 					if self.debug:
 						self.traj_stored.append(self.planner.waypts)
 						self.traj_deformed.append(self.planner.waypts_deform)
+						self.betas.append(self.planner.beta)
 
 					# update the experimental data with new weights
 					timestamp = time.time() - self.path_start_T
@@ -450,6 +454,10 @@ class PIDVelJaco(object):
 			# check if the arm reached the goal, and restart path
 			if not self.reached_goal:
 				#print "REACHED START --> EXECUTING PATH"
+				if self.debug:
+					# save the current position
+					self.traj_final.append(curr_pos)
+	
 				dist_from_goal = -((curr_pos - self.goal_pos + math.pi)%(2*math.pi) - math.pi)
 				dist_from_goal = np.fabs(dist_from_goal)
 
@@ -469,22 +477,21 @@ class PIDVelJaco(object):
 
 if __name__ == '__main__':
 	if len(sys.argv) < 10:
-		print "ERROR: Not enough arguments. Specify ID, method_type, demo, record, feat_method, feat_list"
+		print "ERROR: Not enough arguments. Specify ID, method_type, record, feat_method, feat_list"
 	else:
 		ID = int(sys.argv[1])
 		method_type = sys.argv[2]
-		demo = sys.argv[3]
-		record = sys.argv[4]
-		debug = sys.argv[5]
-		feat_method = sys.argv[6]
-		feat_list = [x.strip() for x in sys.argv[7].split(',')]
+		record = sys.argv[3]
+		debug = sys.argv[4]
+		feat_method = sys.argv[5]
+		feat_list = [x.strip() for x in sys.argv[6].split(',')]
 		traj_cache = traj_rand = traj_optimal = None
+		if sys.argv[7] != 'None':
+			traj_cache = sys.argv[7]
 		if sys.argv[8] != 'None':
-			traj_cache = sys.argv[8]
+			traj_rand = sys.argv[8]
 		if sys.argv[9] != 'None':
-			traj_rand = sys.argv[9]
-		if sys.argv[10] != 'None':
-			traj_optimal = sys.argv[10]
-	PIDVelJaco(ID,method_type,demo,record,debug,feat_method,feat_list,traj_cache,traj_rand,traj_optimal)
+			traj_optimal = sys.argv[9]
+	PIDVelJaco(ID,method_type,record,debug,feat_method,feat_list,traj_cache,traj_rand,traj_optimal)
 
 
