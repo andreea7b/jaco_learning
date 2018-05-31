@@ -775,6 +775,7 @@ class DiscretePlanner(object):
 		deform_waypt_idx = self.curr_waypt_idx + 1
 		waypts_prev = copy.deepcopy(self.waypts)
 		waypts_deform = copy.deepcopy(self.waypts)
+		u = copy.deepcopy(u_h)
 		gamma = np.zeros((self.n,7))
 
 		if (deform_waypt_idx + self.n) > self.num_waypts:
@@ -784,8 +785,8 @@ class DiscretePlanner(object):
 		for joint in range(7):
 			# zero-center the torque
 			if u_h[joint] != 0:
-				u_h[joint] -= INTERACTION_TORQUE_THRESHOLD[joint]
-			gamma[:,joint] = self.alpha*np.dot(self.H, u_h[joint])
+				u[joint] -= INTERACTION_TORQUE_THRESHOLD[joint]
+			gamma[:,joint] = self.alpha*np.dot(self.H, u[joint])
 		waypts_deform[deform_waypt_idx : self.n + deform_waypt_idx, :] += gamma
 		return (waypts_deform, waypts_prev)
 

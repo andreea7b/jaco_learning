@@ -32,7 +32,9 @@ FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554}
 
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [0.0, 0.2, 0.0]
-INTERACTION_TORQUE_THRESHOLD = [0, 18.0, -0.5, 5.0, -1.0, 0.0, 0.5]							  			  # max command robot can send
+INTERACTION_TORQUE_THRESHOLD = [1.0, 18.0, 0.0, 5.5, -1.0, 1.5, 0.5]							  			  # max command robot can send
+
+MAX_BETA = 0.01
 
 # feature learning methods
 ALL = "ALL"					# updates all features
@@ -76,6 +78,7 @@ class Planner(object):
 		self.waypts_time = None
 
 		self.weights = [0.0]*self.num_features
+		self.beta = 1.0
 		self.waypts_prev = None
 		self.waypts_deform = None
 
@@ -670,42 +673,41 @@ class Planner(object):
 
 				# Set up the optimization problem:
 				def u_minimizer(u):
-					#u = np.fmax(np.fabs(u), INTERACTION_TORQUE_THRESHOLD) - INTERACTION_TORQUE_THRESHOLD
-					u = np.reshape(u, (7,1))
-					(waypts_deform_p, waypts_prev) = self.deform(u)
-					H_features = self.featurize(waypts_deform_p)
-					Phi_H = np.array([sum(x) for x in H_features[1:]])
-					cost = np.linalg.norm(u)**2 
+					cost = np.linalg.norm(u)**2
 					return cost
 
 				# Set up the constraints:
-				def u_constraint(u):
+				def u_constraint1(u):
 					u = np.reshape(u, (7,1))
 					(waypts_deform_p, waypts_prev) = self.deform(u)
 					H_features = self.featurize(waypts_deform_p)
 					Phi_H = np.array([sum(x) for x in H_features[1:]])
-					cost = sum((Phi_H - Phi_p)**2)
+					cost = 0.001 - sum((Phi_H - Phi_p)**2)
 					return cost
 
-				# Set up bounds based on which entries are 0
-				u_bounds = []
-				for i in range(7):
-					if u_h[i] == 0.0:
-						u_bounds.append((0,0))
-					else:
-						u_bounds.append((None,None))
+				def u_constraint2(u):
+					return np.linalg.norm(u_h)**2 - np.linalg.norm(u)**2
+
+				def u_constraint3(u):
+					return np.linalg.norm(u)**2 - 0.01
 
 				# First compute what the optimal action would have been
-				u_h_opt = minimize(u_minimizer, u_h, method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), bounds=u_bounds, options={'maxiter': 1e5, 'disp': True})
+				u_h_opt = minimize(u_minimizer, u_h, method='SLSQP', constraints=({'type': 'ineq', 'fun': u_constraint1}, {'type': 'ineq', 'fun': u_constraint2}, {'type': 'ineq', 'fun': u_constraint3}), options={'maxiter': 15, 'ftol': 1e-1, 'disp': True})
 				u_h_star = np.reshape(u_h_opt.x, (7, 1)) 
 
-				# Compute beta
-				beta = 1/abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2)
-				print "here is u_h and its norm:", u_h, np.linalg.norm(u_h)
-				print "here is optimal u_h and its norm:", u_h_star, np.linalg.norm(u_h_star)
-				print "here is beta:", beta
+				# Compute beta after filtering the torques
+				for joint in range(7):
+					if u_h[joint] != 0.0:
+						u_h[joint] -= INTERACTION_TORQUE_THRESHOLD[joint]
+					if abs(u_h_star[joint]) > 0.01:	
+						u_h_star[joint] -= INTERACTION_TORQUE_THRESHOLD[joint]
+
+				self.beta = self.num_features/(2*MAX_BETA*abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2))
+				print "here is u_h norm:", np.linalg.norm(u_h)
+				print "here is optimal u_h norm:", np.linalg.norm(u_h_star)
+				print "here is beta:", self.beta
 				# Compute new weights
-				curr_weight = self.weights - beta * np.dot(update_gains, update)
+				curr_weight = self.weights - self.beta * np.dot(update_gains, update)
 
 			# clip values at max and min allowed weights
 			for i in range(self.num_features):
@@ -727,6 +729,7 @@ class Planner(object):
 		"""
 		waypts_prev = copy.deepcopy(self.waypts)
 		waypts_deform = copy.deepcopy(self.waypts)
+		u_deform = copy.deepcopy(u_h)
 		gamma = np.zeros((self.n,7))
 		deform_waypt_idx = self.curr_waypt_idx + 1
 		
@@ -737,8 +740,8 @@ class Planner(object):
 		for joint in range(7):
 			# zero-center the torque
 			if u_h[joint] != 0:
-				u_h[joint] -= INTERACTION_TORQUE_THRESHOLD[joint]	
-			gamma[:,joint] = self.alpha*np.dot(self.H, u_h[joint])
+				u_deform[joint] -= INTERACTION_TORQUE_THRESHOLD[joint]	
+			gamma[:,joint] = self.alpha*np.dot(self.H, u_deform[joint])
 		waypts_deform[deform_waypt_idx : self.n + deform_waypt_idx, :] += gamma
 		return (waypts_deform, waypts_prev)
 

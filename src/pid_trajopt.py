@@ -49,9 +49,9 @@ place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 
 epsilon = 0.10							# epislon for when robot think it's at goal
 MAX_CMD_TORQUE = 40.0					# max command robot can send
-INTERACTION_TORQUE_THRESHOLD = [0, 18.0, -0.5, 5.0, -1.0, 0.0, 0.5] # threshold when interaction is measured 
+INTERACTION_TORQUE_THRESHOLD = [1.0, 18.0, 0.0, 5.5, -1.0, 1.5, 0.5] # threshold when interaction is measured 
 #INTERACTION_TORQUE_BALANCE = [.3, .7, .7, .3, .3, 1.6, 0]
-INTERACTION_TORQUE_EPSILON = [4.0, 5.0, 3.0, 4.0, 2.0, 2.0, 1.0]
+INTERACTION_TORQUE_EPSILON = [4.0, 6.0, 3.0, 4.0, 2.0, 2.0, 1.0]
 
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
 
@@ -130,6 +130,7 @@ class PIDVelJaco(object):
 			self.debug = True
 			self.traj_stored = []
 			self.traj_deformed = []
+			self.traj_final = []
 		else:
 			print "Oopse - it is unclear if you want to debug. Not debuging."
 			self.debug = False
@@ -228,6 +229,9 @@ class PIDVelJaco(object):
 		# create joint-velocity publisher
 		self.vel_pub = rospy.Publisher(prefix + '/in/joint_velocity', kinova_msgs.msg.JointVelocity, queue_size=1)
 
+		# create a beta publisher
+		self.beta_pub = rospy.Publisher(prefix + '/in/beta', Float32, queue_size=1)
+
 		# create subscriber to joint_angles
 		rospy.Subscriber(prefix + '/out/joint_angles', kinova_msgs.msg.JointAngles, self.joint_angles_callback, queue_size=1)
 		# create subscriber to joint_torques
@@ -246,6 +250,7 @@ class PIDVelJaco(object):
 				break
 
 			self.vel_pub.publish(ros_utils.cmd_to_JointVelocityMsg(self.cmd))
+			self.beta_pub.publish(self.planner.beta)
 			r.sleep()
 
 		print "----------------------------------"
@@ -263,6 +268,9 @@ class PIDVelJaco(object):
 
 			savefile = "/traj_dump/traj_deformed_"+savestr+".p"
 			pickle.dump(self.traj_deformed, open( here + savefile, "wb" ) )
+
+			savefile = "/traj_dump/traj_final_"+savestr+".p"
+			pickle.dump(self.traj_final, open( here + savefile, "wb" ) )
 			self.debug = False
 
 		# save experimental data (only if experiment started)
@@ -413,7 +421,11 @@ class PIDVelJaco(object):
 		- if robot is moving to start of desired trajectory or 
 		- if robot is moving along the desired trajectory 
 		"""
-		#print(curr_pos, self.start_pos, self.goal_pos)
+		if self.debug:
+			# save the current position
+			import pdb;pdb.set_trace()
+			self.traj_final.append(curr_pos)
+
 		# check if the arm is at the start of the path to execute
 		if not self.reached_start:
 			dist_from_start = -((curr_pos - self.start_pos + math.pi)%(2*math.pi) - math.pi)
@@ -460,7 +472,7 @@ class PIDVelJaco(object):
 				if is_at_goal:
 					self.reached_goal = True
 			else:
-				print "REACHED GOAL! Holding position at goal."
+				#print "REACHED GOAL! Holding position at goal."
 				self.target_pos = self.goal_pos
 
 				# TODO: this should only set it once!
