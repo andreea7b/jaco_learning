@@ -49,7 +49,7 @@ class DiscretePlanner(object):
 		# ---- important discrete variables ---- #
 		#self.weights_dict = [[-1.0, -1.0], [-1.0, 0.], [-1.0, 1.0], [0., -1.0], [0., 0.], [0., 1.0], [1.0, -1.0], [1.0, 0.], [1.0, 1.0]]
 		self.weights_dict = [[-1.0], [0.], [1.0]]
-		self.betas_dict = [0.001, 0.003, 0.01, 0.03, 0.1, 0.3]
+		self.betas_dict = [0.01, 0.03, 0.1, 0.3, 1.0]
 
 		self.num_betas = len(self.betas_dict)
 		self.num_weights = len(self.weights_dict)
@@ -57,10 +57,6 @@ class DiscretePlanner(object):
 		# Construct uninformed prior
 		P_bt = np.ones((self.num_betas, self.num_weights))
 		self.P_bt = 1.0/self.num_betas * P_bt
-
-		# Decide on planning and deformation
-		self.replan_weights = "WEIGHTED"    # can be ARGMAX, MEAN or WEIGHTED
-		self.deform_method = "ONE"		# can be ONE or ALL
 
 		# ---- important internal variables ---- #
 		self.feat_method = feat_method	# can be ALL, MAX, or BETA
@@ -689,26 +685,12 @@ class DiscretePlanner(object):
 				curr_weight = [self.weights[i] for i in range(len(self.weights))]
 				curr_weight[max_idx] = curr_weight[max_idx] - update_gains[max_idx]*update[max_idx+1]
 			elif self.feat_method == BETA:
-				# TODO: not working. If we deform all optimals, first precompute the deformations
-				if self.deform_method == "ALL":
-					traj_optimal_deform = [0] * self.num_weights
-					for weight_i in range(self.num_weights):
-						curr_timestep = int(self.waypts_time[self.curr_waypt_idx])
-						u_h_p = np.reshape(waypts_deform[curr_timestep] - self.traj_optimal[weight_i][curr_timestep], (7,1))
-						(waypts_partial, _) = self.deform_given_waypts(self.traj_optimal[weight_i], u_h_p)
-						traj_optimal_deform[weight_i] = np.concatenate((waypts_prev[:curr_timestep+1], waypts_partial[curr_timestep+1:]))
-
 				# Now compute probabilities for each beta and theta in the dictionary
 				P_xi = np.zeros((self.num_betas, self.num_weights))
 				for (weight_i, weight) in enumerate(self.weights_dict):
 					for (beta_i, beta) in enumerate(self.betas_dict):
 						# Compute -beta*(weight^T*Phi(xi_H))
-						if self.deform_method == "ONE":
-							numerator = -beta * np.dot([1] + weight, Phi_p)
-						elif self.deform_method == "ALL":
-							curr_features = self.featurize(traj_optimal_deform[weight_i])
-							Phi_curr = np.array([curr_features[0]] + [sum(x) for x in curr_features[1:]])
-							numerator = -beta * np.dot([1] + weight, Phi_curr)
+						numerator = -beta * np.dot([1] + weight, Phi_p)
 
 						# Calculate the integral in log space
 						num_trajs = self.traj_rand.shape[0]
@@ -739,27 +721,18 @@ class DiscretePlanner(object):
 				# Normalize posterior
 				posterior = posterior / sum(sum(posterior))
 
-				if self.replan_weights == "ARGMAX":
-					# Get optimal weight and beta by doing argmax
-					(best_beta_i, best_weight_i) = np.unravel_index(np.argmax(posterior), posterior.shape)
-					curr_weight = self.weights_dict[best_weight_i]
-				elif self.replan_weights == "MEAN":
-					# Compute optimal expected weight
-					P_weight = sum(posterior, 0)
-					curr_weight = np.sum(np.transpose(self.weights_dict)*P_weight, 1)
-				elif self.replan_weights == "WEIGHTED":
-					# Another method uses beta-weighted expected weight
-					P_weight = np.matmul(np.transpose(posterior), self.betas_dict)
-					P_weight = P_weight / sum(P_weight,0)
-					curr_weight = np.matmul(P_weight, self.weights_dict)
+				# Compute optimal expected weight
+				P_weight = sum(posterior, 0)
+				curr_weight = np.sum(np.transpose(self.weights_dict)*P_weight, 1)
 
 				P_beta = np.sum(posterior, axis=1)
 				self.beta = np.dot(self.betas_dict,P_beta)
 				
 				self.P_bt = posterior
+				print "observation model:", P_obs
 				print "posterior", self.P_bt
-				print "theta marginal:", sum(self.P_bt, 0)
-
+				print "theta marginal:", P_weight
+				print "beta average:", self.beta
 			print "curr_weight after = " + str(curr_weight)
 
 			# clip values at max and min allowed weights
