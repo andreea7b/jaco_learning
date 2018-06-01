@@ -123,6 +123,9 @@ class PIDVelJaco(object):
 			self.traj_deformed = []
 			self.traj_final = []
 			self.betas = []
+			self.u_h = []
+			self.u_h_star = []
+			self.interaction_pts = []
 		else:
 			print "Oopse - it is unclear if you want to debug. Not debuging."
 			self.debug = False
@@ -266,6 +269,15 @@ class PIDVelJaco(object):
 
 			savefile = "/traj_dump/betas_"+savestr+".p"
 			pickle.dump(self.betas, open( here + savefile, "wb" ) )
+
+			savefile = "/traj_dump/iact_pts_"+savestr+".p"
+			pickle.dump(self.interaction_pts, open( here + savefile, "wb" ) )
+
+			if self.feat_method == BETA:
+				savefile = "/traj_dump/u_hs_"+savestr+".p"
+				pickle.dump(self.u_h, open( here + savefile, "wb" ) )
+				savefile = "/traj_dump/u_h_stars_"+savestr+".p"
+				pickle.dump(self.u_h_star, open( here + savefile, "wb" ) )
 			self.debug = False
 
 		# save experimental data (only if experiment started)
@@ -362,6 +374,10 @@ class PIDVelJaco(object):
 						self.traj_stored.append(self.planner.waypts)
 						self.traj_deformed.append(self.planner.waypts_deform)
 						self.betas.append(self.planner.beta)
+						self.interaction_pts.append(self.curr_pos)
+						if self.feat_method == BETA:
+							self.u_h.append(self.planner.u_h)
+							self.u_h_star.append(self.planner.u_h_star)
 
 					# update the experimental data with new weights
 					timestamp = time.time() - self.path_start_T

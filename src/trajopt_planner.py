@@ -34,7 +34,7 @@ OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [0.0, 0.2, 0.0]
 INTERACTION_TORQUE_THRESHOLD = [1.0, 18.0, 0.0, 5.5, -1.0, 1.5, 0.5]							  			  # max command robot can send
 
-MAX_BETA = 0.01
+MAX_BETA = 0.015
 
 # feature learning methods
 ALL = "ALL"					# updates all features
@@ -81,6 +81,8 @@ class Planner(object):
 		self.beta = 1.0
 		self.waypts_prev = None
 		self.waypts_deform = None
+		self.u_h = None
+		self.u_h_star = None
 
 		# ---- Plotting weights & features over time ---- #
 		self.weight_update = None
@@ -631,7 +633,12 @@ class Planner(object):
 		---
 		input is human force and returns updated weights 
 		"""
+		# zero-center the torque
+		for joint in range(7):
+			if u_h[joint] != 0:
+				u_h[joint] -= INTERACTION_TORQUE_THRESHOLD[joint]
 		(waypts_deform, waypts_prev) = self.deform(u_h)	
+		
 		if waypts_deform is not None:
 			self.waypts_deform = waypts_deform
 			new_features = self.featurize(waypts_deform)
@@ -670,41 +677,53 @@ class Planner(object):
 				update = update[1:]
 				Phi_p = Phi_p[1:]
 				Phi = Phi[1:]
+				# Print the features
+				print("Phi_H:", Phi_p)
+				print("Phi_R:", Phi)
 
 				# Set up the optimization problem:
-				def u_minimizer(u):
-					cost = np.linalg.norm(u)**2
-					return cost
-
-				# Set up the constraints:
-				def u_constraint1(u):
+				def u_unconstrained(u):
 					u = np.reshape(u, (7,1))
 					(waypts_deform_p, waypts_prev) = self.deform(u)
 					H_features = self.featurize(waypts_deform_p)
 					Phi_H = np.array([sum(x) for x in H_features[1:]])
-					cost = 0.001 - sum((Phi_H - Phi_p)**2)
+
+					cost = np.linalg.norm(u_h)**2 + 0.1*sum((Phi_H - Phi_p)**2)
 					return cost
 
-				def u_constraint2(u):
-					return np.linalg.norm(u_h)**2 - np.linalg.norm(u)**2
+				def u_constrained(u):
+					cost = np.linalg.norm(u_h)**2
+					return cost
 
-				def u_constraint3(u):
-					return np.linalg.norm(u)**2 - 0.01
+				# Set up the constraints:
+				def u_constraint(u):
+					u = np.reshape(u, (7,1))
+					(waypts_deform_p, waypts_prev) = self.deform(u)
+					H_features = self.featurize(waypts_deform_p)
+					Phi_H = np.array([sum(x) for x in H_features[1:]])
+					cost = 0.01 - sum((Phi_H - Phi_p)**2)
+					return cost
+
+				# Set up bounds:
+				u_bounds = []
+				for joint in range(7):
+					if u_h[joint] == 0.0:
+						u_bounds.append((0,0))
+					else:
+						u_bounds.append((None,None))
 
 				# First compute what the optimal action would have been
-				u_h_opt = minimize(u_minimizer, u_h, method='SLSQP', constraints=({'type': 'ineq', 'fun': u_constraint1}, {'type': 'ineq', 'fun': u_constraint2}, {'type': 'ineq', 'fun': u_constraint3}), options={'maxiter': 15, 'ftol': 1e-1, 'disp': True})
+				u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', bounds=u_bounds, constraints=({'type': 'ineq', 'fun': u_constraint}), options={'maxiter': 40, 'ftol': 1e-6, 'disp': True})
+				#u_h_opt = minimize(u_unconstrained, u_h, options={'maxiter': 1000, 'disp': True})
 				u_h_star = np.reshape(u_h_opt.x, (7, 1)) 
 
-				# Compute beta after filtering the torques
-				for joint in range(7):
-					if u_h[joint] != 0.0:
-						u_h[joint] -= INTERACTION_TORQUE_THRESHOLD[joint]
-					if abs(u_h_star[joint]) > 0.01:	
-						u_h_star[joint] -= INTERACTION_TORQUE_THRESHOLD[joint]
+				self.u_h = u_h
+				self.u_h_star = u_h_star
 
+				# Compute beta 
 				self.beta = self.num_features/(2*MAX_BETA*abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2))
-				print "here is u_h norm:", np.linalg.norm(u_h)
-				print "here is optimal u_h norm:", np.linalg.norm(u_h_star)
+				print "here is u_h and its norm:", u_h, np.linalg.norm(u_h)
+				print "here is optimal u_h and its norm:", u_h_star, np.linalg.norm(u_h_star)
 				print "here is beta:", self.beta
 				# Compute new weights
 				curr_weight = self.weights - self.beta * np.dot(update_gains, update)
@@ -729,7 +748,6 @@ class Planner(object):
 		"""
 		waypts_prev = copy.deepcopy(self.waypts)
 		waypts_deform = copy.deepcopy(self.waypts)
-		u_deform = copy.deepcopy(u_h)
 		gamma = np.zeros((self.n,7))
 		deform_waypt_idx = self.curr_waypt_idx + 1
 		
@@ -737,11 +755,8 @@ class Planner(object):
 			print "Deforming too close to end. Returning same trajectory"
 			return (waypts_prev, waypts_prev)
 		
-		for joint in range(7):
-			# zero-center the torque
-			if u_h[joint] != 0:
-				u_deform[joint] -= INTERACTION_TORQUE_THRESHOLD[joint]	
-			gamma[:,joint] = self.alpha*np.dot(self.H, u_deform[joint])
+		for joint in range(7):	
+			gamma[:,joint] = self.alpha*np.dot(self.H, u_h[joint])
 		waypts_deform[deform_waypt_idx : self.n + deform_waypt_idx, :] += gamma
 		return (waypts_deform, waypts_prev)
 

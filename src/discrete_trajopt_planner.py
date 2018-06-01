@@ -125,7 +125,7 @@ class DiscretePlanner(object):
 		# ---- DEFORMATION Initialization ---- #
 
 		self.alpha = -0.1
-		self.n = 10
+		self.n = 15
 		self.A = np.zeros((self.n+2, self.n))
 		np.fill_diagonal(self.A, 1)
 		for i in range(self.n):
@@ -733,6 +733,7 @@ class DiscretePlanner(object):
 				print "posterior", self.P_bt
 				print "theta marginal:", P_weight
 				print "beta average:", self.beta
+				print "update:", update[1:]
 			print "curr_weight after = " + str(curr_weight)
 
 			# clip values at max and min allowed weights
@@ -764,27 +765,6 @@ class DiscretePlanner(object):
 			if u_h[joint] != 0:
 				u[joint] -= INTERACTION_TORQUE_THRESHOLD[joint]
 			gamma[:,joint] = self.alpha*np.dot(self.H, u[joint])
-		waypts_deform[deform_waypt_idx : self.n + deform_waypt_idx, :] += gamma
-		return (waypts_deform, waypts_prev)
-
-	def deform_given_waypts(self, waypts, u_h):
-		"""
-		Deforms the next n waypoints of the given upsampled trajectory
-		updates the upsampled trajectory, stores old given trajectory
-		---
-		input is trajectory and human force, returns deformed and old waypts
-		"""
-		deform_waypt_idx = self.curr_waypt_idx + 1
-		waypts_prev = copy.deepcopy(waypts)
-		waypts_deform = copy.deepcopy(waypts)
-		gamma = np.zeros((self.n,7))
-
-		if (deform_waypt_idx + self.n) > self.num_waypts:
-			print "Deforming too close to end. Returning same trajectory"
-			return (waypts_prev, waypts_prev)
-
-		for joint in range(7):
-			gamma[:,joint] = self.alpha*np.dot(self.H, u_h[joint])
 		waypts_deform[deform_waypt_idx : self.n + deform_waypt_idx, :] += gamma
 		return (waypts_deform, waypts_prev)
 
