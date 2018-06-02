@@ -87,7 +87,7 @@ class PIDVelJaco(object):
 		sim_flag                  - flag for if in simulation or not
 	"""
 
-	def __init__(self, ID, method_type, record, debug, feat_method, feat_list, traj_cache=None, traj_rand=None, traj_optimal=None):
+	def __init__(self, ID, method_type, record, debug, feat_method, feat_list, traj_cache=None, traj_rand=None):
 		"""
 		Setup of the ROS node. Publishing computed torques happens at 100Hz.
 		"""
@@ -104,7 +104,6 @@ class PIDVelJaco(object):
 
 		# trajectory paths
 		self.traj_cache = traj_cache
-		self.traj_optimal = traj_optimal
 		self.traj_rand = traj_rand
 
 		# record experimental data mode 
@@ -165,7 +164,7 @@ class PIDVelJaco(object):
 		self.curr_pos = None
 
 		# create the trajopt planner and plan from start to goal
-		self.planner = discrete_trajopt_planner.DiscretePlanner(self.feat_method, self.feat_list, self.traj_cache, self.traj_rand, self.traj_optimal)
+		self.planner = discrete_trajopt_planner.DiscretePlanner(self.feat_method, self.feat_list, self.traj_cache, self.traj_rand)
 
 		# stores the current trajectory we are tracking, produced by planner
 		self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=None)
@@ -485,13 +484,11 @@ if __name__ == '__main__':
 		debug = sys.argv[4]
 		feat_method = sys.argv[5]
 		feat_list = [x.strip() for x in sys.argv[6].split(',')]
-		traj_cache = traj_rand = traj_optimal = None
+		traj_cache = traj_rand = None
 		if sys.argv[7] != 'None':
 			traj_cache = sys.argv[7]
 		if sys.argv[8] != 'None':
 			traj_rand = sys.argv[8]
-		if sys.argv[9] != 'None':
-			traj_optimal = sys.argv[9]
-	PIDVelJaco(ID,method_type,record,debug,feat_method,feat_list,traj_cache,traj_rand,traj_optimal)
+	PIDVelJaco(ID,method_type,record,debug,feat_method,feat_list,traj_cache,traj_rand)
 
 

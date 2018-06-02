@@ -26,7 +26,7 @@ import pickle
 
 # feature constacts (update gains and max weights)
 UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0}
-MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0}
+MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
 FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554}
 
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
@@ -44,7 +44,7 @@ class DiscretePlanner(object):
 	with TrajOpt.
 	"""
 
-	def __init__(self, feat_method, feat_list, traj_cache=None, traj_rand=None, traj_optimal=None):
+	def __init__(self, feat_method, feat_list, traj_cache=None, traj_rand=None):
 
 		# ---- important discrete variables ---- #
 		#self.weights_dict = [[-1.0, -1.0], [-1.0, 0.], [-1.0, 1.0], [0., -1.0], [0., 0.], [0., 1.0], [1.0, -1.0], [1.0, 0.], [1.0, 1.0]]
@@ -74,16 +74,13 @@ class DiscretePlanner(object):
 		self.MAX_ITER = 40
 
 		# this is the cache of trajectories computed for all max/min weights
-		self.traj_cache = self.traj_optimal = self.traj_rand = None	
+		self.traj_cache = self.traj_rand = None	
 		if traj_cache is not None:
 			here = os.path.dirname(os.path.realpath(__file__))
 			self.traj_cache = pickle.load( open( here + traj_cache, "rb" ) )
 		if traj_rand is not None:
 			here = os.path.dirname(os.path.realpath(__file__))
 			self.traj_rand = pickle.load( open( here + traj_rand, "rb" ) )
-		if traj_optimal is not None:
-			here = os.path.dirname(os.path.realpath(__file__))
-			self.traj_optimal = pickle.load( open( here + traj_optimal, "rb" ) )
 
 		# these variables are for the upsampled trajectory
 		self.waypts = None

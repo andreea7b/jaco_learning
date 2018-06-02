@@ -26,9 +26,9 @@ import itertools
 import pickle
 
 # feature constacts (update gains and max weights)
-UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0}
-MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0}
-FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554}
+UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0, 'human':100.0}
+MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
+FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554, 'human':1.0021}
 
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [0.0, 0.2, 0.0]
@@ -78,7 +78,7 @@ class Planner(object):
 		self.waypts_time = None
 
 		self.weights = [0.0]*self.num_features
-		self.beta = 1.0
+		self.beta = [1.0]*self.num_features
 		self.waypts_prev = None
 		self.waypts_deform = None
 		self.u_h = None
@@ -143,7 +143,7 @@ class Planner(object):
 		input trajectory, output list of feature values
 		"""
 		features = [self.velocity_features(waypts)]
-		features += self.num_features * [[0.0] * (len(waypts)-1)]
+		features += [[0.0 for _ in range(len(waypts)-1)] for _ in range(self.num_features)]
 		for index in range(0,len(waypts)-1):
 			for feat in range(1,self.num_features+1):
 				if self.feat_list[feat-1] == 'table':
@@ -643,12 +643,15 @@ class Planner(object):
 			self.waypts_deform = waypts_deform
 			new_features = self.featurize(waypts_deform)
 			old_features = self.featurize(waypts_prev)
+
 			Phi_p = np.array([new_features[0]] + [sum(x) for x in new_features[1:]])
 			Phi = np.array([old_features[0]] + [sum(x) for x in old_features[1:]])
 
 			self.prev_features = Phi_p
 			self.curr_features = Phi
-
+			# Print the features
+			print("Phi_H:", Phi_p)
+			print("Phi_R:", Phi)
 			# Determine alpha and max theta
 			update_gains = [0.0] * self.num_features
 			max_weights = [0.0] * self.num_features
@@ -661,7 +664,7 @@ class Planner(object):
 
 			if self.feat_method == ALL:
 				# update all weights 
-				curr_weight = self.weights - np.dot(update_gains, update[1:])
+				curr_weight = self.weights - update_gains * update[1:]
 			elif self.feat_method == MAX:
 				print "updating max weight"
 				change_in_features = np.divide(update[1:], feat_range)
@@ -677,9 +680,6 @@ class Planner(object):
 				update = update[1:]
 				Phi_p = Phi_p[1:]
 				Phi = Phi[1:]
-				# Print the features
-				print("Phi_H:", Phi_p)
-				print("Phi_R:", Phi)
 
 				# Set up the optimization problem:
 				def u_unconstrained(u):
@@ -688,7 +688,7 @@ class Planner(object):
 					H_features = self.featurize(waypts_deform_p)
 					Phi_H = np.array([sum(x) for x in H_features[1:]])
 
-					cost = np.linalg.norm(u_h)**2 + 0.1*sum((Phi_H - Phi_p)**2)
+					cost = np.linalg.norm(u_h)**2 + 0.1*(Phi_H[i] - Phi_p[i])**2
 					return cost
 
 				def u_constrained(u):
@@ -701,7 +701,7 @@ class Planner(object):
 					(waypts_deform_p, waypts_prev) = self.deform(u)
 					H_features = self.featurize(waypts_deform_p)
 					Phi_H = np.array([sum(x) for x in H_features[1:]])
-					cost = 0.01 - sum((Phi_H - Phi_p)**2)
+					cost = 0.01 - (Phi_H[i] - Phi_p[i])**2
 					return cost
 
 				# Set up bounds:
@@ -712,21 +712,22 @@ class Planner(object):
 					else:
 						u_bounds.append((None,None))
 
-				# First compute what the optimal action would have been
-				u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', bounds=u_bounds, constraints=({'type': 'ineq', 'fun': u_constraint}), options={'maxiter': 40, 'ftol': 1e-6, 'disp': True})
-				#u_h_opt = minimize(u_unconstrained, u_h, options={'maxiter': 1000, 'disp': True})
-				u_h_star = np.reshape(u_h_opt.x, (7, 1)) 
+				# Compute what the optimal action would have been wrt every feature
+				for i in range(self.num_features):
+					u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', bounds=u_bounds, constraints=({'type': 'ineq', 'fun': u_constraint}), options={'maxiter': 40, 'ftol': 1e-6, 'disp': True})
+					#u_h_opt = minimize(u_unconstrained, u_h, options={'maxiter': 1000, 'disp': True})
+					u_h_star = np.reshape(u_h_opt.x, (7, 1)) 
 
-				self.u_h = u_h
-				self.u_h_star = u_h_star
+					self.u_h = u_h
+					self.u_h_star = u_h_star
 
-				# Compute beta 
-				self.beta = self.num_features/(2*MAX_BETA*abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2))
-				print "here is u_h and its norm:", u_h, np.linalg.norm(u_h)
-				print "here is optimal u_h and its norm:", u_h_star, np.linalg.norm(u_h_star)
-				print "here is beta:", self.beta
+					# Compute beta 
+					self.beta[i] = 1/(2*MAX_BETA*abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2))
+					print "here is u_h and its norm:", u_h, np.linalg.norm(u_h)
+					print "here is optimal u_h and its norm:", u_h_star, np.linalg.norm(u_h_star)
+					print "here is beta:", self.beta
 				# Compute new weights
-				curr_weight = self.weights - self.beta * np.dot(update_gains, update)
+				curr_weight = self.weights - np.array(self.beta)*update_gains*update
 
 			# clip values at max and min allowed weights
 			for i in range(self.num_features):

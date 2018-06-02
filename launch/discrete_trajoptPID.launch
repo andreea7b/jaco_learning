@@ -24,13 +24,9 @@
 	<!-- Location with trajectory random -->
 	<arg name="traj_rand" default="None"/>
 
-	<!-- Location with trajectory optimal -->
-	<arg name="traj_optimal" default="None"/>
-
 	<!-- velocity-based with trajopt planning PID -->
 	<node name="pid_trajopt" pkg="beta_adaptive_pHRI" type="discrete_pid_trajopt.py"
 	args="$(arg ID) $(arg method_type) $(arg record) $(arg debug)
-	$(arg feat_method) $(arg feat_list) $(arg traj_cache) $(arg traj_rand) $(arg
-	traj_optimal)" output="screen"/>
+	$(arg feat_method) $(arg feat_list) $(arg traj_cache) $(arg traj_rand)" output="screen"/>
 
 </launch>

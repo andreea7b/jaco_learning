@@ -49,9 +49,9 @@ place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 
 epsilon = 0.10							# epislon for when robot think it's at goal
 MAX_CMD_TORQUE = 40.0					# max command robot can send
-INTERACTION_TORQUE_THRESHOLD = [1.0, 18.0, 0.0, 5.5, -1.0, 1.5, 0.5] # threshold when interaction is measured 
+INTERACTION_TORQUE_THRESHOLD = [1.0, 18.0, 0.0, 5.0, -1.0, 1.5, 0.0] # threshold when interaction is measured 
 #INTERACTION_TORQUE_BALANCE = [.3, .7, .7, .3, .3, 1.6, 0]
-INTERACTION_TORQUE_EPSILON = [4.0, 6.0, 3.0, 4.0, 2.0, 2.0, 1.0]
+INTERACTION_TORQUE_EPSILON = [4.0, 6.0, 3.0, 3.0, 2.0, 2.0, 2.0]
 
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
 
@@ -154,7 +154,6 @@ class PIDVelJaco(object):
 		place = place_lower
 		if 'human' in self.feat_list:
 			pick = pick_shelf
-			place = place_higher
 		if 'coffee' in self.feat_list:
 			pick = pick_basic_EEtilt
 
