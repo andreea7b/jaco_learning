@@ -28,13 +28,14 @@ import pickle
 # feature constacts (update gains and max weights)
 UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0, 'human':100.0}
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
-FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554, 'human':1.0021}
+FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554, 'human':0.0}
+MAX_BETA = {'table':0.1, 'coffee':0.05}
 
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [0.0, 0.2, 0.0]
-INTERACTION_TORQUE_THRESHOLD = [1.0, 18.0, 0.0, 5.5, -1.0, 1.5, 0.5]							  			  # max command robot can send
-
-MAX_BETA = 0.015
+INTERACTION_TORQUE_THRESHOLD = [0.88414821, 17.22751856, -0.40134936,  6.23537946, -0.90013662, 1.32379884,  0.10218059]
+INTERACTION_TORQUE_EPSILON = [3.5, 5.19860601, 3.43663145, 4.20296168, 2.5, 2.18056208, 2.0]
+INTERACTION_TORQUE_EPSILON = [2.5, 4.5, 1.5, 2.5, 1.5, 1.5, 1.5]
 
 # feature learning methods
 ALL = "ALL"					# updates all features
@@ -108,7 +109,7 @@ class Planner(object):
 		#plotLaptop(self.env,self.bodies,OBS_CENTER)
 		#plotCabinet(self.env)
 		#plotSphere(self.env,self.bodies,OBS_CENTER,0.4)
-		#plotSphere(self.env,self.bodies,HUMAN_CENTER,1)
+		plotSphere(self.env,self.bodies,HUMAN_CENTER,1)
 
 		# ---- DEFORMATION Initialization ---- #
 
@@ -637,8 +638,9 @@ class Planner(object):
 		for joint in range(7):
 			if u_h[joint] != 0:
 				u_h[joint] -= INTERACTION_TORQUE_THRESHOLD[joint]
+				#u_h[joint] /= INTERACTION_TORQUE_EPSILON[joint]
 		(waypts_deform, waypts_prev) = self.deform(u_h)	
-		
+		print "u_h: ", u_h
 		if waypts_deform is not None:
 			self.waypts_deform = waypts_deform
 			new_features = self.featurize(waypts_deform)
@@ -688,7 +690,7 @@ class Planner(object):
 					H_features = self.featurize(waypts_deform_p)
 					Phi_H = np.array([sum(x) for x in H_features[1:]])
 
-					cost = np.linalg.norm(u_h)**2 + 0.1*(Phi_H[i] - Phi_p[i])**2
+					cost = np.linalg.norm(u_h)**2 + 100*(Phi_H[i] - Phi_p[i])**2
 					return cost
 
 				def u_constrained(u):
@@ -701,28 +703,21 @@ class Planner(object):
 					(waypts_deform_p, waypts_prev) = self.deform(u)
 					H_features = self.featurize(waypts_deform_p)
 					Phi_H = np.array([sum(x) for x in H_features[1:]])
-					cost = 0.01 - (Phi_H[i] - Phi_p[i])**2
+					cost = (Phi_H[i] - Phi_p[i])**2
 					return cost
-
-				# Set up bounds:
-				u_bounds = []
-				for joint in range(7):
-					if u_h[joint] == 0.0:
-						u_bounds.append((0,0))
-					else:
-						u_bounds.append((None,None))
 
 				# Compute what the optimal action would have been wrt every feature
 				for i in range(self.num_features):
-					u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', bounds=u_bounds, constraints=({'type': 'ineq', 'fun': u_constraint}), options={'maxiter': 40, 'ftol': 1e-6, 'disp': True})
-					#u_h_opt = minimize(u_unconstrained, u_h, options={'maxiter': 1000, 'disp': True})
+					u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 40, 'ftol': 1e-6, 'disp': True})
+					#u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 1000, 'disp': True})
 					u_h_star = np.reshape(u_h_opt.x, (7, 1)) 
 
 					self.u_h = u_h
 					self.u_h_star = u_h_star
 
 					# Compute beta 
-					self.beta[i] = 1/(2*MAX_BETA*abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2))
+					beta_norm = MAX_BETA[self.feat_list[i]]
+					self.beta[i] = 1/(2*beta_norm*abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2))
 					print "here is u_h and its norm:", u_h, np.linalg.norm(u_h)
 					print "here is optimal u_h and its norm:", u_h_star, np.linalg.norm(u_h_star)
 					print "here is beta:", self.beta

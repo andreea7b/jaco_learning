@@ -49,10 +49,12 @@ place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 
 epsilon = 0.10							# epislon for when robot think it's at goal
 MAX_CMD_TORQUE = 40.0					# max command robot can send
-INTERACTION_TORQUE_THRESHOLD = [1.0, 18.0, 0.0, 5.0, -1.0, 1.5, 0.0] # threshold when interaction is measured 
-#INTERACTION_TORQUE_BALANCE = [.3, .7, .7, .3, .3, 1.6, 0]
-INTERACTION_TORQUE_EPSILON = [4.0, 6.0, 3.0, 3.0, 2.0, 2.0, 2.0]
-
+INTERACTION_TORQUE_THRESHOLD = [0.88414821, 17.22751856, -0.40134936,  6.23537946, -0.90013662, 1.32379884,  0.10218059]
+INTERACTION_TORQUE_EPSILON = [3.5, 5.19860601, 3.43663145, 4.20296168, 2.5, 2.18056208, 2.0]
+#INTERACTION_TORQUE_THRESHOLD_H = [1.36192323,  3.65373421, -0.68740237,  4.7870034 ,  0.00609922, 0.78909187,  0.08676397]
+#INTERACTION_TORQUE_EPSILON_H = [1.08428119, 16.4806366 ,  2.17833173,  3.66202366,  1.19402969, 0.90049668,  0.05292616]
+INTERACTION_TORQUE_EPSILON = [1.23024002, 2.11410761, 0.37168837, 1.08928728, 0.14269492, 0.18044418, 0.0409207]
+INTERACTION_TORQUE_EPSILON = [2.5, 4.5, 1.5, 2.5, 1.5, 1.5, 1.5]
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
 
 IMPEDANCE = 'A'
@@ -152,8 +154,12 @@ class PIDVelJaco(object):
 		# by default for table and laptop, these are the pick and place
 		pick = pick_basic
 		place = place_lower
-		if 'human' in self.feat_list:
-			pick = pick_shelf
+		#INTERACTION_TORQUE_THRESHOLD = INTERACTION_TORQUE_THRESHOLD_T
+		#INTERACTION_TORQUE_EPSILON = INTERACTION_TORQUE_EPSILON_T
+		#if 'human' in self.feat_list:
+			#pick = pick_shelf
+			#INTERACTION_TORQUE_THRESHOLD = INTERACTION_TORQUE_THRESHOLD_H
+			#INTERACTION_TORQUE_EPSILON = INTERACTION_TORQUE_EPSILON_H
 		if 'coffee' in self.feat_list:
 			pick = pick_basic_EEtilt
 
@@ -169,7 +175,6 @@ class PIDVelJaco(object):
 
 		# stores the current trajectory we are tracking, produced by planner
 		self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=None)
-
 		print "original traj: " + str(self.traj)
 
 		# If debug mode on, save the trajectory for future inspection
@@ -344,9 +349,9 @@ class PIDVelJaco(object):
 		# read the current joint torques from the robot
 		torque_curr = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
 		interaction = False
+
 		for i in range(7):
 			THRESHOLD = INTERACTION_TORQUE_THRESHOLD[i]
-			#torque_curr[i][0] -= INTERACTION_TORQUE_BALANCE[i]
 			if np.fabs(torque_curr[i][0] - THRESHOLD) > INTERACTION_TORQUE_EPSILON[i] and self.reached_start:
 				interaction = True
 			else:
@@ -367,7 +372,6 @@ class PIDVelJaco(object):
 					print "in joint torques callback: going to plan..."
 					self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=self.traj)
 					print "in joint torques callback: finished planning -- self.traj = " + str(self.traj)
-
 					# If debug mode on, save the trajectory for future inspection
 					if self.debug:
 						self.traj_stored.append(self.planner.waypts)
