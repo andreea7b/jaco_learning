@@ -54,7 +54,7 @@ INTERACTION_TORQUE_EPSILON = [3.5, 5.19860601, 3.43663145, 4.20296168, 2.5, 2.18
 #INTERACTION_TORQUE_THRESHOLD_H = [1.36192323,  3.65373421, -0.68740237,  4.7870034 ,  0.00609922, 0.78909187,  0.08676397]
 #INTERACTION_TORQUE_EPSILON_H = [1.08428119, 16.4806366 ,  2.17833173,  3.66202366,  1.19402969, 0.90049668,  0.05292616]
 INTERACTION_TORQUE_EPSILON = [1.23024002, 2.11410761, 0.37168837, 1.08928728, 0.14269492, 0.18044418, 0.0409207]
-INTERACTION_TORQUE_EPSILON = [2.5, 4.5, 1.5, 2.5, 1.5, 1.5, 1.5]
+INTERACTION_TORQUE_EPSILON = [3.0, 5.0, 2.0, 3.0, 1.5, 1.5, 1.5]
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
 
 IMPEDANCE = 'A'
@@ -90,7 +90,7 @@ class PIDVelJaco(object):
 		sim_flag                  - flag for if in simulation or not
 	"""
 
-	def __init__(self, ID, method_type, record, debug, feat_method, feat_list, traj_cache=None):
+	def __init__(self, ID, method_type, record, feat_method, feat_list, traj_cache=None):
 		"""
 		Setup of the ROS node. Publishing computed torques happens at 100Hz.
 		"""
@@ -102,7 +102,7 @@ class PIDVelJaco(object):
 
 		# can be strings 'table', 'coffee', 'human', 'origin', 'laptop'
 		self.feat_list = feat_list
-		self.num_feats = len(self.feat_list)
+		self.num_feat = len(self.feat_list)
 
 		# traj_cache: None or path to trajectory cache
 		self.traj_cache = traj_cache
@@ -116,22 +116,6 @@ class PIDVelJaco(object):
 			print "Oopse - it is unclear if you want to record data. Not recording data."
 			self.record = False
 
-		# debug mode 
-		if debug == "F" or debug == "f":
-			self.debug = False
-		elif debug == "T" or debug == "t":
-			self.debug = True
-			self.traj_stored = []
-			self.traj_deformed = []
-			self.traj_final = []
-			self.betas = []
-			self.u_h = []
-			self.u_h_star = []
-			self.interaction_pts = []
-		else:
-			print "Oopse - it is unclear if you want to debug. Not debuging."
-			self.debug = False
-
 		# start admittance control mode
 		self.start_admittance_mode()
 
@@ -140,14 +124,14 @@ class PIDVelJaco(object):
 		# total time for trajectory
 		self.T = 20.0   #TODO THIS IS EXPERIMENTAL - used to be 15.0
 
-		# initialize trajectory weights
+		# initialize trajectory weights and betas
 
-		# TODO THIS IS EXPERIMENTAL - CHANGE BACK TO ALL 0
-		self.weights = [0.0]*self.num_feats
+		self.weights = [0.0]*self.num_feat
+		self.betas = [1.0]*self.num_feat
 
 		# if in demo mode, then set the weights to be optimal
 		if self.method_type == DEMONSTRATION:
-			for feat in range(0,self.num_feats):
+			for feat in range(0,self.num_feat):
 				self.weights[feat] = MAX_WEIGHTS[feat_list[feat]]
 
 		# initialize start/goal based on features
@@ -156,8 +140,8 @@ class PIDVelJaco(object):
 		place = place_lower
 		#INTERACTION_TORQUE_THRESHOLD = INTERACTION_TORQUE_THRESHOLD_T
 		#INTERACTION_TORQUE_EPSILON = INTERACTION_TORQUE_EPSILON_T
-		#if 'human' in self.feat_list:
-			#pick = pick_shelf
+		if 'human' in self.feat_list:
+			pick = pick_shelf
 			#INTERACTION_TORQUE_THRESHOLD = INTERACTION_TORQUE_THRESHOLD_H
 			#INTERACTION_TORQUE_EPSILON = INTERACTION_TORQUE_EPSILON_H
 		if 'coffee' in self.feat_list:
@@ -176,10 +160,6 @@ class PIDVelJaco(object):
 		# stores the current trajectory we are tracking, produced by planner
 		self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=None)
 		print "original traj: " + str(self.traj)
-
-		# If debug mode on, save the trajectory for future inspection
-		if self.debug:
-			self.traj_stored.append(self.planner.waypts)
 
 		# save intermediate target position from degrees (default) to radians 
 		self.target_pos = start.reshape((7,1))
@@ -216,10 +196,11 @@ class PIDVelJaco(object):
 		self.controller = pid.PID(self.P,self.I,self.D,0,0)
 
 		# ---- Experimental Utils ---- #
-
 		self.expUtil = exp_utils.experiment_utils.ExperimentUtils()
 		# update the list of replanned trajectories with new trajectory
 		self.expUtil.update_replanned_trajList(0.0, self.traj)
+		# update the list of replanned waypoints with new waypoints
+		self.expUtil.update_replanned_wayptsList(0.0, self.planner.waypts)
 
 		# ---- ROS Setup ---- #
 
@@ -227,9 +208,6 @@ class PIDVelJaco(object):
 
 		# create joint-velocity publisher
 		self.vel_pub = rospy.Publisher(prefix + '/in/joint_velocity', kinova_msgs.msg.JointVelocity, queue_size=1)
-
-		# create a beta publisher
-		self.beta_pub = rospy.Publisher(prefix + '/in/beta', Float32, queue_size=1)
 
 		# create subscriber to joint_angles
 		rospy.Subscriber(prefix + '/out/joint_angles', kinova_msgs.msg.JointAngles, self.joint_angles_callback, queue_size=1)
@@ -249,7 +227,6 @@ class PIDVelJaco(object):
 				break
 
 			self.vel_pub.publish(ros_utils.cmd_to_JointVelocityMsg(self.cmd))
-			self.beta_pub.publish(self.planner.beta)
 			r.sleep()
 
 		print "----------------------------------"
@@ -258,52 +235,29 @@ class PIDVelJaco(object):
 		#self.planner.plot_feature_update()
 		#self.planner.plot_weight_update()
 
-		# If debug mode is on, pickle the data
-		if self.debug:
-			savestr = "_".join(self.feat_list)
-			savefile = "/traj_dump/traj_stored_"+savestr+".p"
-			here = os.path.dirname(os.path.realpath(__file__))
-			pickle.dump(self.traj_stored, open( here + savefile, "wb" ) )
-
-			savefile = "/traj_dump/traj_deformed_"+savestr+".p"
-			pickle.dump(self.traj_deformed, open( here + savefile, "wb" ) )
-
-			savefile = "/traj_dump/traj_final_"+savestr+".p"
-			pickle.dump(self.traj_final, open( here + savefile, "wb" ) )
-
-			savefile = "/traj_dump/betas_"+savestr+".p"
-			pickle.dump(self.betas, open( here + savefile, "wb" ) )
-
-			savefile = "/traj_dump/iact_pts_"+savestr+".p"
-			pickle.dump(self.interaction_pts, open( here + savefile, "wb" ) )
-
-			if self.feat_method == BETA:
-				savefile = "/traj_dump/u_hs_"+savestr+".p"
-				pickle.dump(self.u_h, open( here + savefile, "wb" ) )
-				savefile = "/traj_dump/u_h_stars_"+savestr+".p"
-				pickle.dump(self.u_h_star, open( here + savefile, "wb" ) )
-			self.debug = False
-
 		# save experimental data (only if experiment started)
 		if self.record and self.reached_start:
 			print "Saving experimental data to file..."
-			if self.feat_method == ALL:
-				method = "A"
-			elif self.feat_method == MAX:
-				method = "B"
-			elif self.feat_method == BETA:
-				method = "C"
-
-			weights_filename = "weights" + str(ID) + str(self.num_feat) + method
-			force_filename = "force" + str(ID) + str(self.num_feat) + method
-			tracked_filename = "tracked" + str(ID) + str(self.num_feat) + method
-			deformed_filename = "deformed" + str(ID) + str(self.num_feat) + method
-			replanned_filename = "replanned" + str(ID) + str(self.num_feat) + method
+			settings_string = str(ID) + "_" + self.method_type + "_" + self.feat_method + "_" + "_".join(feat_list)
+			weights_filename = "weights_" + settings_string
+			betas_filename = "betas" + settings_string
+			force_filename = "force" + settings_string
+			interaction_pts_filename = "interaction_pts" + settings_string
+			tracked_filename = "tracked" + settings_string
+			deformed_filename = "deformed" + settings_string
+			deformed_waypts_filename = "deformed_waypts" + settings_string
+			replanned_filename = "replanned" + settings_string
+			replanned_waypts_filename = "replanned_waypts" + settings_string
+			
 			self.expUtil.pickle_weights(weights_filename)
+			self.expUtil.pickle_betas(betas_filename)
 			self.expUtil.pickle_force(force_filename)
+			self.expUtil.pickle_interaction_pts(interaction_pts_filename)
 			self.expUtil.pickle_tracked_traj(tracked_filename)
-			self.expUtil.pickle_deformed_traj(deformed_filename)
+			self.expUtil.pickle_deformed_trajList(deformed_filename)
+			self.expUtil.pickle_deformed_wayptsList(deformed_waypts_filename)
 			self.expUtil.pickle_replanned_trajList(replanned_filename)
+			self.expUtil.pickle_replanned_wayptsList(replanned_waypts_filename)
 
 		# end admittance control mode
 		self.stop_admittance_mode()
@@ -354,6 +308,8 @@ class PIDVelJaco(object):
 			THRESHOLD = INTERACTION_TORQUE_THRESHOLD[i]
 			if np.fabs(torque_curr[i][0] - THRESHOLD) > INTERACTION_TORQUE_EPSILON[i] and self.reached_start:
 				interaction = True
+				#center torques around zero
+				torque_curr[i][0] -= THRESHOLD
 			else:
 				#zero out torques below threshold for cleanliness
 				torque_curr[i][0] = 0.0
@@ -365,33 +321,34 @@ class PIDVelJaco(object):
 			if self.reached_start and not self.reached_goal:
 				timestamp = time.time() - self.path_start_T
 				self.expUtil.update_tauH(timestamp, torque_curr)
+				self.expUtil.update_interaction_point(timestamp, self.curr_pos)
 
 				if self.method_type == LEARNING:
 					self.weights = self.planner.learnWeights(torque_curr)
+					self.betas = self.planner.betas
 
 					print "in joint torques callback: going to plan..."
 					self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=self.traj)
 					print "in joint torques callback: finished planning -- self.traj = " + str(self.traj)
-					# If debug mode on, save the trajectory for future inspection
-					if self.debug:
-						self.traj_stored.append(self.planner.waypts)
-						self.traj_deformed.append(self.planner.waypts_deform)
-						self.betas.append(self.planner.beta)
-						self.interaction_pts.append(self.curr_pos)
-						if self.feat_method == BETA:
-							self.u_h.append(self.planner.u_h)
-							self.u_h_star.append(self.planner.u_h_star)
 
-					# update the experimental data with new weights
+					# update the experimental data with new weights and new betas
 					timestamp = time.time() - self.path_start_T
 					self.expUtil.update_weights(timestamp, self.weights)
+					self.expUtil.update_betas(timestamp, self.betas)
 
 					# update the list of replanned trajectories with new trajectory
 					self.expUtil.update_replanned_trajList(timestamp, self.traj)
 
+					# update the list of replanned trajectory waypts with new trajectory
+					self.expUtil.update_replanned_wayptsList(timestamp, self.planner.waypts)
+
 					# store deformed trajectory
 					deformed_traj = self.planner.get_waypts_plan()
-					self.expUtil.update_deformed_traj(deformed_traj)
+					self.expUtil.update_deformed_trajList(timestamp, deformed_traj)
+
+					# store deformed trajectory waypoints
+					deformed_traj_waypts = self.planner.waypts_deform
+					self.expUtil.update_deformed_wayptsList(timestamp, deformed_traj_waypts)
 
 	def joint_angles_callback(self, msg):
 		"""
@@ -454,9 +411,8 @@ class PIDVelJaco(object):
 				# set start time and the original weights as experimental data
 				self.expUtil.set_startT(self.path_start_T)
 				timestamp = time.time() - self.path_start_T
-				#self.expUtil.update_weights(timestamp, self.weights)
 			else:
-				print "NOT AT START"
+				#print "NOT AT START"
 				# if not at start of trajectory yet, set starting position 
 				# of the trajectory as the current target position
 				self.target_pos = self.start_pos
@@ -470,10 +426,6 @@ class PIDVelJaco(object):
 			# check if the arm reached the goal, and restart path
 			if not self.reached_goal:
 				#print "REACHED START --> EXECUTING PATH"
-				if self.debug:
-					# save the current position
-					self.traj_final.append(curr_pos)
-
 				dist_from_goal = -((curr_pos - self.goal_pos + math.pi)%(2*math.pi) - math.pi)
 				dist_from_goal = np.fabs(dist_from_goal)
 
@@ -486,25 +438,24 @@ class PIDVelJaco(object):
 				if is_at_goal:
 					self.reached_goal = True
 			else:
-				#print "REACHED GOAL! Holding position at goal."
+				print "REACHED GOAL! Holding position at goal."
 				self.target_pos = self.goal_pos
 
 				# TODO: this should only set it once!
 				self.expUtil.set_endT(time.time())
 
 if __name__ == '__main__':
-	if len(sys.argv) < 10:
-		print "ERROR: Not enough arguments. Specify ID, method_type, record, debug, feat_method, feat_list"
+	if len(sys.argv) < 8:
+		print "ERROR: Not enough arguments. Specify ID, method_type, record, feat_method, feat_list"
 	else:
 		ID = int(sys.argv[1])
 		method_type = sys.argv[2]
 		record = sys.argv[3]
-		debug = sys.argv[4]
-		feat_method = sys.argv[5]
-		feat_list = [x.strip() for x in sys.argv[6].split(',')]
+		feat_method = sys.argv[4]
+		feat_list = [x.strip() for x in sys.argv[5].split(',')]
 		traj_cache = None
-		if sys.argv[7] != 'None':
-			traj_cache = sys.argv[7]
-	PIDVelJaco(ID,method_type,record,debug,feat_method,feat_list,traj_cache)
+		if sys.argv[6] != 'None':
+			traj_cache = sys.argv[6]
+	PIDVelJaco(ID,method_type,record,feat_method,feat_list,traj_cache)
 
 

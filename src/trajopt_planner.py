@@ -24,18 +24,19 @@ import copy
 import os
 import itertools
 import pickle
+import cProfile
 
 # feature constacts (update gains and max weights)
 UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0, 'human':100.0}
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
 FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554, 'human':0.0}
-MAX_BETA = {'table':0.1, 'coffee':0.05}
+MAX_BETA = {'table':0.05, 'coffee':0.03}
 
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [0.0, 0.2, 0.0]
 INTERACTION_TORQUE_THRESHOLD = [0.88414821, 17.22751856, -0.40134936,  6.23537946, -0.90013662, 1.32379884,  0.10218059]
 INTERACTION_TORQUE_EPSILON = [3.5, 5.19860601, 3.43663145, 4.20296168, 2.5, 2.18056208, 2.0]
-INTERACTION_TORQUE_EPSILON = [2.5, 4.5, 1.5, 2.5, 1.5, 1.5, 1.5]
+INTERACTION_TORQUE_EPSILON = [3.0, 5.0, 2.0, 3.0, 1.5, 1.5, 1.5]
 
 # feature learning methods
 ALL = "ALL"					# updates all features
@@ -79,11 +80,9 @@ class Planner(object):
 		self.waypts_time = None
 
 		self.weights = [0.0]*self.num_features
-		self.beta = [1.0]*self.num_features
+		self.betas = [1.0]*self.num_features
 		self.waypts_prev = None
 		self.waypts_deform = None
-		self.u_h = None
-		self.u_h_star = None
 
 		# ---- Plotting weights & features over time ---- #
 		self.weight_update = None
@@ -231,7 +230,6 @@ class Planner(object):
 		self.robot.SetDOFValues(waypt)
 		coords = robotToCartesian(self.robot)
 		EEcoord_z = coords[6][2]
-		#print "EE z distance:", EEcoord_z
 		return EEcoord_z
 
 	def table_cost(self, waypt):
@@ -634,13 +632,8 @@ class Planner(object):
 		---
 		input is human force and returns updated weights 
 		"""
-		# zero-center the torque
-		for joint in range(7):
-			if u_h[joint] != 0:
-				u_h[joint] -= INTERACTION_TORQUE_THRESHOLD[joint]
-				#u_h[joint] /= INTERACTION_TORQUE_EPSILON[joint]
 		(waypts_deform, waypts_prev) = self.deform(u_h)	
-		print "u_h: ", u_h
+
 		if waypts_deform is not None:
 			self.waypts_deform = waypts_deform
 			new_features = self.featurize(waypts_deform)
@@ -651,9 +644,7 @@ class Planner(object):
 
 			self.prev_features = Phi_p
 			self.curr_features = Phi
-			# Print the features
-			print("Phi_H:", Phi_p)
-			print("Phi_R:", Phi)
+
 			# Determine alpha and max theta
 			update_gains = [0.0] * self.num_features
 			max_weights = [0.0] * self.num_features
@@ -708,21 +699,18 @@ class Planner(object):
 
 				# Compute what the optimal action would have been wrt every feature
 				for i in range(self.num_features):
-					u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 40, 'ftol': 1e-6, 'disp': True})
+					u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 20, 'ftol': 1e-6, 'disp': True})
 					#u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 1000, 'disp': True})
 					u_h_star = np.reshape(u_h_opt.x, (7, 1)) 
 
-					self.u_h = u_h
-					self.u_h_star = u_h_star
-
 					# Compute beta 
 					beta_norm = MAX_BETA[self.feat_list[i]]
-					self.beta[i] = 1/(2*beta_norm*abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2))
+					self.betas[i] = 1/(2*beta_norm*abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2))
 					print "here is u_h and its norm:", u_h, np.linalg.norm(u_h)
 					print "here is optimal u_h and its norm:", u_h_star, np.linalg.norm(u_h_star)
-					print "here is beta:", self.beta
+					print "here is beta:", self.betas
 				# Compute new weights
-				curr_weight = self.weights - np.array(self.beta)*update_gains*update
+				curr_weight = self.weights - np.array(self.betas)*update_gains*update
 
 			# clip values at max and min allowed weights
 			for i in range(self.num_features):

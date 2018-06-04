@@ -31,8 +31,8 @@ FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554}
 
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [0.0, 0.2, 0.0]
-INTERACTION_TORQUE_THRESHOLD = [0, 18.0, -0.5, 5.0, -1.0, 0.0, 0.5]
-
+INTERACTION_TORQUE_THRESHOLD = [0.88414821, 17.22751856, -0.40134936,  6.23537946, -0.90013662, 1.32379884,  0.10218059]
+INTERACTION_TORQUE_EPSILON = [3.0, 5.0, 2.0, 3.0, 1.5, 1.5, 1.5]
 # feature learning methods
 ALL = "ALL"					# updates all features
 MAX = "MAX"					# updates only feature that changed the most

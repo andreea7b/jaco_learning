@@ -87,7 +87,7 @@ class PIDVelJaco(object):
 		sim_flag                  - flag for if in simulation or not
 	"""
 
-	def __init__(self, ID, method_type, record, debug, feat_method, feat_list, traj_cache=None, traj_rand=None):
+	def __init__(self, ID, method_type, record, feat_method, feat_list, traj_cache=None, traj_rand=None):
 		"""
 		Setup of the ROS node. Publishing computed torques happens at 100Hz.
 		"""
@@ -481,14 +481,13 @@ if __name__ == '__main__':
 		ID = int(sys.argv[1])
 		method_type = sys.argv[2]
 		record = sys.argv[3]
-		debug = sys.argv[4]
-		feat_method = sys.argv[5]
-		feat_list = [x.strip() for x in sys.argv[6].split(',')]
+		feat_method = sys.argv[4]
+		feat_list = [x.strip() for x in sys.argv[5].split(',')]
 		traj_cache = traj_rand = None
+		if sys.argv[6] != 'None':
+			traj_cache = sys.argv[6]
 		if sys.argv[7] != 'None':
-			traj_cache = sys.argv[7]
-		if sys.argv[8] != 'None':
-			traj_rand = sys.argv[8]
-	PIDVelJaco(ID,method_type,record,debug,feat_method,feat_list,traj_cache,traj_rand)
+			traj_rand = sys.argv[7]
+	PIDVelJaco(ID,method_type,record,feat_method,feat_list,traj_cache,traj_rand)
 
 

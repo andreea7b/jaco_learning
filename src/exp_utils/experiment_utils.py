@@ -26,16 +26,29 @@ class ExperimentUtils(object):
 		# stores dictionary of all the replanned trajectories
 		self.replanned_trajList = {}
 
-		# stores trajectory as it is deformed
-		self.deformed_traj = None
+		# stores dictionary of all the replanned waypoints
+		self.replanned_wayptsList = {}
+
+		# stores trajectories as they are deformed
+		self.deformed_trajList = {}
+
+		# stores trajectory waypoints as they are deformed
+		self.deformed_wayptsList = {}
 
 		# stores the list of positions as the robot is moving 
 		# in the form [timestamp, j1, j2, ... , j7]
 		self.tracked_traj = None
 
+		# stores list of interaction waypoints
+		self.interaction_pts = None
+
 		# stores weights over time 
-		# always in the form [timestamp, weight1, weight2, weight3]
+		# always in the form [timestamp, weight1, ..., weightN]
 		self.weights = None
+
+		# stores betas over time 
+		# always in the form [timestamp, beta1, ..., betaN]
+		self.betas = None
 
 		# stores running list of forces applied by human
 		# in the form [timestamp, j1, j2, ... , j7]
@@ -54,11 +67,26 @@ class ExperimentUtils(object):
 		if timestamp not in self.replanned_trajList:
 			self.replanned_trajList[timestamp] = traj
 
-	def update_deformed_traj(self, waypts):
+	def update_replanned_wayptsList(self, timestamp, waypts):
+		"""
+		Updates the dictionary of replanned trajectory waypoints since the start.
+		"""
+		if timestamp not in self.replanned_wayptsList:
+			self.replanned_wayptsList[timestamp] = waypts
+
+	def update_deformed_trajList(self, timestamp, waypts):
 		"""
 		Updates the deformed trajectory
 		"""
-		self.deformed_traj = waypts
+		if timestamp not in self.deformed_trajList:
+			self.deformed_trajList[timestamp] = waypts
+
+	def update_deformed_wayptsList(self, timestamp, waypts):
+		"""
+		Updates the deformed trajectory waypoints
+		"""
+		if timestamp not in self.deformed_wayptsList:
+			self.deformed_wayptsList[timestamp] = waypts
 
 	def update_tracked_traj(self, timestamp, curr_pos):
 		"""
@@ -82,6 +110,17 @@ class ExperimentUtils(object):
 		else:
 			self.tauH = np.vstack([self.tauH, currTau])
 
+	def update_interaction_point(self, timestamp, interaction_point):
+		"""
+		Uses current position reading from the robot during interaction
+		Saves timestamp when this position was read
+		""" 
+		curr_iact_pt = np.append([timestamp], interaction_point.reshape(7))
+		if self.interaction_pts is None:
+			self.interaction_pts = np.array([curr_iact_pt])
+		else:
+			self.interaction_pts = np.vstack([self.interaction_pts, curr_iact_pt])
+
 	def update_weights(self, timestamp, new_weight):
 		"""
 		Updates list of timestamped weights
@@ -94,6 +133,19 @@ class ExperimentUtils(object):
 			self.weights = np.array([new_w])
 		else:
 			self.weights = np.vstack([self.weights, new_w])
+
+	def update_betas(self, timestamp, new_beta):
+		"""
+		Updates list of timestamped betas
+		"""
+		if new_beta is None:
+			print "in update_betas: new_beta is None..."
+			return 
+		new_b = np.array([timestamp] + new_beta)
+		if self.betas is None:
+			self.betas = np.array([new_b])
+		else:
+			self.betas = np.vstack([self.betas, new_b])
 	
 	def set_startT(self,start_t):
 		"""
@@ -111,7 +163,7 @@ class ExperimentUtils(object):
 
 	def get_unique_filepath(self,subdir,filename):
 		# get the current script path
-		here = os.path.dirname(os.path.realpath(__file__))
+		here = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..'))
 		subdir = "/data/experimental/"+subdir+"/"
 		filepath = here + subdir + filename + "1.p"
 
@@ -130,14 +182,29 @@ class ExperimentUtils(object):
 		filepath = self.get_unique_filepath("replanned",filename)
 		pickle.dump(self.replanned_trajList, open( filepath, "wb" ) )
 
-
-	def pickle_deformed_traj(self, filename):
+	def pickle_replanned_wayptsList(self, filename):
 		"""
-		Pickles the deformed_traj data structure for later analysis. 
+		Pickles the replanned_wayptsList data structure for later analysis. 
+		"""
+
+		filepath = self.get_unique_filepath("replanned_waypts",filename)
+		pickle.dump(self.replanned_wayptsList, open( filepath, "wb" ) )
+
+	def pickle_deformed_trajList(self, filename):
+		"""
+		Pickles the deformed_trajList data structure for later analysis. 
 		"""
 
 		filepath = self.get_unique_filepath("deformed",filename)
-		pickle.dump(self.deformed_traj, open( filepath, "wb" ) )
+		pickle.dump(self.deformed_trajList, open( filepath, "wb" ) )
+
+	def pickle_deformed_wayptsList(self, filename):
+		"""
+		Pickles the deformed_wayptsList data structure for later analysis. 
+		"""
+
+		filepath = self.get_unique_filepath("deformed_waypts",filename)
+		pickle.dump(self.deformed_wayptsList, open( filepath, "wb" ) )
 
 	def pickle_tracked_traj(self, filename):
 		"""
@@ -154,6 +221,22 @@ class ExperimentUtils(object):
 
 		filepath = self.get_unique_filepath("weights",filename)
 		pickle.dump(self.weights, open( filepath, "wb" ) )
+
+	def pickle_betas(self, filename):
+		"""
+		Pickles the betas data structure for later analysis. 
+		"""
+
+		filepath = self.get_unique_filepath("betas",filename)
+		pickle.dump(self.betas, open( filepath, "wb" ) )
+
+	def pickle_interaction_pts(self, filename):
+		"""
+		Pickles the interaction_pts data structure for later analysis. 
+		"""
+
+		filepath = self.get_unique_filepath("interaction_pts",filename)
+		pickle.dump(self.interaction_pts, open( filepath, "wb" ) )
 
 	def pickle_force(self, filename):
 		"""

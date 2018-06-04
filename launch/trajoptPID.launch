@@ -9,9 +9,6 @@
 	<!-- Record data mode -->
 	<arg name="record" default="F"/>
 
-	<!-- Debug mode -->
-	<arg name="debug" default="F"/>
-
 	<!-- Feature learning method (ALL, MAX, BETA)-->
 	<arg name="feat_method" default="ALL"/>
 
@@ -23,7 +20,7 @@
 
 	<!-- velocity-based with trajopt planning PID -->
 	<node name="pid_trajopt" pkg="beta_adaptive_pHRI" type="pid_trajopt.py"
-    args="$(arg ID) $(arg method_type) $(arg record) $(arg debug)
+    args="$(arg ID) $(arg method_type) $(arg record)
     $(arg feat_method) $(arg feat_list) $(arg traj_cache)" output="screen"/>
 
 </launch>
