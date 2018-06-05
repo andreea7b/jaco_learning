@@ -30,13 +30,10 @@ import cProfile
 UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0, 'human':100.0}
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
 FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554, 'human':0.0}
-MAX_BETA = {'table':0.05, 'coffee':0.03}
+MAX_BETA = {'table':0.05, 'coffee':0.03, 'human':0.05}
 
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
-HUMAN_CENTER = [0.0, 0.2, 0.0]
-INTERACTION_TORQUE_THRESHOLD = [0.88414821, 17.22751856, -0.40134936,  6.23537946, -0.90013662, 1.32379884,  0.10218059]
-INTERACTION_TORQUE_EPSILON = [3.5, 5.19860601, 3.43663145, 4.20296168, 2.5, 2.18056208, 2.0]
-INTERACTION_TORQUE_EPSILON = [3.0, 5.0, 2.0, 3.0, 1.5, 1.5, 1.5]
+HUMAN_CENTER = [0.0, -0.2, 0.0]
 
 # feature learning methods
 ALL = "ALL"					# updates all features
@@ -108,7 +105,7 @@ class Planner(object):
 		#plotLaptop(self.env,self.bodies,OBS_CENTER)
 		#plotCabinet(self.env)
 		#plotSphere(self.env,self.bodies,OBS_CENTER,0.4)
-		plotSphere(self.env,self.bodies,HUMAN_CENTER,1)
+		plotSphere(self.env,self.bodies,HUMAN_CENTER,3)
 
 		# ---- DEFORMATION Initialization ---- #
 
@@ -699,13 +696,14 @@ class Planner(object):
 
 				# Compute what the optimal action would have been wrt every feature
 				for i in range(self.num_features):
-					u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 20, 'ftol': 1e-6, 'disp': True})
+					u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 15, 'ftol': 1e-6, 'disp': True})
 					#u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 1000, 'disp': True})
 					u_h_star = np.reshape(u_h_opt.x, (7, 1)) 
 
 					# Compute beta 
 					beta_norm = MAX_BETA[self.feat_list[i]]
-					self.betas[i] = 1/(2*beta_norm*abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2))
+					beta_norm = 1.0/np.linalg.norm(u_h_star)**2
+					self.betas[i] = min(1, 1/(2*beta_norm*abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2)))
 					print "here is u_h and its norm:", u_h, np.linalg.norm(u_h)
 					print "here is optimal u_h and its norm:", u_h_star, np.linalg.norm(u_h_star)
 					print "here is beta:", self.betas

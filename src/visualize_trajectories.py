@@ -31,14 +31,16 @@ if __name__ == '__main__':
 	here = os.path.dirname(os.path.realpath(__file__))
 	trajs = pickle.load( open( here + traj_path, "rb" ) )
 
-	if "final" in traj_path:
-		plotTraj(env,robot,bodies,trajs, size=8,color=[0, 0, 1])
-		if 'iact_pts' in locals():
-			plotTraj(env,robot,bodies,iact_pts, size=10,color=[1, 0, 0])
-		raw_input("Press Enter to continue...")
-	else:
-		for waypts_plan in trajs:
+	if isinstance(trajs,dict):
+		for (timestep, waypts_plan) in trajs.items():
+			print "timestep: ", timestep
 			plotTraj(env,robot,bodies,waypts_plan, size=8,color=[0, 0, 1])
 			raw_input("Press Enter to continue...")
 			bodies = []
+	else:
+		plotTraj(env,robot,bodies,trajs[:,1:], size=8,color=[0, 0, 1])
+		if 'iact_pts' in locals():
+			plotTraj(env,robot,bodies,iact_pts[:,1:], size=10,color=[1, 0, 0])
+		raw_input("Press Enter to continue...")
+		
 
