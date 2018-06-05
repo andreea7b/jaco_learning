@@ -15,7 +15,7 @@ if __name__ == '__main__':
 	T = 20.0
 
 	feat_method = "ALL"
-	feat_list = "human"
+	feat_list = "table,coffee,human"
 	feat_list = [x.strip() for x in feat_list.split(',')]
 	num_features = len(feat_list)
 	planner = Planner(feat_method, feat_list)
@@ -23,7 +23,7 @@ if __name__ == '__main__':
 
 	# initialize start/goal based on features
 	# by default for table and laptop, these are the pick and place
-	pick = pick_basic
+	pick = pick_basic_EEtilt
 	place = place_lower
 	if 'coffee' in feat_list:
 		pick = pick_basic_EEtilt

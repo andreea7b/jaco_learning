@@ -29,7 +29,7 @@ import cProfile
 # feature constacts (update gains and max weights)
 UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0, 'human':100.0}
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
-FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554, 'human':0.0}
+FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554, 'human':3.2}
 MAX_BETA = {'table':0.05, 'coffee':0.03, 'human':0.05}
 
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
@@ -105,7 +105,7 @@ class Planner(object):
 		#plotLaptop(self.env,self.bodies,OBS_CENTER)
 		#plotCabinet(self.env)
 		#plotSphere(self.env,self.bodies,OBS_CENTER,0.4)
-		plotSphere(self.env,self.bodies,HUMAN_CENTER,3)
+		plotSphere(self.env,self.bodies,HUMAN_CENTER,0.6)
 
 		# ---- DEFORMATION Initialization ---- #
 
@@ -333,8 +333,8 @@ class Planner(object):
 		"""
 		Computes distance from end-effector to human in xy coords
 		input trajectory, output scalar distance where 
-			0: EE is at more than 0.4 meters away from human
-			+: EE is closer than 0.4 meters to human
+			0: EE is at more than 0.6 meters away from human
+			+: EE is closer than 0.6 meters to human
 		"""
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
@@ -343,7 +343,7 @@ class Planner(object):
 		coords = robotToCartesian(self.robot)
 		EE_coord_xy = coords[6][0:2]
 		human_xy = np.array(HUMAN_CENTER[0:2])
-		dist = np.linalg.norm(EE_coord_xy - human_xy) - 0.4
+		dist = np.linalg.norm(EE_coord_xy - human_xy) - 0.6
 		if dist > 0:
 			return 0
 		return -dist
@@ -479,7 +479,7 @@ class Planner(object):
                             "wxyz" : quat_target,
                             "link": "j2s7s300_link_7",
 							"rot_coeffs" : [0,0,0],
-							"pos_coeffs" : [35,35,35],
+							"pos_coeffs" : [5,5,5],
                             }
 			}
 			],
