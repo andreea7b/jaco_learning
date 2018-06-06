@@ -80,15 +80,7 @@ class Planner(object):
 		self.betas = [1.0]*self.num_features
 		self.waypts_prev = None
 		self.waypts_deform = None
-
-		# ---- Plotting weights & features over time ---- #
-		self.weight_update = None
-		self.update_time = None
-
-		self.feature_update = None
-		self.prev_features = None
-		self.curr_features = None
-		self.update_time2 = None
+		self.updates = [0.0]*self.num_features
 
 		# ---- OpenRAVE Initialization ---- #
 
@@ -651,6 +643,7 @@ class Planner(object):
 				max_weights[feat] = MAX_WEIGHTS[self.feat_list[feat]]
 				feat_range[feat] = FEAT_RANGE[self.feat_list[feat]]
 			update = Phi_p - Phi
+			self.updates = update[1:].tolist()
 
 			if self.feat_method == ALL:
 				# update all weights 
@@ -717,7 +710,7 @@ class Planner(object):
 			print "here are the old weights:", self.weights
 			print "here are the new weights:", curr_weight
 
-			self.weights = curr_weight
+			self.weights = curr_weight.tolist()
 
 			return self.weights
 

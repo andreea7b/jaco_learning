@@ -50,6 +50,10 @@ class ExperimentUtils(object):
 		# always in the form [timestamp, beta1, ..., betaN]
 		self.betas = None
 
+		# stores updates over time 
+		# always in the form [timestamp, update1, ..., updateN]
+		self.updates = None
+
 		# stores running list of forces applied by human
 		# in the form [timestamp, j1, j2, ... , j7]
 		self.tauH = None 
@@ -147,6 +151,19 @@ class ExperimentUtils(object):
 		else:
 			self.betas = np.vstack([self.betas, new_b])
 	
+	def update_updates(self, timestamp, new_update):
+		"""
+		Updates list of timestamped updates
+		"""
+		if new_update is None:
+			print "in update_updates: new_update is None..."
+			return 
+		new_u = np.array([timestamp] + new_update)
+		if self.updates is None:
+			self.updates = np.array([new_u])
+		else:
+			self.updates = np.vstack([self.updates, new_u])
+
 	def set_startT(self,start_t):
 		"""
 		Records start time for experiment
@@ -240,6 +257,14 @@ class ExperimentUtils(object):
 
 		filepath = self.get_unique_filepath("betas",filename)
 		pickle.dump(self.betas, open( filepath, "wb" ) )
+
+	def pickle_updates(self, filename):
+		"""
+		Pickles the update data structure for later analysis. 
+		"""
+
+		filepath = self.get_unique_filepath("updates",filename)
+		pickle.dump(self.updates, open( filepath, "wb" ) )
 
 	def pickle_interaction_pts(self, filename):
 		"""
