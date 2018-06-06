@@ -32,7 +32,6 @@ import numpy as np
 from numpy import linalg
 import matplotlib.pyplot as plt
 import pickle
-import rosbag
 
 prefix = 'j2s7s300_driver'
 
@@ -51,13 +50,12 @@ place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 epsilon = 0.10							# epislon for when robot think it's at goal
 MAX_CMD_TORQUE = 40.0					# max command robot can send
 INTERACTION_TORQUE_THRESHOLD = [0.88414821, 17.22751856, -0.40134936,  6.23537946, -0.90013662, 1.32379884,  0.10218059]
-INTERACTION_TORQUE_EPSILON = [3.0, 5.0, 2.0, 4.0, 1.5, 1.5, 1.5]
+INTERACTION_TORQUE_EPSILON = [3.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
 
 IMPEDANCE = 'A'
 LEARNING = 'B'
 DEMONSTRATION = 'C'
-REPLAY = 'D'
 
 ALL = "ALL"						# updates all features
 MAX = "MAX"						# updates only feature that changed the most
@@ -88,11 +86,11 @@ class PIDVelJaco(object):
 		sim_flag                  - flag for if in simulation or not
 	"""
 
-	def __init__(self, ID, method_type, record, feat_method, feat_list, traj_cache=None):
+	def __init__(self, ID, method_type, record, replay, feat_method, feat_list, traj_cache=None):
 		"""
 		Setup of the ROS node. Publishing computed torques happens at 100Hz.
 		"""
-		# method type - A=IMPEDANCE, B=LEARNING, C=DEMONSTRATION, D=REPLAY
+		# method type - A=IMPEDANCE, B=LEARNING, C=DEMONSTRATION
 		self.method_type = method_type
 
 		# can be ALL, MAX, or BETA
@@ -114,8 +112,15 @@ class PIDVelJaco(object):
 			print "Oopse - it is unclear if you want to record data. Not recording data."
 			self.record = False
 
-		# start admittance control mode
-		self.start_admittance_mode()
+		# replay experimental data mode 
+		if replay == "F" or replay == "f":
+			self.replay = False
+		else:
+			self.replay = replay
+
+		if self.replay == False:
+			# start admittance control mode
+			self.start_admittance_mode()
 
 		# ---- Trajectory Setup ---- #
 
@@ -199,13 +204,6 @@ class PIDVelJaco(object):
 
 		rospy.init_node("pid_trajopt")
 
-		# If record, start rosbag
-		if self.record:
-			settings_string = str(ID) + "_" + self.method_type + "_" + self.feat_method + "_" + "_".join(feat_list)
-			bag_filename = "bag_" + settings_string
-			bag_path = self.expUtil.get_unique_filepath("bag",bag_filename)
-			self.bag = rosbag.Bag(bag_path.replace(".p", ".bag"), 'w')
-
 		# create joint-velocity publisher
 		self.vel_pub = rospy.Publisher(prefix + '/in/joint_velocity', kinova_msgs.msg.JointVelocity, queue_size=1)
 
@@ -238,16 +236,16 @@ class PIDVelJaco(object):
 		# save experimental data (only if experiment started)
 		if self.record and self.reached_start:
 			print "Saving experimental data to file..."
-			settings_string = str(ID) + "_" + self.method_type + "_" + self.feat_method + "_" + "_".join(feat_list)
+			settings_string = str(ID) + "_" + self.method_type + "_" + self.feat_method + "_" + "_".join(feat_list) + "_correction_" + replay
 			weights_filename = "weights_" + settings_string
-			betas_filename = "betas" + settings_string
-			force_filename = "force" + settings_string
-			interaction_pts_filename = "interaction_pts" + settings_string
-			tracked_filename = "tracked" + settings_string
-			deformed_filename = "deformed" + settings_string
-			deformed_waypts_filename = "deformed_waypts" + settings_string
-			replanned_filename = "replanned" + settings_string
-			replanned_waypts_filename = "replanned_waypts" + settings_string
+			betas_filename = "betas_" + settings_string
+			force_filename = "force_" + settings_string
+			interaction_pts_filename = "interaction_pts_" + settings_string
+			tracked_filename = "tracked_" + settings_string
+			deformed_filename = "deformed_" + settings_string
+			deformed_waypts_filename = "deformed_waypts_" + settings_string
+			replanned_filename = "replanned_" + settings_string
+			replanned_waypts_filename = "replanned_waypts_" + settings_string
 			
 			self.expUtil.pickle_weights(weights_filename)
 			self.expUtil.pickle_betas(betas_filename)
@@ -259,10 +257,9 @@ class PIDVelJaco(object):
 			self.expUtil.pickle_replanned_trajList(replanned_filename)
 			self.expUtil.pickle_replanned_wayptsList(replanned_waypts_filename)
 
-			self.bag.close()
-
-		# end admittance control mode
-		self.stop_admittance_mode()
+		if self.replay == False:
+			# end admittance control mode
+			self.stop_admittance_mode()
 
 	def start_admittance_mode(self):
 		"""
@@ -305,8 +302,6 @@ class PIDVelJaco(object):
 		# read the current joint torques from the robot
 		torque_curr = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
 		interaction = False
-		if self.record:
-			self.bag.write('torques', msg)
 
 		for i in range(7):
 			#center torques around zero
@@ -364,9 +359,6 @@ class PIDVelJaco(object):
 
 		# convert to radians
 		self.curr_pos = self.curr_pos*(math.pi/180.0)
-
-		if self.record:
-			self.bag.write('angles', msg)
 
 		# update the OpenRAVE simulation 
 		#self.planner.update_curr_pos(curr_pos)
@@ -452,16 +444,17 @@ class PIDVelJaco(object):
 
 if __name__ == '__main__':
 	if len(sys.argv) < 8:
-		print "ERROR: Not enough arguments. Specify ID, method_type, record, feat_method, feat_list"
+		print "ERROR: Not enough arguments. Specify ID, method_type, record, replay, feat_method, feat_list"
 	else:
 		ID = int(sys.argv[1])
 		method_type = sys.argv[2]
 		record = sys.argv[3]
-		feat_method = sys.argv[4]
-		feat_list = [x.strip() for x in sys.argv[5].split(',')]
+		replay = sys.argv[4]
+		feat_method = sys.argv[5]
+		feat_list = [x.strip() for x in sys.argv[6].split(',')]
 		traj_cache = None
-		if sys.argv[6] != 'None':
-			traj_cache = sys.argv[6]
-	PIDVelJaco(ID,method_type,record,feat_method,feat_list,traj_cache)
+		if sys.argv[7] != 'None':
+			traj_cache = sys.argv[7]
+	PIDVelJaco(ID,method_type,record,replay,feat_method,feat_list,traj_cache)
 
 

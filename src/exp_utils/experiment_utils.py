@@ -166,10 +166,21 @@ class ExperimentUtils(object):
 		here = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..'))
 		subdir = "/data/experimental/"+subdir+"/"
 		filepath = here + subdir + filename + "1.p"
-
 		i = 2
 		while os.path.exists(filepath):
 			filepath = here+subdir+filename+str(i)+".p"
+			i+=1
+
+		return filepath
+
+	def get_unique_bagpath(self,subdir,filename):
+		# get the current script path
+		here = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..'))
+		subdir = "/data/experimental/"+subdir+"/"
+		filepath = here + subdir + filename + "1.bag"
+		i = 2
+		while os.path.exists(filepath):
+			filepath = here+subdir+filename+str(i)+".bag"
 			i+=1
 
 		return filepath

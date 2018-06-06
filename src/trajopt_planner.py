@@ -479,7 +479,7 @@ class Planner(object):
                             "wxyz" : quat_target,
                             "link": "j2s7s300_link_7",
 							"rot_coeffs" : [0,0,0],
-							"pos_coeffs" : [5,5,5],
+							"pos_coeffs" : [35,35,35],
                             }
 			}
 			],
@@ -696,14 +696,14 @@ class Planner(object):
 
 				# Compute what the optimal action would have been wrt every feature
 				for i in range(self.num_features):
-					u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 15, 'ftol': 1e-6, 'disp': True})
+					u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 20, 'ftol': 1e-6, 'disp': True})
 					#u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 1000, 'disp': True})
 					u_h_star = np.reshape(u_h_opt.x, (7, 1)) 
 
 					# Compute beta 
 					beta_norm = MAX_BETA[self.feat_list[i]]
 					beta_norm = 1.0/np.linalg.norm(u_h_star)**2
-					self.betas[i] = min(1, 1/(2*beta_norm*abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2)))
+					self.betas[i] = 1/(2*beta_norm*abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2))
 					print "here is u_h and its norm:", u_h, np.linalg.norm(u_h)
 					print "here is optimal u_h and its norm:", u_h_star, np.linalg.norm(u_h_star)
 					print "here is beta:", self.betas
