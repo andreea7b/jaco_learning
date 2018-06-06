@@ -1,0 +1,27 @@
+cnumpy.core.multiarray
+_reconstruct
+p1
+(cnumpy
+ndarray
+p2
+(I0
+tS'b'
+tRp3
+(I1
+(I2
+I3
+tcnumpy
+dtype
+p4
+(S'f8'
+I0
+I1
+tRp5
+(I3
+S'<'
+NNNI-1
+I-1
+I0
+tbI00
+S'\x00\x00\x00\x90\xa8\x9e\x16@\x00\xe8Wb\x14y\xad\xbf\x00\x0c\xd8zD~\xce?\x00\x00\x00 \xab\xb4\x1d@@\x14w7\xab\x80\xca\xbf\x00\xe8\xb2B\xea\x90\xad?'
+tb.

@@ -39,7 +39,7 @@ home_pos = [103.366,197.13,180.070,43.4309,265.11,257.271,287.9276]
 candlestick_pos = [180.0]*7
 
 pick_basic = [104.2, 151.6, 183.8, 101.8, 224.2, 216.9, 310.8]
-pick_basic_EEtilt = [104.2, 151.6, 183.8, 101.8, 224.2, 216.9, 200.0]
+pick_basic_EEtilt = [104.2, 151.6, 183.8, 101.8, 224.2, 216.9, 225.0]
 pick_shelf = [210.8, 241.0, 209.2, 97.8, 316.8, 91.9, 322.8]
 place_lower = [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 322.0]
 place_higher = [210.5,118.5,192.5,105.4,229.15,245.47,316.4]
@@ -131,6 +131,7 @@ class PIDVelJaco(object):
 
 		self.weights = [0.0]*self.num_feat
 		self.betas = [1.0]*self.num_feat
+		self.updates = [0.0]*self.num_feat
 
 		# if in demo mode, then set the weights to be optimal
 		if self.method_type == DEMONSTRATION:
@@ -236,7 +237,7 @@ class PIDVelJaco(object):
 		# save experimental data (only if experiment started)
 		if self.record and self.reached_start:
 			print "Saving experimental data to file..."
-			settings_string = str(ID) + "_" + self.method_type + "_" + self.feat_method + "_" + "_".join(feat_list) + "_correction_" + replay
+			settings_string = str(ID) + "_" + self.method_type + "_" + self.feat_method + "_" + "_".join(feat_list) + "_correction_" + replay + "_"
 			weights_filename = "weights_" + settings_string
 			betas_filename = "betas_" + settings_string
 			force_filename = "force_" + settings_string
@@ -246,7 +247,8 @@ class PIDVelJaco(object):
 			deformed_waypts_filename = "deformed_waypts_" + settings_string
 			replanned_filename = "replanned_" + settings_string
 			replanned_waypts_filename = "replanned_waypts_" + settings_string
-			
+			updates_filename = "updates_" + settings_string
+
 			self.expUtil.pickle_weights(weights_filename)
 			self.expUtil.pickle_betas(betas_filename)
 			self.expUtil.pickle_force(force_filename)
@@ -256,6 +258,7 @@ class PIDVelJaco(object):
 			self.expUtil.pickle_deformed_wayptsList(deformed_waypts_filename)
 			self.expUtil.pickle_replanned_trajList(replanned_filename)
 			self.expUtil.pickle_replanned_wayptsList(replanned_waypts_filename)
+			self.expUtil.pickle_updates(updates_filename)
 
 		if self.replay == False:
 			# end admittance control mode
@@ -324,6 +327,7 @@ class PIDVelJaco(object):
 				if self.method_type == LEARNING:
 					self.weights = self.planner.learnWeights(torque_curr)
 					self.betas = self.planner.betas
+					self.updates = self.planner.updates
 
 					print "in joint torques callback: going to plan..."
 					self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=self.traj)
@@ -333,6 +337,7 @@ class PIDVelJaco(object):
 					timestamp = time.time() - self.path_start_T
 					self.expUtil.update_weights(timestamp, self.weights)
 					self.expUtil.update_betas(timestamp, self.betas)
+					self.expUtil.update_updates(timestamp, self.updates)
 
 					# update the list of replanned trajectories with new trajectory
 					self.expUtil.update_replanned_trajList(timestamp, self.traj)
