@@ -33,7 +33,7 @@ FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554, 'huma
 MAX_BETA = {'table':0.05, 'coffee':0.03, 'human':0.05}
 
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
-HUMAN_CENTER = [0.0, -0.2, 0.0]
+HUMAN_CENTER = [0.0, -0.4, 0.0]
 
 # feature learning methods
 ALL = "ALL"					# updates all features
@@ -97,7 +97,7 @@ class Planner(object):
 		#plotLaptop(self.env,self.bodies,OBS_CENTER)
 		#plotCabinet(self.env)
 		#plotSphere(self.env,self.bodies,OBS_CENTER,0.4)
-		plotSphere(self.env,self.bodies,HUMAN_CENTER,0.6)
+		plotSphere(self.env,self.bodies,HUMAN_CENTER,1.0)
 
 		# ---- DEFORMATION Initialization ---- #
 
@@ -241,12 +241,20 @@ class Planner(object):
 		---
 		input trajectory, output scalar cost
 		"""
+		# get rotation transform, convert it to euler coordinates, and make sure the end effector is upright
+		def mat2euler(mat):
+			gamma = np.arctan2(mat[2,1], mat[2,2])
+			beta = np.arctan2(-mat[2,0], np.sqrt(mat[2,1]**2 + mat[2,2]**2))
+			alpha = np.arctan2(mat[1,0], mat[0,0])
+			return np.array([gamma,beta,alpha])
+
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
 		self.robot.SetDOFValues(waypt)
 		EE_link = self.robot.GetLinks()[7]
-		return sum(abs(EE_link.GetTransform()[:2,:3].dot([1,0,0])))
+		[yaw, pitch, roll] = mat2euler(EE_link.GetTransform()[:3,:3])
+		return -abs(pitch)-abs(roll)
 
 	def coffee_cost(self, waypt):
 		"""
@@ -325,8 +333,8 @@ class Planner(object):
 		"""
 		Computes distance from end-effector to human in xy coords
 		input trajectory, output scalar distance where 
-			0: EE is at more than 0.6 meters away from human
-			+: EE is closer than 0.6 meters to human
+			0: EE is at more than 1 meters away from human
+			+: EE is closer than 1 meters to human
 		"""
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
@@ -335,9 +343,9 @@ class Planner(object):
 		coords = robotToCartesian(self.robot)
 		EE_coord_xy = coords[6][0:2]
 		human_xy = np.array(HUMAN_CENTER[0:2])
-		dist = np.linalg.norm(EE_coord_xy - human_xy) - 0.6
+		dist = np.linalg.norm(EE_coord_xy - human_xy) - 2.0
 		if dist > 0:
-			return 0
+			return 0.01
 		return -dist
 
 	def human_cost(self, waypt):
@@ -627,7 +635,8 @@ class Planner(object):
 			self.waypts_deform = waypts_deform
 			new_features = self.featurize(waypts_deform)
 			old_features = self.featurize(waypts_prev)
-
+			print "new features:", new_features
+			print "old features:", old_features
 			Phi_p = np.array([new_features[0]] + [sum(x) for x in new_features[1:]])
 			Phi = np.array([old_features[0]] + [sum(x) for x in old_features[1:]])
 
@@ -689,7 +698,7 @@ class Planner(object):
 
 				# Compute what the optimal action would have been wrt every feature
 				for i in range(self.num_features):
-					u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 20, 'ftol': 1e-6, 'disp': True})
+					u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 10, 'ftol': 1e-6, 'disp': True})
 					#u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 1000, 'disp': True})
 					u_h_star = np.reshape(u_h_opt.x, (7, 1)) 
 

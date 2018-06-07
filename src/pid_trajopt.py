@@ -50,7 +50,7 @@ place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 epsilon = 0.10							# epislon for when robot think it's at goal
 MAX_CMD_TORQUE = 40.0					# max command robot can send
 INTERACTION_TORQUE_THRESHOLD = [0.88414821, 17.22751856, -0.40134936,  6.23537946, -0.90013662, 1.32379884,  0.10218059]
-INTERACTION_TORQUE_EPSILON = [3.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]
+INTERACTION_TORQUE_EPSILON = [4.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
 
 IMPEDANCE = 'A'
