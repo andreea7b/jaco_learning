@@ -311,14 +311,14 @@ class PIDVelJaco(object):
 			torque_curr[i][0] -= INTERACTION_TORQUE_THRESHOLD[i]
 			if np.fabs(torque_curr[i][0]) > INTERACTION_TORQUE_EPSILON[i] and self.reached_start:
 				interaction = True
-			#else:
+			else:
 				#zero out torques below threshold for cleanliness
-				#torque_curr[i][0] = 0.0
+				torque_curr[i][0] = 0.0
 
 		# if experienced large enough interaction force, then deform traj
 		if interaction:
-			print "--- INTERACTION ---"
-			print "u_h: " + str(torque_curr)
+			#print "--- INTERACTION ---"
+			#print "u_h: " + str(torque_curr)
 			if self.reached_start and not self.reached_goal:
 				timestamp = time.time() - self.path_start_T
 				self.expUtil.update_tauH(timestamp, torque_curr)

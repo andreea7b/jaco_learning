@@ -181,7 +181,7 @@ class ExperimentUtils(object):
 	def get_unique_filepath(self,subdir,filename):
 		# get the current script path
 		here = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..'))
-		subdir = "/data/debug/"+subdir+"/"
+		subdir = "/data/experimental/"+subdir+"/"
 		filepath = here + subdir + filename + "1.p"
 		i = 2
 		while os.path.exists(filepath):
