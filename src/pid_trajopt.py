@@ -50,7 +50,7 @@ place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 epsilon = 0.10							# epislon for when robot think it's at goal
 MAX_CMD_TORQUE = 40.0					# max command robot can send
 INTERACTION_TORQUE_THRESHOLD = [0.88414821, 17.22751856, -0.40134936,  6.23537946, -0.90013662, 1.32379884,  0.10218059]
-INTERACTION_TORQUE_EPSILON = [3.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]
+INTERACTION_TORQUE_EPSILON = [4.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
 
 IMPEDANCE = 'A'
@@ -311,14 +311,14 @@ class PIDVelJaco(object):
 			torque_curr[i][0] -= INTERACTION_TORQUE_THRESHOLD[i]
 			if np.fabs(torque_curr[i][0]) > INTERACTION_TORQUE_EPSILON[i] and self.reached_start:
 				interaction = True
-			#else:
+			else:
 				#zero out torques below threshold for cleanliness
-				#torque_curr[i][0] = 0.0
+				torque_curr[i][0] = 0.0
 
 		# if experienced large enough interaction force, then deform traj
 		if interaction:
-			print "--- INTERACTION ---"
-			print "u_h: " + str(torque_curr)
+			#print "--- INTERACTION ---"
+			#print "u_h: " + str(torque_curr)
 			if self.reached_start and not self.reached_goal:
 				timestamp = time.time() - self.path_start_T
 				self.expUtil.update_tauH(timestamp, torque_curr)

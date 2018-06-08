@@ -27,13 +27,14 @@ import pickle
 import cProfile
 
 # feature constacts (update gains and max weights)
-UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0, 'human':100.0}
+UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0, 'human':20.0}
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
 FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554, 'human':3.2}
 MAX_BETA = {'table':0.05, 'coffee':0.03, 'human':0.05}
+INTERACTION_TORQUE_EPSILON = [4.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]
 
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
-HUMAN_CENTER = [0.0, -0.2, 0.0]
+HUMAN_CENTER = [0.0, -0.4, 0.0]
 
 # feature learning methods
 ALL = "ALL"					# updates all features
@@ -97,7 +98,7 @@ class Planner(object):
 		#plotLaptop(self.env,self.bodies,OBS_CENTER)
 		#plotCabinet(self.env)
 		#plotSphere(self.env,self.bodies,OBS_CENTER,0.4)
-		plotSphere(self.env,self.bodies,HUMAN_CENTER,0.6)
+		plotSphere(self.env,self.bodies,HUMAN_CENTER,1.0)
 
 		# ---- DEFORMATION Initialization ---- #
 
@@ -241,12 +242,23 @@ class Planner(object):
 		---
 		input trajectory, output scalar cost
 		"""
+		# get rotation transform, convert it to euler coordinates, and make sure the end effector is upright
+		def mat2euler(mat):
+			gamma = np.arctan2(mat[2,1], mat[2,2])
+			beta = np.arctan2(-mat[2,0], np.sqrt(mat[2,1]**2 + mat[2,2]**2))
+			alpha = np.arctan2(mat[1,0], mat[0,0])
+			return np.array([gamma,beta,alpha])
+
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
 		self.robot.SetDOFValues(waypt)
 		EE_link = self.robot.GetLinks()[7]
-		return sum(abs(EE_link.GetTransform()[:2,:3].dot([1,0,0])))
+		R = EE_link.GetTransform()[:3,:3]
+		[yaw, pitch, roll] = mat2euler(R)
+		#print "yaw, pitch, roll:", yaw, pitch, roll
+		#print "rotation matrix:", R
+		return (pitch + 1.5)
 
 	def coffee_cost(self, waypt):
 		"""
@@ -325,8 +337,8 @@ class Planner(object):
 		"""
 		Computes distance from end-effector to human in xy coords
 		input trajectory, output scalar distance where 
-			0: EE is at more than 0.6 meters away from human
-			+: EE is closer than 0.6 meters to human
+			0: EE is at more than 1.7 meters away from human
+			+: EE is closer than 1.7 meters to human
 		"""
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
@@ -335,9 +347,9 @@ class Planner(object):
 		coords = robotToCartesian(self.robot)
 		EE_coord_xy = coords[6][0:2]
 		human_xy = np.array(HUMAN_CENTER[0:2])
-		dist = np.linalg.norm(EE_coord_xy - human_xy) - 0.6
+		dist = np.linalg.norm(EE_coord_xy - human_xy) - 1.7
 		if dist > 0:
-			return 0
+			return 0.01
 		return -dist
 
 	def human_cost(self, waypt):
@@ -656,7 +668,7 @@ class Planner(object):
 				max_idx = np.argmax(np.fabs(change_in_features))
 
 				# update only weight of feature with maximal change
-				curr_weight = [self.weights[i] for i in range(len(self.weights))]
+				curr_weight = np.array([self.weights[i] for i in range(len(self.weights))])
 				curr_weight[max_idx] = curr_weight[max_idx] - update_gains[max_idx]*update[max_idx+1]
 			elif self.feat_method == BETA:
 				# Define minimization function
@@ -664,24 +676,30 @@ class Planner(object):
 				Phi_p = Phi_p[1:]
 				Phi = Phi[1:]
 
-				# Set up the optimization problem:
+				# Set up the unconstrained optimization problem:
 				def u_unconstrained(u):
-					u = np.reshape(u, (7,1))
-					(waypts_deform_p, waypts_prev) = self.deform(u)
+					if self.feat_list[i] == 'table':
+						lambda_u = 20000
+					elif self.feat_list[i] == 'human':
+						lambda_u = 1500
+					elif self.feat_list[i] == 'coffee':	
+						lambda_u = 20000
+					u_p = np.reshape(u, (7,1))
+					(waypts_deform_p, waypts_prev) = self.deform(u_p)
 					H_features = self.featurize(waypts_deform_p)
 					Phi_H = np.array([sum(x) for x in H_features[1:]])
-
-					cost = np.linalg.norm(u_h)**2 + 100*(Phi_H[i] - Phi_p[i])**2
+					cost = np.linalg.norm(u_p)**2 + lambda_u*(Phi_H[i] - Phi_p[i])**2
 					return cost
 
+				# Constrained variant of the optimization problem
 				def u_constrained(u):
-					cost = np.linalg.norm(u_h)**2
+					cost = np.linalg.norm(u)**2
 					return cost
 
 				# Set up the constraints:
 				def u_constraint(u):
-					u = np.reshape(u, (7,1))
-					(waypts_deform_p, waypts_prev) = self.deform(u)
+					u_p = np.reshape(u, (7,1))
+					(waypts_deform_p, waypts_prev) = self.deform(u_p)
 					H_features = self.featurize(waypts_deform_p)
 					Phi_H = np.array([sum(x) for x in H_features[1:]])
 					cost = (Phi_H[i] - Phi_p[i])**2
@@ -689,9 +707,23 @@ class Planner(object):
 
 				# Compute what the optimal action would have been wrt every feature
 				for i in range(self.num_features):
-					u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 20, 'ftol': 1e-6, 'disp': True})
-					#u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 1000, 'disp': True})
+					if self.feat_list[i] == 'table':
+						#u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 5, 'ftol': 1e-6, 'disp': True})
+						u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 5, 'disp': True})
+					elif self.feat_list[i] == 'human':
+						#u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 20, 'ftol': 1e-6, 'disp': True})
+						u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 10, 'disp': True})
+					elif self.feat_list[i] == 'coffee':
+						u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 40, 'ftol': 1e-6, 'disp': True})
+						#u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 10, 'disp': True})
 					u_h_star = np.reshape(u_h_opt.x, (7, 1)) 
+
+					# Print the Phis
+					(waypts_star, _) = self.deform(u_h_star)
+					H_features = self.featurize(waypts_star)
+					Phi_H = np.array([sum(x) for x in H_features[1:]])
+					print "Phi_H_star:", Phi_H
+					print "Phi_H:", Phi_p
 
 					# Compute beta 
 					beta_norm = MAX_BETA[self.feat_list[i]]
