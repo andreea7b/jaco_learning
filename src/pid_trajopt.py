@@ -86,10 +86,15 @@ class PIDVelJaco(object):
 		sim_flag                  - flag for if in simulation or not
 	"""
 
-	def __init__(self, ID, method_type, record, replay, feat_method, feat_list, traj_cache=None):
+	def __init__(self, ID, task, method_type, record, replay, feat_method, feat_list):
 		"""
 		Setup of the ROS node. Publishing computed torques happens at 100Hz.
 		"""
+		# task, if any
+		self.task = task
+		if task == "None":
+			self.task = None
+
 		# method type - A=IMPEDANCE, B=LEARNING, C=DEMONSTRATION
 		self.method_type = method_type
 
@@ -99,9 +104,6 @@ class PIDVelJaco(object):
 		# can be strings 'table', 'coffee', 'human', 'origin', 'laptop'
 		self.feat_list = feat_list
 		self.num_feat = len(self.feat_list)
-
-		# traj_cache: None or path to trajectory cache
-		self.traj_cache = traj_cache
 
 		# record experimental data mode 
 		if record == "F" or record == "f":
@@ -133,18 +135,21 @@ class PIDVelJaco(object):
 		self.betas = [1.0]*self.num_feat
 		self.updates = [0.0]*self.num_feat
 
-		# if in demo mode, then set the weights to be optimal
-		if self.method_type == DEMONSTRATION:
-			for feat in range(0,self.num_feat):
-				self.weights[feat] = MAX_WEIGHTS[feat_list[feat]]
-
 		# initialize start/goal based on features
 		# by default for table and laptop, these are the pick and place
+		self.traj_cache = "/traj_dump/traj_cache_" + "_".join(self.feat_list) + ".p"
 		pick = pick_basic_EEtilt
+		if self.task is None:
+			self.traj_cache = "/traj_dump_offline/traj_cache_" + "_".join(self.feat_list) + ".p"
+			if "coffee" in self.feat_list:
+				pick = pick_basic_EEtilt
+		elif self.task == "coffee":
+			pick = pick_basic_EEtilt
+			self.traj_cache = "/traj_dump/traj_cache_coffee.p"
+		elif self.task == "table":
+			if "coffee" in self.feat_list:
+				self.traj_cache = "/traj_dump/traj_cache_badcoffee.p"
 		place = place_lower
-
-		#if 'coffee' in self.feat_list:
-		#	pick = pick_basic_EEtilt
 
 		start = np.array(pick)*(math.pi/180.0)
 		goal = np.array(place)*(math.pi/180.0)
@@ -153,8 +158,17 @@ class PIDVelJaco(object):
 
 		self.curr_pos = None
 
+		# if in demo mode, then set the weights to be optimal
+		if self.method_type == DEMONSTRATION:
+			if self.task == "table":
+				feat_list = ["table"]
+			elif self.task == "coffee":
+				feat_list = ["coffee"]
+			for feat in range(0,self.num_feat):
+				self.weights[feat] = MAX_WEIGHTS[feat_list[feat]]
+
 		# create the trajopt planner and plan from start to goal
-		self.planner = trajopt_planner.Planner(self.feat_method, self.feat_list, self.traj_cache)
+		self.planner = trajopt_planner.Planner(self.feat_method, self.feat_list, self.task, self.traj_cache)
 
 		# stores the current trajectory we are tracking, produced by planner
 		self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=None)
@@ -237,7 +251,10 @@ class PIDVelJaco(object):
 		# save experimental data (only if experiment started)
 		if self.record and self.reached_start:
 			print "Saving experimental data to file..."
-			settings_string = str(ID) + "_" + self.method_type + "_" + self.feat_method + "_" + "_".join(feat_list) + "_correction_" + replay + "_"
+			if self.task == None:
+				settings_string = str(ID) + "_" + self.method_type + "_" + self.feat_method + "_" + "_".join(feat_list) + "_correction_" + replay + "_"
+			else:
+				settings_string = str(ID) + "_" + self.method_type + "_" + self.feat_method + "_" + "_".join(feat_list) + "_correction_" + task + "_"
 			weights_filename = "weights_" + settings_string
 			betas_filename = "betas_" + settings_string
 			force_filename = "force_" + settings_string
@@ -305,16 +322,14 @@ class PIDVelJaco(object):
 		# read the current joint torques from the robot
 		torque_curr = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
 		interaction = False
-
 		for i in range(7):
 			#center torques around zero
 			torque_curr[i][0] -= INTERACTION_TORQUE_THRESHOLD[i]
 			if np.fabs(torque_curr[i][0]) > INTERACTION_TORQUE_EPSILON[i] and self.reached_start:
 				interaction = True
-			else:
+			#else:
 				#zero out torques below threshold for cleanliness
-				torque_curr[i][0] = 0.0
-
+			#	torque_curr[i][0] = 0.0
 		# if experienced large enough interaction force, then deform traj
 		if interaction:
 			#print "--- INTERACTION ---"
@@ -441,7 +456,7 @@ class PIDVelJaco(object):
 				if is_at_goal:
 					self.reached_goal = True
 			else:
-				print "REACHED GOAL! Holding position at goal."
+				#print "REACHED GOAL! Holding position at goal."
 				self.target_pos = self.goal_pos
 
 				# TODO: this should only set it once!
@@ -452,14 +467,10 @@ if __name__ == '__main__':
 		print "ERROR: Not enough arguments. Specify ID, method_type, record, replay, feat_method, feat_list"
 	else:
 		ID = int(sys.argv[1])
-		method_type = sys.argv[2]
-		record = sys.argv[3]
-		replay = sys.argv[4]
-		feat_method = sys.argv[5]
-		feat_list = [x.strip() for x in sys.argv[6].split(',')]
-		traj_cache = None
-		if sys.argv[7] != 'None':
-			traj_cache = sys.argv[7]
-	PIDVelJaco(ID,method_type,record,replay,feat_method,feat_list,traj_cache)
-
-
+		task = sys.argv[2]
+		method_type = sys.argv[3]
+		record = sys.argv[4]
+		replay = sys.argv[5]
+		feat_method = sys.argv[6]
+		feat_list = [x.strip() for x in sys.argv[7].split(',')]
+	PIDVelJaco(ID,task,method_type,record,replay,feat_method,feat_list)
