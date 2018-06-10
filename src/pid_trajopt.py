@@ -456,7 +456,7 @@ class PIDVelJaco(object):
 				if is_at_goal:
 					self.reached_goal = True
 			else:
-				print "REACHED GOAL! Holding position at goal."
+				#print "REACHED GOAL! Holding position at goal."
 				self.target_pos = self.goal_pos
 
 				# TODO: this should only set it once!

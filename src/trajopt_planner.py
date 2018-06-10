@@ -25,16 +25,19 @@ import os
 import itertools
 import pickle
 import cProfile
+import matplotlib.mlab as mlab
 
 # feature constacts (update gains and max weights)
 UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0, 'human':20.0}
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
 FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554, 'human':3.2}
-MAX_BETA = {'table':1.2, 'coffee':1.2, 'human':0.05}
+MAX_BETA = {'table':1.2, 'coffee':1.2, 'human':1}
 INTERACTION_TORQUE_EPSILON = [4.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]
 
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [0.0, -0.4, 0.0]
+
+P_beta = {"table0": [0.08544,0.2805], "table1": [1.299504, 0.780244], "coffee0": [0.03531365, 0.0435], "coffee1": [0.8935788, 0.3724877]}
 
 # feature learning methods
 ALL = "ALL"					# updates all features
@@ -261,6 +264,8 @@ class Planner(object):
 		[yaw, pitch, roll] = mat2euler(R)
 		#print "yaw, pitch, roll:", yaw, pitch, roll
 		#print "rotation matrix:", R
+		if self.task == "table":
+			return sum(abs(EE_link.GetTransform()[:2,:3].dot([1,0,0])))
 		return (pitch + 1.5)
 
 	def coffee_cost(self, waypt):
@@ -350,9 +355,9 @@ class Planner(object):
 		coords = robotToCartesian(self.robot)
 		EE_coord_xy = coords[6][0:2]
 		human_xy = np.array(HUMAN_CENTER[0:2])
-		dist = np.linalg.norm(EE_coord_xy - human_xy) - 1.7
+		dist = np.linalg.norm(EE_coord_xy - human_xy) - 0.4
 		if dist > 0:
-			return 0.01
+			return 0
 		return -dist
 
 	def human_cost(self, waypt):
@@ -713,8 +718,8 @@ class Planner(object):
 						u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 10, 'ftol': 1e-6, 'disp': True})
 						#u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 5, 'disp': True})
 					elif self.feat_list[i] == 'human':
-						#u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 20, 'ftol': 1e-6, 'disp': True})
-						u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 10, 'disp': True})
+						u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 20, 'ftol': 1e-6, 'disp': True})
+						#u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 10, 'disp': True})
 					elif self.feat_list[i] == 'coffee':
 						u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 10, 'ftol': 1e-6, 'disp': True})
 						#u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 10, 'disp': True})
@@ -728,13 +733,17 @@ class Planner(object):
 					print "Phi_H:", Phi_p
 					print "norm cost: ", np.linalg.norm(u_h_star)**2, "; delta phi cost:", (Phi_H[i] - Phi_p[i])**2
 					# Compute beta 
-					beta_norm = MAX_BETA[self.feat_list[i]]
 					beta_norm = 1.0/np.linalg.norm(u_h_star)**2
 					self.betas[i] = 1/(2*beta_norm*abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2))
 					print "here is u_h and its norm:", u_h, np.linalg.norm(u_h)
 					print "here is optimal u_h and its norm:", u_h_star, np.linalg.norm(u_h_star)
 					print "here is beta:", self.betas
+					# Compute update using P(i|beta)
+					mus1 = P_beta[self.feat_list[i]+"1"]
+					mus0 = P_beta[self.feat_list[i]+"0"]
+					#update_beta = mlab.normpdf(self.betas[i],mus1[0],mus1[1]) / (mlab.normpdf(self.betas[i],mus1[0],mus1[1]) + mlab.normpdf(self.betas[i],mus0[0],mus0[1]))
 					update_beta = min(1,self.betas[i]/MAX_BETA[self.feat_list[i]])
+					print "here is one: ", mlab.normpdf(self.betas[i],mus1[0],mus1[1]), "and zero: ", mlab.normpdf(self.betas[i],mus0[0],mus0[1])
 					print "here is beta:", update_beta
 				# Compute new weights
 				curr_weight = self.weights - np.array(update_beta)*update_gains*update

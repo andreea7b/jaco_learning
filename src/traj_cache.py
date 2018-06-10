@@ -15,7 +15,7 @@ if __name__ == '__main__':
 	T = 20.0
 
 	feat_method = "ALL"
-	feat_list = "table,coffee,human"
+	feat_list = "table,human"
 	feat_list = [x.strip() for x in feat_list.split(',')]
 	num_features = len(feat_list)
 	planner = Planner(feat_method, feat_list)

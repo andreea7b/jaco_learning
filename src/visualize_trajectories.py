@@ -29,11 +29,15 @@ if __name__ == '__main__':
 	plotTableMount(env,bodies)
 
 	here = os.path.dirname(os.path.realpath(__file__))
-	trajs = pickle.load( open( here + traj_path, "rb" ) )
-
+	trajs = pickle.load( open( here + "/" + traj_path, "rb" ) )
 	if isinstance(trajs,dict):
 		for (timestep, waypts_plan) in trajs.items():
 			print "timestep: ", timestep
+			plotTraj(env,robot,bodies,waypts_plan, size=8,color=[0, 0, 1])
+			raw_input("Press Enter to continue...")
+			bodies = []
+	elif trajs.ndim == 3:
+		for waypts_plan in trajs:
 			plotTraj(env,robot,bodies,waypts_plan, size=8,color=[0, 0, 1])
 			raw_input("Press Enter to continue...")
 			bodies = []
