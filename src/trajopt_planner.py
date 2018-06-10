@@ -30,7 +30,7 @@ import cProfile
 UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0, 'human':20.0}
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
 FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554, 'human':3.2}
-MAX_BETA = {'table':0.05, 'coffee':0.03, 'human':0.05}
+MAX_BETA = {'table':1.2, 'coffee':1.2, 'human':0.05}
 INTERACTION_TORQUE_EPSILON = [4.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]
 
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
@@ -47,7 +47,7 @@ class Planner(object):
 	with TrajOpt.
 	"""
 
-	def __init__(self, feat_method, feat_list, traj_cache=None):
+	def __init__(self, feat_method, feat_list, task=None, traj_cache=None):
 
 		# ---- important internal variables ---- #
 		self.feat_method = feat_method	# can be ALL, MAX, or BETA
@@ -70,6 +70,9 @@ class Planner(object):
 			self.traj_cache = pickle.load( open( here + traj_cache, "rb" ) )
 		else:
 			self.traj_cache = None
+
+		# this is the task
+		self.task = task
 
 		# these variables are for the upsampled trajectory
 		self.waypts = None
@@ -219,7 +222,7 @@ class Planner(object):
 			waypt[2] += math.pi
 		self.robot.SetDOFValues(waypt)
 		coords = robotToCartesian(self.robot)
-		EEcoord_z = coords[6][2]
+		EEcoord_z = coords[6][2] + 0.1016
 		return EEcoord_z
 
 	def table_cost(self, waypt):
@@ -462,7 +465,6 @@ class Planner(object):
 					min_dist_idx = w_i
 
 			init_waypts = np.array(self.traj_cache[min_dist_idx])
-
 		request = {
 			"basic_info": {
 				"n_steps": self.num_waypts_plan,
@@ -708,13 +710,13 @@ class Planner(object):
 				# Compute what the optimal action would have been wrt every feature
 				for i in range(self.num_features):
 					if self.feat_list[i] == 'table':
-						#u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 5, 'ftol': 1e-6, 'disp': True})
-						u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 5, 'disp': True})
+						u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 10, 'ftol': 1e-6, 'disp': True})
+						#u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 5, 'disp': True})
 					elif self.feat_list[i] == 'human':
 						#u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 20, 'ftol': 1e-6, 'disp': True})
 						u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 10, 'disp': True})
 					elif self.feat_list[i] == 'coffee':
-						u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 40, 'ftol': 1e-6, 'disp': True})
+						u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 10, 'ftol': 1e-6, 'disp': True})
 						#u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 10, 'disp': True})
 					u_h_star = np.reshape(u_h_opt.x, (7, 1)) 
 
@@ -724,7 +726,7 @@ class Planner(object):
 					Phi_H = np.array([sum(x) for x in H_features[1:]])
 					print "Phi_H_star:", Phi_H
 					print "Phi_H:", Phi_p
-
+					print "norm cost: ", np.linalg.norm(u_h_star)**2, "; delta phi cost:", (Phi_H[i] - Phi_p[i])**2
 					# Compute beta 
 					beta_norm = MAX_BETA[self.feat_list[i]]
 					beta_norm = 1.0/np.linalg.norm(u_h_star)**2
@@ -732,8 +734,10 @@ class Planner(object):
 					print "here is u_h and its norm:", u_h, np.linalg.norm(u_h)
 					print "here is optimal u_h and its norm:", u_h_star, np.linalg.norm(u_h_star)
 					print "here is beta:", self.betas
+					update_beta = min(1,self.betas[i]/MAX_BETA[self.feat_list[i]])
+					print "here is beta:", update_beta
 				# Compute new weights
-				curr_weight = self.weights - np.array(self.betas)*update_gains*update
+				curr_weight = self.weights - np.array(update_beta)*update_gains*update
 
 			# clip values at max and min allowed weights
 			for i in range(self.num_features):
@@ -783,7 +787,7 @@ class Planner(object):
 		self.weights = weights
 		print "weights in replan: " + str(weights)
 
-		if 'coffee' in self.feat_list:
+		if 'coffee' in self.feat_list or self.task=="coffee":
 			place_pose = [-0.46513, 0.29041, 0.69497]
 			self.trajOptPose(start, goal, place_pose)
 		else:
