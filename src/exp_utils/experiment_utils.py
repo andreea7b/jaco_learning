@@ -21,7 +21,7 @@ from openrave_utils import *
 import data_io
 
 class ExperimentUtils(object):
-	
+
 	def __init__(self):
 		# stores dictionary of all the replanned trajectories
 		self.replanned_trajList = {}
@@ -106,7 +106,7 @@ class ExperimentUtils(object):
 			self.tracked_traj = np.array([currTraj])
 		else:	
 			self.tracked_traj = np.vstack([self.tracked_traj, currTraj])
-		
+
 	def update_tauH(self, timestamp, tau_h):
 		"""
 		Uses current joint torque reading from the robot during interaction

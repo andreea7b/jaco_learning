@@ -23,20 +23,19 @@ import trajopt_planner
 
 # possible range of feature values for each feature
 CUP_RANGE = 1.87608702
-TABLE_RANGE = 0.6918574 
+TABLE_RANGE = 0.6918574
 LAPTOP_RANGE = 1.00476554
 
 pick_basic = [104.2, 151.6, 183.8, 101.8, 224.2, 216.9, 310.8]
-pick_shelf = [210.8, 241.0, 209.2, 97.8, 316.8, 91.9, 322.8]
 place_lower = [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 322.0]
-place_higher = [210.5,118.5,192.5,105.4,229.15,245.47,316.4]
 
-ONE_FEAT = 1					# experiment where human has to correct only one feature (out of three)
-TWO_FEAT = 2					# experiment where human has to correc two features
+TABLE_TABLE = 1
+COFFEE_TABLE = 2
+COFFEE_COFFEE = 3
+TABLE_COFFEE = 4
 
-ALL = "ALL" 					# updates all features
-MAX = "MAX"						# updates only feature that changed the most
-
+ALL = "ALL"
+BETA = "BETA"
 EXP_TASK = 2
 
 NUM_PPL = 12					# number of participants
@@ -51,32 +50,31 @@ def	save_parsed_data(filename, csvData=True, pickleData=False):
 	Give the filename you want to save it as
 	If you want to pickle or not
 	"""
-	#obj_metrics = compute_obj_metrics()
+	obj_metrics = compute_obj_metrics()
 	subj_metrics = compute_subj_metrics()
-	
+
 	# write to file
 	here = os.path.dirname(os.path.realpath(__file__))
-	subdir = "/data/experimental/"
-
+	subdir = "/data/study/"
 
 	if pickleData:
-	#	filepath_obj = here + subdir + filename + "_obj.p"
-	#	pickle.dump(obj_metrics, open( filepath_obj, "wb" ) )
+		filepath_obj = here + subdir + filename + "_obj.p"
+		pickle.dump(obj_metrics, open( filepath_obj, "wb" ) )
 		filepath_subj = here + subdir + filename + "_subj.p"
 		pickle.dump(subj_metrics, open( filepath_subj, "wb" ) )
 
 	if csvData:
-	#	filepath_obj = here + subdir + filename + "_obj.csv"
+		filepath_obj = here + subdir + filename + "_obj.csv"
 		filepath_subj = here + subdir + filename + "_subj.csv"
-		"""
-		# write objective metrics
+
+        # write objective metrics
 		with open(filepath_obj, 'w') as out_obj:
 			header = "participant,task,attempt,method,"
-			header += "Rvel,Rcup,Rtable,Rvel*,Rcup*,Rtable*,RvD,RcD,RtD,iactForce,iactTime,"
+			header += "Rcup,Rtable,Rcup*,Rtable*,RcD,RtD,iactForce,iactTime,"
 			header += "DotAvg,DotFinal,AngleFinal,L2Final,CupAway,TableAway,CupDiffFinal,TableDiffFinal,"
 			header +=  "CupWeightPath,TableWeightPath,WeightPath,CupDiff,TableDiff,RegretFinal,AngleAvg,Regret\n"
 			out_obj.write(header)
-			# participant ID can take values 0 - 9
+			# participant ID can take values 0 - 11
 			for ID in obj_metrics.keys():
 				for task in obj_metrics[ID]:
 					# trial can take values 1 or 2
@@ -88,10 +86,10 @@ def	save_parsed_data(filename, csvData=True, pickleData=False):
 								out_obj.write(","+str(num))
 							out_obj.write('\n')
 		out_obj.close()
-		"""
-		# write subjective metrics
+
+        # write subjective metrics
 		with open(filepath_subj, 'w') as out_subj:
-			header = "participant,task,method,age,gender,Q1,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q9,Q10\n"
+			header = "participant,task,method,age,gender,Q1,Q2,Q3,Q4,Q5,Q6,Q7,Q8\n"
 			out_subj.write(header)
 			for ID in subj_metrics.keys():
 				for task in subj_metrics[ID]:
@@ -111,8 +109,8 @@ def compute_obj_metrics():
 	Computes the optimal reward, force, and total interaction time for all
 	participants across all trials and all experimental conditions.
 	"""
-	# each participant does task 1 (ONE_FEAT), 2 (TWO_FEAT) 
-	# and has attempt 1,2 with Method A (ALL), B (MAX) = 2*4*N
+	# each participant does task 1 (TABLE_TABLE), 2 (COFFEE_TABLE), 3 (COFFEE_COFFEE), 4 (TABLE_COFFEE) 
+	# and has attempt 1,2 with Method A (ALL), B (BETA) = 4*4*N
 	# objective metrics: optimal reward, avg_force, weight_metric, total iact time = 4 
 	# participant ID can take values 0 - 11
 
