@@ -108,7 +108,7 @@ class PIDVelJaco(object):
 		# record experimental data mode 
 		if record == "F" or record == "f":
 			self.record = False
-		elif record == "T" or record == "t":
+		elif record == "T" or record == "t" or record == "R":
 			self.record = True
 		else:
 			print "Oopse - it is unclear if you want to record data. Not recording data."
@@ -257,6 +257,7 @@ class PIDVelJaco(object):
 				settings_string = str(ID) + "_" + self.method_type + "_" + self.feat_method + "_" + "_".join(feat_list) + "_correction_" + task + "_"
 			weights_filename = "weights_" + settings_string
 			betas_filename = "betas_" + settings_string
+			betas_u_filename = "betas_u_" + settings_string
 			force_filename = "force_" + settings_string
 			interaction_pts_filename = "interaction_pts_" + settings_string
 			tracked_filename = "tracked_" + settings_string
@@ -268,6 +269,7 @@ class PIDVelJaco(object):
 
 			self.expUtil.pickle_weights(weights_filename)
 			self.expUtil.pickle_betas(betas_filename)
+			self.expUtil.pickle_betas_u(betas_u_filename)
 			self.expUtil.pickle_force(force_filename)
 			self.expUtil.pickle_interaction_pts(interaction_pts_filename)
 			self.expUtil.pickle_tracked_traj(tracked_filename)
@@ -342,6 +344,7 @@ class PIDVelJaco(object):
 				if self.method_type == LEARNING:
 					self.weights = self.planner.learnWeights(torque_curr)
 					self.betas = self.planner.betas
+					self.betas_u = self.planner.betas_u
 					self.updates = self.planner.updates
 
 					print "in joint torques callback: going to plan..."
@@ -352,6 +355,7 @@ class PIDVelJaco(object):
 					timestamp = time.time() - self.path_start_T
 					self.expUtil.update_weights(timestamp, self.weights)
 					self.expUtil.update_betas(timestamp, self.betas)
+					self.expUtil.update_betas_u(timestamp, self.betas_u)
 					self.expUtil.update_updates(timestamp, self.updates)
 
 					# update the list of replanned trajectories with new trajectory
