@@ -53,7 +53,10 @@ def parse_exp_data(dataType):
 				task = 2
 			else:
 				task = 3
-		method = info[2]
+		if info[2] == "ALL":
+			method = "A"
+		elif info[2] == "BETA":
+			method = "B"
 		trial = int(info[-1][0])
 
 		print "ID: " + str(ID) + ", task: " + str(task) + ", method: " + str(method) + ", trial: " + str(trial)

@@ -35,7 +35,7 @@ def get_pickled_metrics(filename):
 	"""
 
 	here = os.path.dirname(os.path.realpath(__file__))
-	subdir = "/data/experimental/"
+	subdir = "/data/study/"
 	datapath = here + subdir + filename
 
 	metrics = pickle.load( open( datapath, "rb" ) )
@@ -148,67 +148,55 @@ def augment_weights(time, weights):
 	Augments the weight data with 0.1 sec timesteps
 	"""
 	#print "time: " + str(time)
-	cup_w = weights[:,0]
-	table_w = weights[:,1]
-	#print "cup_w: " + str(cup_w)
-	#print "table_w: " + str(table_w)
+	feat_w = weights[:,0]
+	#print "feat_w: " + str(feat_w)
 
 	aug_time = [0.0]*200 # traj is 20 sec, sampling at 0.1 sec
-	aug_cup = [0.0]*200
-	aug_table = [0.0]*200
+	aug_feat = [0.0]*200
 
 	aug_idx = 0
 	idx = 0
-	prev_cup = 0.0
-	prev_table = 0.0
+	prev_feat = 0.0
 	times = np.arange(0.1, 20.0, 0.1)
 	for t in times:
 		aug_time[aug_idx] = t
 		#clipped_t = round(time[idx][0],1)
-		if idx < len(cup_w) and np.isclose(round(time[idx][0],1), t, rtol=1e-05, atol=1e-08, equal_nan=False):
-			aug_cup[aug_idx] = cup_w[idx]
-			aug_table[aug_idx] = table_w[idx]
-			prev_cup = cup_w[idx]
-			prev_table = table_w[idx]
+		if idx < len(feat_w) and np.isclose(round(time[idx][0],1), t, rtol=1e-05, atol=1e-08, equal_nan=False):
+			aug_feat[aug_idx] = feat_w[idx]
+			prev_feat = feat_w[idx]
 			idx += 1
 		else:
-			aug_cup[aug_idx] = prev_cup
-			aug_table[aug_idx] = prev_table
+			aug_feat[aug_idx] = prev_feat
 		aug_idx += 1
 
 	aug_time[-1] = 20.0
-	aug_cup[-1] = prev_cup
-	aug_table[-1] = prev_table
-	return (aug_time, aug_cup, aug_table)
+	aug_feat[-1] = prev_feat
+	return (aug_time, aug_feat)
 
 def plot_weights(task, saveFig=False):
 	"""
 	For the current task, makes 4 plots of all the weight updates over time
 	for all the participants. 
 	Two sets of plots: 
-		- left 2 are for Update ALL (top = cup weight, bottom = table)
-		- right 2 are for Update ONE (top = cup weight, bottom = table)
+		- left are for Update ALL 
+		- right are for Update BETA 
 	"""
 	weightData = data_io.parse_exp_data("weights")
 
-	f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, sharex='col', sharey='row')
+	f, ((ax1, ax2)) = plt.subplots(1, 2, sharex='col', sharey='row')
 
-	ax1.set_title('Update ALL')
-	ax2.set_title('Update ONE')
-	ax3.set_xlabel('time (s)')
-	ax4.set_xlabel('time (s)')
+	ax1.set_title('Update BETA-fixed')
+	ax2.set_title('Update BETA-adaptive')
+	ax1.set_xlabel('time (s)')
+	ax2.set_xlabel('time (s)')
 	ax1.set_ylabel('weight')
-	ax3.set_ylabel('weight')
+	ax2.set_ylabel('weight')
 
 	ax1.set_ylim([-1.5, 1.5])
 	ax2.set_ylim([-1.5, 1.5])
-	ax3.set_ylim([-1.5, 1.5])
-	ax4.set_ylim([-1.5, 1.5])
 
 	ax1.set_xlim([0, 20])
 	ax2.set_xlim([0, 20])
-	ax3.set_xlim([0, 20])
-	ax4.set_xlim([0, 20])
 
 	#ax2.set_title('Task 2: Table+Cup')
 
@@ -219,9 +207,13 @@ def plot_weights(task, saveFig=False):
 	trial = 2
 
 	if task == 1:
-		f.suptitle("Task 1: Correct Distance to Table",fontsize=20)
-	else:
-		f.suptitle("Task 2: Correct Distance to Table + Cup Orientation",fontsize=20)
+		f.suptitle("Task 1: R knows table; H corrects table",fontsize=20)
+	elif task == 2:
+		f.suptitle("Task 2: R knows cup orientation; H corrects distance to table",fontsize=20)
+	elif task == 3:
+		f.suptitle("Task 3: R knows cup orientation; H corrects cup orientation",fontsize=20)
+	elif task == 4:
+		f.suptitle("Task 2: R knows distance to table; H corrects cup orientation",fontsize=20)
 	Acount = 0
 	Bcount = 0
 
@@ -233,40 +225,111 @@ def plot_weights(task, saveFig=False):
 			
 			data = weightData[ID][task][trial][method]
 			timestamp = data[:,0:1]
-			weights = data[:,1:len(data)+1]
+			weights = data[:,1:]
 
-			(aug_time, aug_cup, aug_table) = augment_weights(timestamp, weights)
-
+			(aug_time, aug_feat) = augment_weights(timestamp, weights)
 			if method == "A":
 				if Acount != 0:
-					ax1.plot(aug_time,aug_cup,linewidth=4.0, color=greyC)
-					ax3.plot(aug_time,aug_table,linewidth=4.0, color='k')
+					ax1.plot(aug_time,aug_feat,linewidth=4.0, color=greyC)
 				else:
-					ax1.plot(aug_time,aug_cup,linewidth=4.0, color=greyC, label='Cup')
-					ax3.plot(aug_time,aug_table,linewidth=4.0, color='k', label='Table')
+					ax1.plot(aug_time,aug_feat,linewidth=4.0, color=greyC, label='feat')
 					Acount += 1
 					ax1.axhline(y=0, color='k', linestyle='-')
 					ax1.legend()
-					ax3.axhline(y=0, color='k', linestyle='-')
-					ax3.legend()
 			elif method == "B":
 				if Bcount != 0:
-					ax2.plot(aug_time,aug_cup,linewidth=4.0, color=orangeC)
-					ax4.plot(aug_time,aug_table,linewidth=4.0, color='r')
+					ax2.plot(aug_time,aug_feat,linewidth=4.0, color=orangeC)
 				else:
-					ax2.plot(aug_time,aug_cup,linewidth=4.0, color=orangeC, label='Cup')
-					ax4.plot(aug_time,aug_table,linewidth=4.0, color='r', label='Table')
+					ax2.plot(aug_time,aug_feat,linewidth=4.0, color=orangeC, label='feat')
 					Bcount += 1
 					ax2.axhline(y=0, color='k', linestyle='-')
 					ax2.legend()				
-					ax4.axhline(y=0, color='k', linestyle='-')
-					ax4.legend()
 				
 	plt.show()
 
 	if saveFig:
 		here = os.path.dirname(os.path.realpath(__file__))
-		subdir = "/data/experimental/"
+		subdir = "/data/study/"
+		datapath = here + subdir
+		f.savefig(datapath+"task"+str(task)+"Weights.pdf", bbox_inches="tight")
+		print "Saved weights figure."
+
+def plot_weights_average(task, saveFig=False):
+	"""
+	For the current task, makes 2 plots of all the weight updates over time
+	for all the participants averaged. 
+	Two sets of plots: 
+		- left are for Update ALL 
+		- right are for Update BETA 
+	"""
+	weightData = data_io.parse_exp_data("weights")
+
+	f, ((ax1, ax2)) = plt.subplots(1, 2, sharex='col', sharey='row')
+
+	ax1.set_title('Update BETA-fixed')
+	ax2.set_title('Update BETA-adaptive')
+	ax1.set_xlabel('time (s)')
+	ax2.set_xlabel('time (s)')
+	ax1.set_ylabel('weight')
+	ax2.set_ylabel('weight')
+
+	ax1.set_ylim([-1.5, 1.5])
+	ax2.set_ylim([-1.5, 1.5])
+
+	ax1.set_xlim([0, 20])
+	ax2.set_xlim([0, 20])
+
+	#ax2.set_title('Task 2: Table+Cup')
+
+	greyC = "grey"		#(44/255., 160/255., 44/255.)
+	blueC = "#4BABC5" 	#(31/255., 119/255., 180/255.)
+	orangeC = "#F79545" #(255/255., 127/255., 14/255.)
+
+	trial = 2
+
+	if task == 1:
+		f.suptitle("Task 1: R knows table; H corrects table",fontsize=20)
+	elif task == 2:
+		f.suptitle("Task 2: R knows cup orientation; H corrects distance to table",fontsize=20)
+	elif task == 3:
+		f.suptitle("Task 3: R knows cup orientation; H corrects cup orientation",fontsize=20)
+	elif task == 4:
+		f.suptitle("Task 4: R knows distance to table; H corrects cup orientation",fontsize=20)
+	Acount = 0
+	Bcount = 0
+	A_weights = [None]*NUM_PPL
+	B_weights = [None]*NUM_PPL
+
+	for ID in weightData.keys():
+		#for task in weightData[ID]:
+		# trial can take values 1 or 2
+		#for trial in weightData[ID][task]:
+		for method in weightData[ID][task][trial]:
+			
+			data = weightData[ID][task][trial][method]
+			timestamp = data[:,0:1]
+			weights = data[:,1:]
+
+			(aug_time, aug_feat) = augment_weights(timestamp, weights)
+			if method == "A":
+				A_weights[Acount] = aug_feat
+				Acount += 1
+			elif method == "B":
+				B_weights[Bcount] = aug_feat
+				Bcount += 1
+			
+	ax1.plot(A_sum,aug_feat,linewidth=4.0, color=greyC)
+	ax1.axhline(y=0, color='k', linestyle='-')
+	ax1.legend()
+	ax2.plot(aug_time,aug_feat,linewidth=4.0, color=orangeC)
+	ax2.axhline(y=0, color='k', linestyle='-')
+	ax2.legend()	
+	
+	plt.show()
+
+	if saveFig:
+		here = os.path.dirname(os.path.realpath(__file__))
+		subdir = "/data/study/"
 		datapath = here + subdir
 		f.savefig(datapath+"task"+str(task)+"Weights.pdf", bbox_inches="tight")
 		print "Saved weights figure."
@@ -334,7 +397,7 @@ def plot_cupTableDiffFinal(saveFig=False):
 
 	if saveFig:
 		here = os.path.dirname(os.path.realpath(__file__))
-		subdir = "/data/experimental/"
+		subdir = "/data/study/"
 		datapath = here + subdir
 		fig.savefig(datapath+"cupDiff.pdf", bbox_inches="tight")
 		print "Saved cupDiff figure."
@@ -347,7 +410,7 @@ def plot_cupTableDiffFinal(saveFig=False):
 
 	if saveFig:
 		here = os.path.dirname(os.path.realpath(__file__))
-		subdir = "/data/experimental/"
+		subdir = "/data/study/"
 		datapath = here + subdir
 		fig.savefig(datapath+"tableDiff.pdf", bbox_inches="tight")
 		print "Saved tableDiff figure."
@@ -544,7 +607,7 @@ def plot_dotOverTime(T1=True,saveFig=False):
 
 	if saveFig:
 		here = os.path.dirname(os.path.realpath(__file__))
-		subdir = "/data/experimental/"
+		subdir = "/data/study/"
 		datapath = here + subdir
 		if T1:
 			fig.savefig(datapath+"dotAvgTimeT1.pdf", bbox_inches="tight")
@@ -811,7 +874,7 @@ def plot_undoingObjSubj(saveFig=False):
 
 	if saveFig:
 		here = os.path.dirname(os.path.realpath(__file__))
-		subdir = "/data/experimental/"
+		subdir = "/data/study/"
 		datapath = here + subdir
 		fig.savefig(datapath+"awayUndoing.pdf", bbox_inches="tight")
 		print "Saved awayUndoing figure."
@@ -880,7 +943,7 @@ def plot_dotF_cupDiff_tableDiff(saveFig=False):
 
 	if saveFig:
 		here = os.path.dirname(os.path.realpath(__file__))
-		subdir = "/data/experimental/"
+		subdir = "/data/study/"
 		datapath = here + subdir
 		fig.savefig(datapath+"dotDiffFinal.pdf", bbox_inches="tight")
 		print "Saved dotDiffFinal figure."
@@ -1124,6 +1187,7 @@ if __name__ == '__main__':
 
 	# --- for plotting objective metrics --- #
 	#plot_cupTableDiffFinal(True)
-	plot_dotOverTime(T1=True, saveFig=True) 		# DONE
+	#plot_dotOverTime(T1=True, saveFig=True) 		# DONE
 	#plot_undoingObjSubj(saveFig=True)				# DONE
 	#plot_dotF_cupDiff_tableDiff(True)				# DONE
+	plot_weights(4)
