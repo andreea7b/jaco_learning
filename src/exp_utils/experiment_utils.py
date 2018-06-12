@@ -50,6 +50,10 @@ class ExperimentUtils(object):
 		# always in the form [timestamp, beta1, ..., betaN]
 		self.betas = None
 
+		# stores betas over time 
+		# always in the form [timestamp, beta1, ..., betaN]
+		self.betas_u = None
+
 		# stores updates over time 
 		# always in the form [timestamp, update1, ..., updateN]
 		self.updates = None
@@ -150,6 +154,19 @@ class ExperimentUtils(object):
 			self.betas = np.array([new_b])
 		else:
 			self.betas = np.vstack([self.betas, new_b])
+
+	def update_betas_u(self, timestamp, new_beta_u):
+		"""
+		Updates list of timestamped betas_u
+		"""
+		if new_beta_u is None:
+			print "in update_betas_u: new_beta_u is None..."
+			return 
+		new_b_u = np.array([timestamp] + new_beta_u)
+		if self.betas_u is None:
+			self.betas_u = np.array([new_b_u])
+		else:
+			self.betas_u = np.vstack([self.betas_u, new_b_u])
 	
 	def update_updates(self, timestamp, new_update):
 		"""
@@ -257,6 +274,14 @@ class ExperimentUtils(object):
 
 		filepath = self.get_unique_filepath("betas",filename)
 		pickle.dump(self.betas, open( filepath, "wb" ) )
+
+	def pickle_betas_u(self, filename):
+		"""
+		Pickles the betas_u data structure for later analysis. 
+		"""
+
+		filepath = self.get_unique_filepath("betas_u",filename)
+		pickle.dump(self.betas_u, open( filepath, "wb" ) )
 
 	def pickle_updates(self, filename):
 		"""

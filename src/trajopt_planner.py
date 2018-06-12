@@ -38,6 +38,8 @@ OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [0.0, -0.4, 0.0]
 
 P_beta = {"table0": [0.08544,0.2805], "table1": [1.299504, 0.780244], "coffee0": [0.03531365, 0.0435], "coffee1": [0.8935788, 0.3724877]}
+P_beta = {"table0": [0.2812229471102,0.785259743792], "table1": [1.03739176569, 0.884690604024], "coffee0": [0.066663976825, 0.145431535369], "coffee1": [1.34962872178, 1.31424668516], "human0": [0.197915493304,0.333474670518], "human1": [0.979108305045, 0.335266279387]}
+P_beta = {"table0": [0.08544,0.2805], "table1": [1.299504, 0.780244], "coffee0": [0.066663976825, 0.145431535369], "coffee1": [1.34962872178, 1.31424668516], "human0": [0.197915493304,0.333474670518], "human1": [0.979108305045, 0.335266279387]}
 
 # feature learning methods
 ALL = "ALL"					# updates all features
@@ -85,6 +87,7 @@ class Planner(object):
 
 		self.weights = [0.0]*self.num_features
 		self.betas = [1.0]*self.num_features
+		self.betas_u = [1.0]*self.num_features
 		self.waypts_prev = None
 		self.waypts_deform = None
 		self.updates = [0.0]*self.num_features
@@ -152,6 +155,26 @@ class Planner(object):
 					features[feat][index] = self.laptop_features(waypts[index+1],waypts[index])
 				elif self.feat_list[feat-1] == 'origin':
 					features[feat][index] = self.origin_features(waypts[index+1])
+		return features
+
+	def featurize_single(self, waypts, feat_idx):
+		"""
+		Computes the user-defined features for a given trajectory and a given feature.
+		---
+		input trajectory, output list of feature values
+		"""
+		features = [0.0 for _ in range(len(waypts)-1)]
+		for index in range(0,len(waypts)-1):
+			if self.feat_list[feat_idx] == 'table':
+				features[index] = self.table_features(waypts[index+1])
+			elif self.feat_list[feat_idx] == 'coffee':
+				features[index] = self.coffee_features(waypts[index+1])
+			elif self.feat_list[feat_idx] == 'human':
+				features[index] = self.human_features(waypts[index+1],waypts[index])
+			elif self.feat_list[feat_idx] == 'laptop':
+				features[index] = self.laptop_features(waypts[index+1],waypts[index])
+			elif self.feat_list[feat_idx] == 'origin':
+				features[index] = self.origin_features(waypts[index+1])
 		return features
 
 	# -- Velocity -- #
@@ -225,7 +248,7 @@ class Planner(object):
 			waypt[2] += math.pi
 		self.robot.SetDOFValues(waypt)
 		coords = robotToCartesian(self.robot)
-		EEcoord_z = coords[6][2] + 0.1016
+		EEcoord_z = coords[6][2]
 		return EEcoord_z
 
 	def table_cost(self, waypt):
@@ -355,7 +378,7 @@ class Planner(object):
 		coords = robotToCartesian(self.robot)
 		EE_coord_xy = coords[6][0:2]
 		human_xy = np.array(HUMAN_CENTER[0:2])
-		dist = np.linalg.norm(EE_coord_xy - human_xy) - 0.4
+		dist = np.linalg.norm(EE_coord_xy - human_xy) - 0.7
 		if dist > 0:
 			return 0
 		return -dist
@@ -693,9 +716,9 @@ class Planner(object):
 						lambda_u = 20000
 					u_p = np.reshape(u, (7,1))
 					(waypts_deform_p, waypts_prev) = self.deform(u_p)
-					H_features = self.featurize(waypts_deform_p)
-					Phi_H = np.array([sum(x) for x in H_features[1:]])
-					cost = np.linalg.norm(u_p)**2 + lambda_u*(Phi_H[i] - Phi_p[i])**2
+					H_features = self.featurize_single(waypts_deform_p,i)
+					Phi_H = sum(H_features)
+					cost = (Phi_H - Phi_p[i])**2
 					return cost
 
 				# Constrained variant of the optimization problem
@@ -707,9 +730,9 @@ class Planner(object):
 				def u_constraint(u):
 					u_p = np.reshape(u, (7,1))
 					(waypts_deform_p, waypts_prev) = self.deform(u_p)
-					H_features = self.featurize(waypts_deform_p)
-					Phi_H = np.array([sum(x) for x in H_features[1:]])
-					cost = (Phi_H[i] - Phi_p[i])**2
+					H_features = self.featurize_single(waypts_deform_p,i)
+					Phi_H = sum(H_features)
+					cost = (Phi_H - Phi_p[i])**2
 					return cost
 
 				# Compute what the optimal action would have been wrt every feature
@@ -718,8 +741,8 @@ class Planner(object):
 						u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 10, 'ftol': 1e-6, 'disp': True})
 						#u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 5, 'disp': True})
 					elif self.feat_list[i] == 'human':
-						u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 20, 'ftol': 1e-6, 'disp': True})
-						#u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 10, 'disp': True})
+						#u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 20, 'ftol': 1e-6, 'disp': True})
+						u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 10, 'disp': True})
 					elif self.feat_list[i] == 'coffee':
 						u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 10, 'ftol': 1e-6, 'disp': True})
 						#u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 10, 'disp': True})
@@ -741,12 +764,12 @@ class Planner(object):
 					# Compute update using P(i|beta)
 					mus1 = P_beta[self.feat_list[i]+"1"]
 					mus0 = P_beta[self.feat_list[i]+"0"]
-					#update_beta = mlab.normpdf(self.betas[i],mus1[0],mus1[1]) / (mlab.normpdf(self.betas[i],mus1[0],mus1[1]) + mlab.normpdf(self.betas[i],mus0[0],mus0[1]))
-					update_beta = min(1,self.betas[i]/MAX_BETA[self.feat_list[i]])
+					self.betas_u[i] = mlab.normpdf(self.betas[i],mus1[0],mus1[1]) / (mlab.normpdf(self.betas[i],mus1[0],mus1[1]) + mlab.normpdf(self.betas[i],mus0[0],mus0[1]))
+					#update_beta = min(1,self.betas[i]/MAX_BETA[self.feat_list[i]])
 					print "here is one: ", mlab.normpdf(self.betas[i],mus1[0],mus1[1]), "and zero: ", mlab.normpdf(self.betas[i],mus0[0],mus0[1])
-					print "here is beta:", update_beta
+					print "here is beta:", self.betas_u
 				# Compute new weights
-				curr_weight = self.weights - np.array(update_beta)*update_gains*update
+				curr_weight = self.weights - np.array(self.betas_u)*update_gains*update
 
 			# clip values at max and min allowed weights
 			for i in range(self.num_features):

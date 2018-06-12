@@ -1,5 +1,5 @@
 (dp1
-F20.198655128479004
+F16.811846017837524
 cnumpy.core.multiarray
 _reconstruct
 p2
