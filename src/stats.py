@@ -45,23 +45,23 @@ def	save_parsed_data(filename, csvData=True, pickleData=False):
 	Give the filename you want to save it as
 	If you want to pickle or not
 	"""
-	obj_metrics = compute_obj_metrics()
-	#subj_metrics = compute_subj_metrics()
+	#obj_metrics = compute_obj_metrics()
+	subj_metrics = compute_subj_metrics()
 
 	# write to file
 	here = os.path.dirname(os.path.realpath(__file__))
 	subdir = "/data/study/"
 
 	if pickleData:
-		filepath_obj = here + subdir + filename + "_obj.p"
-		pickle.dump(obj_metrics, open( filepath_obj, "wb" ) )
-		#filepath_subj = here + subdir + filename + "_subj.p"
-		#pickle.dump(subj_metrics, open( filepath_subj, "wb" ) )
+		#filepath_obj = here + subdir + filename + "_obj.p"
+		#pickle.dump(obj_metrics, open( filepath_obj, "wb" ) )
+		filepath_subj = here + subdir + filename + "_subj.p"
+		pickle.dump(subj_metrics, open( filepath_subj, "wb" ) )
 
 	if csvData:
 		filepath_obj = here + subdir + filename + "_obj.csv"
 		filepath_subj = here + subdir + filename + "_subj.csv"
-
+		"""
         # write objective metrics
 		with open(filepath_obj, 'w') as out_obj:
 			header = "participant,task,attempt,method,"
@@ -81,8 +81,7 @@ def	save_parsed_data(filename, csvData=True, pickleData=False):
 								out_obj.write(","+str(num))
 							out_obj.write('\n')
 		out_obj.close()
-		import pdb;pdb.set_trace()
-
+		"""
         # write subjective metrics
 		with open(filepath_subj, 'w') as out_subj:
 			header = "participant,task,method,age,gender,Q1,Q2,Q3,Q4,Q5,Q6,Q7,Q8\n"
@@ -152,10 +151,6 @@ def compute_obj_metrics():
 						obj_metrics[ID][task][trial][method][8] = weight_l2diff
 						obj_metrics[ID][task][trial][method][9] = weight_l2diffF
 
-						# --- Compute difference between the traj from learned weights and optimal --- #
-						diffFinal_feat = compute_rewardFinalDiff(wdata, task)
-						obj_metrics[ID][task][trial][method][10] = diffFinal_feat
-
 						# --- Compute weight path length --- #
 						feat_pathLength = compute_weightFeatPathLength(wdata)
 						weight_path = compute_weightPathLength(wdata)
@@ -163,7 +158,8 @@ def compute_obj_metrics():
 						obj_metrics[ID][task][trial][method][12] = weight_path
 
 						# --- Compute total final regret --- #
-						regret_final = compute_rewardRegretFinal(wdata, task)
+						diffFinal_feat, regret_final = compute_rewardRegretFinal(wdata, task)
+						obj_metrics[ID][task][trial][method][10] = diffFinal_feat
 						obj_metrics[ID][task][trial][method][14] = regret_final
 
 	# compute tracked trajectory metrics
@@ -453,10 +449,11 @@ def compute_rewardRegretFinal(weightdata, task):
 
 	# compute regret of final learned weight
 	regret_final = np.dot(theta,feat_final) - np.dot(theta,feat_ideal)
+	diff_feat = np.fabs(Rfeat - Rfeat_opt)
 
 	plan.kill_planner()
 
-	return regret_final
+	return diff_feat, regret_final
 
 def compute_rewardFinalDiff(weightdata, task):
 	"""
