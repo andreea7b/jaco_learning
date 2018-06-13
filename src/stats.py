@@ -67,7 +67,7 @@ def	save_parsed_data(filename, csvData=True, pickleData=False):
 			header = "participant,task,attempt,method,"
 			header += "Rvel,Rfeat,Rvel*,Rfeat*,RvD,RfD,iactForce,iactTime,"
 			header += "L2,L2Final,FeatDiffFinal,"
-			header +=  "FeatWeightPath,WeightPath,FeatDiff,RegretFinal,Regret\n"
+			header +=  "FeatWeightPath,WeightPath,RegretFinal,Regret\n"
 			out_obj.write(header)
 			# participant ID can take values 0 - 11
 			for ID in obj_metrics.keys():
@@ -132,8 +132,8 @@ def compute_obj_metrics():
 							# stores: 
 							# Rvel,Rfeat,Rvel*,Rfeat*,RvD,RfD,iactForce,iactTime,
 							# L2,L2Final,FeatDiffFinal,
-							# FeatWeightPath,WeightPath,FeatDiff,RegretFinal,Regret
-							obj_metrics[ID][task][trial][method] = np.array([0.0]*16)
+							# FeatWeightPath,WeightPath,RegretFinal,Regret
+							obj_metrics[ID][task][trial][method] = np.array([0.0]*15)
 						print "ID: " + str(ID) + ", task: " + str(task) + ", method: " + str(method) + ", trial: " + str(trial)
 
 						# --- Compute Effort & Interact Time Metrics ---#
@@ -160,7 +160,7 @@ def compute_obj_metrics():
 						# --- Compute total final regret --- #
 						diffFinal_feat, regret_final = compute_rewardRegretFinal(wdata, task)
 						obj_metrics[ID][task][trial][method][10] = diffFinal_feat
-						obj_metrics[ID][task][trial][method][14] = regret_final
+						obj_metrics[ID][task][trial][method][13] = regret_final
 
 	# compute tracked trajectory metrics
 	for ID in trackedData.keys():
@@ -194,13 +194,9 @@ def compute_obj_metrics():
 					obj_metrics[ID][task][trial][method][4] = np.fabs(Rvel_opt - Rvel)
 					obj_metrics[ID][task][trial][method][5] = np.fabs(Rfeat_opt - Rfeat)
 
-					# --- Compute difference between the traj from tracked traj --- #
-					diffTracked_feat = compute_rewardTrackedDiff(Rfeat, Rfeat_opt)
-					obj_metrics[ID][task][trial][method][13] = diffTracked_feat
-
 					# --- Compute regret of traj executed by robot --- #
 					tracked_regret = compute_rewardRegretTracked(Rfeat, Rfeat_opt, task)
-					obj_metrics[ID][task][trial][method][15] = tracked_regret
+					obj_metrics[ID][task][trial][method][14] = tracked_regret
 
 					plan.kill_planner()
 
@@ -228,7 +224,7 @@ def compute_subj_metrics():
 
 	here = os.path.dirname(os.path.realpath(__file__))
 	subdir = "/data/study/"
-	datapath = here + subdir + "likert_responses_clean.csv"
+	datapath = here + subdir + "likert_survey.csv"
 
 	data = {}
 	firstline = True
@@ -238,20 +234,17 @@ def compute_subj_metrics():
 				firstline = False
 				continue
 			values = line.split(',')
-			ID = int(values[0])
-			task = int(values[2].split(' ')[1]) # Comes as 'Task 1', split on space, take number
-			if values[3] == "ONE":
-				method = "B"
-			elif values[3] == "ALL":
-				method = "A"
-			age = int(values[4])
+			ID = int(values[1])
+			task = int(values[3])+1
+			method = values[2]
+			age = values[4]
 			gender = values[5]
 			techbg = values[6]
 			# store age
 			subj_metrics[ID][task][method][0] = age
 			subj_metrics[ID][task][method][1] = gender
 			# parse likert data
-			for i in range(10):
+			for i in range(8):
 				subj_metrics[ID][task][method][i+2] = values[i+7]
 			
 	return subj_metrics
