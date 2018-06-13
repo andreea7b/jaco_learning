@@ -93,7 +93,7 @@ def	save_parsed_data(filename, csvData=True, pickleData=False):
 						out_subj.write(row)
 						for num in subj_metrics[ID][task][method]:
 							out_subj.write(","+str(num))
-			out_subj.write('\n')
+						out_subj.write('\n')
 		out_subj.close()
 	
 
