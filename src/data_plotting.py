@@ -270,7 +270,7 @@ def plot_weights_average(task, saveFig=False):
 	ax2.set_title('Update BETA-adaptive')
 	ax1.set_xlabel('time (s)')
 	ax2.set_xlabel('time (s)')
-	ax1.set_ylabel('weight')
+	ax1.set_ylabel('Average abs(weight)')
 	ax2.set_ylabel('weight')
 
 	ax1.set_ylim([-1.5, 1.5])
@@ -317,11 +317,16 @@ def plot_weights_average(task, saveFig=False):
 			elif method == "B":
 				B_weights[Bcount] = aug_feat
 				Bcount += 1
-			
-	ax1.plot(A_sum,aug_feat,linewidth=4.0, color=greyC)
+	A_weights = abs(np.array(A_weights))
+	B_weights = abs(np.array(B_weights))
+	A_avg = np.mean(A_weights,0)
+	A_std = np.std(A_weights,0)/np.sqrt(NUM_PPL)
+	B_avg = np.mean(B_weights,0)
+	B_std = np.std(B_weights,0)/np.sqrt(NUM_PPL)
+	ax1.errorbar(aug_time,A_avg,A_std,linewidth=4.0, color=greyC)
 	ax1.axhline(y=0, color='k', linestyle='-')
 	ax1.legend()
-	ax2.plot(aug_time,aug_feat,linewidth=4.0, color=orangeC)
+	ax2.errorbar(aug_time,B_avg,B_std,linewidth=4.0, color=orangeC)
 	ax2.axhline(y=0, color='k', linestyle='-')
 	ax2.legend()	
 	
@@ -1190,4 +1195,4 @@ if __name__ == '__main__':
 	#plot_dotOverTime(T1=True, saveFig=True) 		# DONE
 	#plot_undoingObjSubj(saveFig=True)				# DONE
 	#plot_dotF_cupDiff_tableDiff(True)				# DONE
-	plot_weights(4)
+	plot_weights_average(2)
