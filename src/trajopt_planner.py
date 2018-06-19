@@ -9,6 +9,7 @@ import json
 from sympy import symbols
 from sympy import lambdify
 from scipy.optimize import minimize
+from scipy.stats import chi2
 
 import trajoptpy
 import or_trajopt
@@ -37,9 +38,9 @@ INTERACTION_TORQUE_EPSILON = [4.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [0.0, -0.4, 0.0]
 
-P_beta = {"table0": [0.08544,0.2805], "table1": [1.299504, 0.780244], "coffee0": [0.03531365, 0.0435], "coffee1": [0.8935788, 0.3724877]}
-P_beta = {"table0": [0.2812229471102,0.785259743792], "table1": [1.03739176569, 0.884690604024], "coffee0": [0.066663976825, 0.145431535369], "coffee1": [1.34962872178, 1.31424668516], "human0": [0.197915493304,0.333474670518], "human1": [0.979108305045, 0.335266279387]}
 P_beta = {"table0": [0.08544,0.2805], "table1": [1.299504, 0.780244], "coffee0": [0.066663976825, 0.145431535369], "coffee1": [1.34962872178, 1.31424668516], "human0": [0.197915493304,0.333474670518], "human1": [0.979108305045, 0.335266279387]}
+P_beta = {"table0": [1.8, 0.003, 0.154878], "table1": [1.367376889, 0.1122, 1.054762389], "coffee0": [1.620705, 0.006861725, 0.028936769], "coffee1": [1.28972898761, 0.037616649, 0.7984], "human0": [0.9, 0.02288, 1.2911], "human1": [1.79523382, 0.304278367, 0.58068408153]}
+NR = True
 
 # feature learning methods
 ALL = "ALL"					# updates all features
@@ -748,25 +749,22 @@ class Planner(object):
 						#u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 10, 'disp': True})
 					u_h_star = np.reshape(u_h_opt.x, (7, 1)) 
 
-					# Print the Phis
-					(waypts_star, _) = self.deform(u_h_star)
-					H_features = self.featurize(waypts_star)
-					Phi_H = np.array([sum(x) for x in H_features[1:]])
-					print "Phi_H_star:", Phi_H
-					print "Phi_H:", Phi_p
-					print "norm cost: ", np.linalg.norm(u_h_star)**2, "; delta phi cost:", (Phi_H[i] - Phi_p[i])**2
 					# Compute beta 
 					beta_norm = 1.0/np.linalg.norm(u_h_star)**2
 					self.betas[i] = 1/(2*beta_norm*abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2))
 					print "here is u_h and its norm:", u_h, np.linalg.norm(u_h)
 					print "here is optimal u_h and its norm:", u_h_star, np.linalg.norm(u_h_star)
 					print "here is beta:", self.betas
+
 					# Compute update using P(i|beta)
 					mus1 = P_beta[self.feat_list[i]+"1"]
 					mus0 = P_beta[self.feat_list[i]+"0"]
-					self.betas_u[i] = mlab.normpdf(self.betas[i],mus1[0],mus1[1]) / (mlab.normpdf(self.betas[i],mus1[0],mus1[1]) + mlab.normpdf(self.betas[i],mus0[0],mus0[1]))
-					#update_beta = min(1,self.betas[i]/MAX_BETA[self.feat_list[i]])
-					print "here is one: ", mlab.normpdf(self.betas[i],mus1[0],mus1[1]), "and zero: ", mlab.normpdf(self.betas[i],mus0[0],mus0[1])
+					if NR == False:
+						self.betas_u[i] = mlab.normpdf(self.betas[i],mus1[0],mus1[1]) / (mlab.normpdf(self.betas[i],mus1[0],mus1[1]) + mlab.normpdf(self.betas[i],mus0[0],mus0[1]))
+					else:
+						num = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2])*np.exp(self.weights[i]*update[i])
+						denom = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) + num
+						self.betas_u[i] = num/denom
 					print "here is beta:", self.betas_u
 				# Compute new weights
 				curr_weight = self.weights - np.array(self.betas_u)*update_gains*update

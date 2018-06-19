@@ -138,7 +138,7 @@ class PIDVelJaco(object):
 		# initialize start/goal based on features
 		# by default for table and laptop, these are the pick and place
 		self.traj_cache = "/traj_dump/traj_cache_" + "_".join(self.feat_list) + ".p"
-		pick = pick_basic_EEtilt
+		pick = pick_basic
 		if self.task is None:
 			self.traj_cache = "/traj_dump_offline/traj_cache_" + "_".join(self.feat_list) + ".p"
 			if "coffee" in self.feat_list:

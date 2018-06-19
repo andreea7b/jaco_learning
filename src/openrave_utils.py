@@ -25,7 +25,7 @@ def initialize(model_filename='jaco', envXML=None):
 	env = openravepy.Environment()
 	if envXML is not None:
 		env.LoadURI(envXML)
-	#env.SetViewer('qtcoin')
+	env.SetViewer('qtcoin')
 
 	# Assumes the robot files are located in the data folder of the
 	# kinova_description package in the catkin workspace.
@@ -39,13 +39,13 @@ def initialize(model_filename='jaco', envXML=None):
 	robot.SetActiveDOFs(np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]))
 	robot.SetDOFValues(robot_starting_dofs)
 	
-	# = env.GetViewer()
-	#viewer.SetSize(700,500)
-	#cam_params = np.array([[-0.99885711, -0.01248719, -0.0461361 , -0.18887213],
-	#	   [ 0.02495645,  0.68697757, -0.72624996,  2.04733515],
-	#	   [ 0.04076329, -0.72657133, -0.68588079,  1.67818344],
-	#	   [ 0.        ,  0.        ,  0.        ,  1.        ]])
-	#viewer.SetCamera(cam_params)
+	viewer = env.GetViewer()
+	viewer.SetSize(700,500)
+	cam_params = np.array([[-0.99885711, -0.01248719, -0.0461361 , -0.18887213],
+		   [ 0.02495645,  0.68697757, -0.72624996,  2.04733515],
+		   [ 0.04076329, -0.72657133, -0.68588079,  1.67818344],
+		   [ 0.        ,  0.        ,  0.        ,  1.        ]])
+	viewer.SetCamera(cam_params)
 	
 	return env, robot
 
@@ -150,6 +150,7 @@ def plotTraj(env,robot,bodies,waypts, size=10, color=[0, 1, 0]):
 		waypoint = waypts[i]
 		dof = np.append(waypoint, np.array([1, 1, 1]))
 		dof[2] += math.pi
+		print dof
 		robot.SetDOFValues(dof)
 		coord = robotToCartesian(robot)
 		# sz=0.015
