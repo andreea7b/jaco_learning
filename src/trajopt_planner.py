@@ -8,7 +8,7 @@ import json
 
 from sympy import symbols
 from sympy import lambdify
-from scipy.optimize import minimize
+from scipy.optimize import minimize, newton
 from scipy.stats import chi2
 
 import trajoptpy
@@ -25,20 +25,20 @@ import copy
 import os
 import itertools
 import pickle
-import cProfile
 import matplotlib.mlab as mlab
 
 # feature constacts (update gains and max weights)
 UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0, 'human':20.0}
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
 FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554, 'human':3.2}
-MAX_BETA = {'table':1.2, 'coffee':1.2, 'human':1}
-INTERACTION_TORQUE_EPSILON = [4.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]
 
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [0.0, -0.4, 0.0]
 
+# fit a normal distribution to p(beta|r)
 P_beta = {"table0": [0.08544,0.2805], "table1": [1.299504, 0.780244], "coffee0": [0.066663976825, 0.145431535369], "coffee1": [1.34962872178, 1.31424668516], "human0": [0.197915493304,0.333474670518], "human1": [0.979108305045, 0.335266279387]}
+
+# fit a chi-squared distribution to p(beta|r)
 P_beta = {"table0": [1.8, 0.003, 0.154878], "table1": [1.367376889, 0.1122, 1.054762389], "coffee0": [1.620705, 0.006861725, 0.028936769], "coffee1": [1.28972898761, 0.037616649, 0.7984], "human0": [0.9, 0.02288, 1.2911], "human1": [1.79523382, 0.304278367, 0.58068408153]}
 NR = True
 
@@ -199,7 +199,6 @@ class Planner(object):
 		---
 		input trajectory, output scalar cost
 		"""
-		#mywaypts = np.reshape(waypts,(7,self.num_waypts_plan)).T
 		return self.velocity_features(mywaypts)
 
 	# -- Distance to Robot Base (origin of world) -- #
@@ -218,11 +217,6 @@ class Planner(object):
 		coords = robotToCartesian(self.robot)
 		EEcoord_y = coords[6][1]
 		EEcoord_y = np.linalg.norm(coords[6])
-		#plotSphere(self.env, self.bodies, [coords[6][0],0,0], size=20, color=[1,0,0])
-		#plotSphere(self.env, self.bodies, [0,coords[6][1],0], size=20, color=[0,0,1])
-		#plotSphere(self.env, self.bodies, [0,0,coords[6][2]], size=20, color=[0,1,0])
-		#plotSphere(self.env, self.bodies, coords[6][0:3], size=20, color=[1,1,0])
-		print "EEcoord_y: " + str(EEcoord_y)
 		return EEcoord_y
 
 	def origin_cost(self, waypt):
@@ -286,10 +280,7 @@ class Planner(object):
 		EE_link = self.robot.GetLinks()[7]
 		R = EE_link.GetTransform()[:3,:3]
 		[yaw, pitch, roll] = mat2euler(R)
-		#print "yaw, pitch, roll:", yaw, pitch, roll
-		#print "rotation matrix:", R
-		if self.task == "table":
-			return sum(abs(EE_link.GetTransform()[:2,:3].dot([1,0,0])))
+		#return sum(abs(EE_link.GetTransform()[:2,:3].dot([1,0,0])))
 		return (pitch + 1.5)
 
 	def coffee_cost(self, waypt):
@@ -369,8 +360,8 @@ class Planner(object):
 		"""
 		Computes distance from end-effector to human in xy coords
 		input trajectory, output scalar distance where 
-			0: EE is at more than 1.7 meters away from human
-			+: EE is closer than 1.7 meters to human
+			0: EE is at more than .7 meters away from human
+			+: EE is closer than .7 meters to human
 		"""
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
@@ -752,19 +743,27 @@ class Planner(object):
 					# Compute beta 
 					beta_norm = 1.0/np.linalg.norm(u_h_star)**2
 					self.betas[i] = 1/(2*beta_norm*abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2))
-					print "here is u_h and its norm:", u_h, np.linalg.norm(u_h)
-					print "here is optimal u_h and its norm:", u_h_star, np.linalg.norm(u_h_star)
 					print "here is beta:", self.betas
 
 					# Compute update using P(i|beta)
 					mus1 = P_beta[self.feat_list[i]+"1"]
 					mus0 = P_beta[self.feat_list[i]+"0"]
-					if NR == False:
-						self.betas_u[i] = mlab.normpdf(self.betas[i],mus1[0],mus1[1]) / (mlab.normpdf(self.betas[i],mus1[0],mus1[1]) + mlab.normpdf(self.betas[i],mus0[0],mus0[1]))
-					else:
-						num = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2])*np.exp(self.weights[i]*update[i])
-						denom = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) + num
-						self.betas_u[i] = num/denom
+
+                    # Newton-Rapson setup; define function, derivative, and
+                    # call optimization method
+                    l = 1
+                    def f_theta(weights_p):
+					    num = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2])*np.exp(weights_p[i]*update[i])
+					    denom = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2])*(l/math.pi)**(self.num_feat/2)*np.exp(l*update[i]**2) + num
+                        return weights_p + update_gains[i]*num*update[i]/denom - self.weights[i]
+                    def df_theta(weights_p):
+                        num = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2])*(l/math.pi)**(self.num_feat/2)*np.exp(l*update[i]**2)
+                        denom = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2])*np.exp(weights_p[i]*update[i])
+                        return 1 + update_gains[i]*num/denom
+                    weight_p = newton(f_theta,self.weights[i],df_theta)
+                    num = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2])*np.exp(weight_p[i]*update[i])
+                    denom = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2])*(l/math.pi)**(self.num_feat/2)*np.exp(l*update[i]**2) + num
+                    self.betas_u[i] = num/denom
 					print "here is beta:", self.betas_u
 				# Compute new weights
 				curr_weight = self.weights - np.array(self.betas_u)*update_gains*update
@@ -791,12 +790,12 @@ class Planner(object):
 		waypts_deform = copy.deepcopy(self.waypts)
 		gamma = np.zeros((self.n,7))
 		deform_waypt_idx = self.curr_waypt_idx + 1
-		
+
 		if (deform_waypt_idx + self.n) > self.num_waypts:
 			print "Deforming too close to end. Returning same trajectory"
 			return (waypts_prev, waypts_prev)
-		
-		for joint in range(7):	
+
+		for joint in range(7):
 			gamma[:,joint] = self.alpha*np.dot(self.H, u_h[joint])
 		waypts_deform[deform_waypt_idx : self.n + deform_waypt_idx, :] += gamma
 		return (waypts_deform, waypts_prev)
@@ -893,32 +892,6 @@ class Planner(object):
 		pos = np.array([curr_pos[0][0],curr_pos[1][0],curr_pos[2][0]+math.pi,curr_pos[3][0],curr_pos[4][0],curr_pos[5][0],curr_pos[6][0],0,0,0])
 
 		self.robot.SetDOFValues(pos)
-
-	def plot_weight_update(self):
-		"""
-		Plots weight update over time.
-		"""
-
-		#plt.plot(self.update_time,self.weight_update.T[0],linewidth=4.0,label='Vel')
-		plt.plot(self.update_time,self.weight_update.T[0],linewidth=4.0,label='Coffee')
-		plt.plot(self.update_time,self.weight_update.T[1],linewidth=4.0,label='Table')
-		#plt.plot(self.update_time,self.weight_update.T[2],linewidth=4.0,label='Laptop')
-		plt.legend()
-		plt.title("Weight (for features) changes over time")
-		plt.show()
-
-	def plot_feature_update(self):
-		"""
-		Plots feature change over time.
-		"""
-
-		#plt.plot(self.update_time,self.weight_update.T[0],linewidth=4.0,label='Vel')
-		plt.plot(self.update_time2,self.feature_update.T[1],linewidth=4.0,label='Coffee')
-		plt.plot(self.update_time2,self.feature_update.T[2],linewidth=4.0,label='Table')
-		#plt.plot(self.update_time2,self.feature_update.T[3],linewidth=4.0,label='Laptop')
-		plt.legend()
-		plt.title("Feature changes over time")
-		plt.show()
 
 	def kill_planner(self):
 		"""
