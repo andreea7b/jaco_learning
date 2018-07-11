@@ -35,12 +35,8 @@ FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554, 'huma
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [0.0, -0.4, 0.0]
 
-# fit a normal distribution to p(beta|r)
-P_beta = {"table0": [0.08544,0.2805], "table1": [1.299504, 0.780244], "coffee0": [0.066663976825, 0.145431535369], "coffee1": [1.34962872178, 1.31424668516], "human0": [0.197915493304,0.333474670518], "human1": [0.979108305045, 0.335266279387]}
-
 # fit a chi-squared distribution to p(beta|r)
 P_beta = {"table0": [1.8, 0.003, 0.154878], "table1": [1.367376889, 0.1122, 1.054762389], "coffee0": [1.620705, 0.006861725, 0.028936769], "coffee1": [1.28972898761, 0.037616649, 0.7984], "human0": [0.9, 0.02288, 1.2911], "human1": [1.79523382, 0.304278367, 0.58068408153]}
-NR = True
 
 # feature learning methods
 ALL = "ALL"					# updates all features
@@ -742,28 +738,34 @@ class Planner(object):
 
 					# Compute beta 
 					beta_norm = 1.0/np.linalg.norm(u_h_star)**2
-					self.betas[i] = 1/(2*beta_norm*abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2))
+					self.betas[i] = self.num_features/(2*beta_norm*abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2))
 					print "here is beta:", self.betas
 
 					# Compute update using P(i|beta)
 					mus1 = P_beta[self.feat_list[i]+"1"]
 					mus0 = P_beta[self.feat_list[i]+"0"]
 
-                    # Newton-Rapson setup; define function, derivative, and
-                    # call optimization method
-                    l = 1
-                    def f_theta(weights_p):
-					    num = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2])*np.exp(weights_p[i]*update[i])
-					    denom = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2])*(l/math.pi)**(self.num_feat/2)*np.exp(l*update[i]**2) + num
-                        return weights_p + update_gains[i]*num*update[i]/denom - self.weights[i]
-                    def df_theta(weights_p):
-                        num = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2])*(l/math.pi)**(self.num_feat/2)*np.exp(l*update[i]**2)
-                        denom = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2])*np.exp(weights_p[i]*update[i])
-                        return 1 + update_gains[i]*num/denom
-                    weight_p = newton(f_theta,self.weights[i],df_theta)
-                    num = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2])*np.exp(weight_p[i]*update[i])
-                    denom = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2])*(l/math.pi)**(self.num_feat/2)*np.exp(l*update[i]**2) + num
-                    self.betas_u[i] = num/denom
+					# Newton-Rapson setup; define function, derivative, and
+					# call optimization method
+					l = 1
+					def f_theta(weights_p):
+					    num = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2])*np.exp(weights_p*update[i])
+					    denom = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2])*(l/math.pi)**(self.num_features/2)*np.exp(l*update[i]**2) + num
+					    return weights_p + update_gains[i]*num*update[i]/denom - self.weights[i]
+					def df_theta(weights_p):
+					    num = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2])*(l/math.pi)**(self.num_features/2)*np.exp(l*update[i]**2)
+					    denom = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2])*np.exp(weights_p*update[i])
+					    return 1 + update_gains[i]*num/denom
+
+					try:
+						weight_p = newton(f_theta,self.weights[i],df_theta,maxiter=100)
+					except:
+						print "Newton did not converge properly. Discarding correction."
+						weight_p = self.weights[i]
+					
+					num = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2])*np.exp(weight_p*update[i])
+					denom = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2])*(l/math.pi)**(self.num_features/2)*np.exp(l*update[i]**2) + num
+					self.betas_u[i] = num/denom
 					print "here is beta:", self.betas_u
 				# Compute new weights
 				curr_weight = self.weights - np.array(self.betas_u)*update_gains*update
