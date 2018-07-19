@@ -741,30 +741,39 @@ class Planner(object):
 					self.betas[i] = self.num_features/(2*beta_norm*abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2))
 					print "here is beta:", self.betas
 
-					# Compute update using P(i|beta)
+					# Compute update using P(r|beta)
+					# Compute P(r|beta)
 					mus1 = P_beta[self.feat_list[i]+"1"]
 					mus0 = P_beta[self.feat_list[i]+"0"]
+					p_r0 = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) / (chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) + chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2]))
+					p_r1 = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2]) / (chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) + chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2]))
+					# If they're both very unlikely, p_r0=p_r1=nan; set to 0.5 instead
+					if math.isnan(p_r0) or math.isnan(p_r1):
+						p_r0 = p_r1 = 0.5
 
 					# Newton-Rapson setup; define function, derivative, and
 					# call optimization method
 					l = 1
+					import pdb;pdb.set_trace()
 					def f_theta(weights_p):
-					    num = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2])*np.exp(weights_p*update[i])
-					    denom = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2])*(l/math.pi)**(self.num_features/2)*np.exp(l*update[i]**2) + num
+					    num = p_r1*np.exp(-weights_p*update[i])
+					    denom = p_r0*(l/math.pi)**(self.num_features/2.0)*np.exp(-l*update[i]**2) + num
+					    print "f value:", num, denom, weights_p + update_gains[i]*num*update[i]/denom - self.weights[i] 
 					    return weights_p + update_gains[i]*num*update[i]/denom - self.weights[i]
 					def df_theta(weights_p):
-					    num = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2])*(l/math.pi)**(self.num_features/2)*np.exp(l*update[i]**2)
-					    denom = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2])*np.exp(weights_p*update[i])
+					    num = p_r0*(l/math.pi)**(self.num_features/2.0)*np.exp(-l*update[i]**2)
+					    denom = p_r1*np.exp(-weights_p*update[i])
+					    print "df value:", num, denom, 1 + update_gains[i]*num/denom
 					    return 1 + update_gains[i]*num/denom
 
 					try:
-						weight_p = newton(f_theta,self.weights[i],df_theta,maxiter=100)
+						weight_p = newton(f_theta,self.weights[i],df_theta,tol=1e-06)
 					except:
 						print "Newton did not converge properly. Discarding correction."
 						weight_p = self.weights[i]
 					
-					num = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2])*np.exp(weight_p*update[i])
-					denom = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2])*(l/math.pi)**(self.num_features/2)*np.exp(l*update[i]**2) + num
+					num = p_r1*np.exp(weight_p*update[i])
+					denom = p_r0*(l/math.pi)**(self.num_features/2)*np.exp(l*update[i]**2) + num
 					self.betas_u[i] = num/denom
 					print "here is beta:", self.betas_u
 				# Compute new weights
