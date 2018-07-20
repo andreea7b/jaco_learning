@@ -36,7 +36,7 @@ OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [0.0, -0.4, 0.0]
 
 # fit a chi-squared distribution to p(beta|r)
-P_beta = {"table0": [1.8, 0.003, 0.154878], "table1": [1.367376889, 0.1122, 1.054762389], "coffee0": [1.620705, 0.006861725, 0.028936769], "coffee1": [1.28972898761, 0.037616649, 0.7984], "human0": [0.9, 0.02288, 1.2911], "human1": [1.79523382, 0.304278367, 0.58068408153]}
+P_beta = {"table0": [1.0939453125, 0.0, 0.4212940611], "table1": [2.8, 0.0, 0.4212940611], "coffee0": [0.6966796875, 0.0, 0.409980149094], "coffee1": [2.28408203125, 0.0, 0.409980149094], "human0": [1.83369140925, 0.0, 0.295521098707], "human1": [4.40966796875, 0.0, 0.295521098707]}
 
 # feature learning methods
 ALL = "ALL"					# updates all features
@@ -689,7 +689,6 @@ class Planner(object):
 				curr_weight = np.array([self.weights[i] for i in range(len(self.weights))])
 				curr_weight[max_idx] = curr_weight[max_idx] - update_gains[max_idx]*update[max_idx+1]
 			elif self.feat_method == BETA:
-				# Define minimization function
 				update = update[1:]
 				Phi_p = Phi_p[1:]
 				Phi = Phi[1:]
@@ -747,30 +746,20 @@ class Planner(object):
 					mus0 = P_beta[self.feat_list[i]+"0"]
 					p_r0 = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) / (chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) + chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2]))
 					p_r1 = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2]) / (chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) + chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2]))
-					# If they're both very unlikely, p_r0=p_r1=nan; set to 0.5 instead
-					if math.isnan(p_r0) or math.isnan(p_r1):
-						p_r0 = p_r1 = 0.5
 
 					# Newton-Rapson setup; define function, derivative, and
 					# call optimization method
-					l = 1
-					import pdb;pdb.set_trace()
+					l = 1 # set lambda to 1
 					def f_theta(weights_p):
 					    num = p_r1*np.exp(-weights_p*update[i])
 					    denom = p_r0*(l/math.pi)**(self.num_features/2.0)*np.exp(-l*update[i]**2) + num
-					    print "f value:", num, denom, weights_p + update_gains[i]*num*update[i]/denom - self.weights[i] 
 					    return weights_p + update_gains[i]*num*update[i]/denom - self.weights[i]
 					def df_theta(weights_p):
 					    num = p_r0*(l/math.pi)**(self.num_features/2.0)*np.exp(-l*update[i]**2)
 					    denom = p_r1*np.exp(-weights_p*update[i])
-					    print "df value:", num, denom, 1 + update_gains[i]*num/denom
 					    return 1 + update_gains[i]*num/denom
 
-					try:
-						weight_p = newton(f_theta,self.weights[i],df_theta,tol=1e-06)
-					except:
-						print "Newton did not converge properly. Discarding correction."
-						weight_p = self.weights[i]
+					weight_p = newton(f_theta,self.weights[i],df_theta,tol=1e-04)
 					
 					num = p_r1*np.exp(weight_p*update[i])
 					denom = p_r0*(l/math.pi)**(self.num_features/2)*np.exp(l*update[i]**2) + num
