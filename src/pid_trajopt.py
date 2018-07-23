@@ -2,7 +2,7 @@
 """
 This node demonstrates velocity-based PID control by moving the Jaco
 so that it maintains a fixed distance to a target. 
-Author: Andrea Bajcsy (abajcsy@eecs.berkeley.edu)
+Authors: Andreea Bobu (abobu@eecs.berkeley.edu), Andrea Bajcsy (abajcsy@eecs.berkeley.edu)
 Based on: https://w3.cs.jmu.edu/spragunr/CS354_S15/labs/pid_lab/pid_lab.shtml
 """
 import roslib; roslib.load_manifest('kinova_demo')
@@ -137,6 +137,7 @@ class PIDVelJaco(object):
 
 		# initialize start/goal based on features
 		# by default for table and laptop, these are the pick and place
+		# depending on the task for study, pick and place will be different
 		self.traj_cache = "/traj_dump/traj_cache_" + "_".join(self.feat_list) + ".p"
 		pick = pick_basic_EEtilt
 		if self.task is None:
