@@ -3,8 +3,8 @@
 Implementation of traditional, interactive, and adaptive control schemes for a Kinova 7DOF Jaco robotic arm. 
 ROS, Python, and Kinova API. Testing interaction integrated into planning. 
 
-## Running the Controllers
-### PID Controller 
+## Running Adaptive Physical HRI
+### Kinova arm startup
 In the terminal, run:
 ```
 roslaunch iact_control jaco_pid_demo.launch
