@@ -35,12 +35,10 @@ FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554, 'huma
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [0.0, -0.4, 0.0]
 
-# fit a normal distribution to p(beta|r)
-P_beta = {"table0": [0.08544,0.2805], "table1": [1.299504, 0.780244], "coffee0": [0.066663976825, 0.145431535369], "coffee1": [1.34962872178, 1.31424668516], "human0": [0.197915493304,0.333474670518], "human1": [0.979108305045, 0.335266279387]}
-
-# fit a chi-squared distribution to p(beta|r)
-P_beta = {"table0": [1.8, 0.003, 0.154878], "table1": [1.367376889, 0.1122, 1.054762389], "coffee0": [1.620705, 0.006861725, 0.028936769], "coffee1": [1.28972898761, 0.037616649, 0.7984], "human0": [0.9, 0.02288, 1.2911], "human1": [1.79523382, 0.304278367, 0.58068408153]}
-NR = True
+# fit a chi-squared distribution to p(beta|r); numers are [deg_of_freedom, loc, scale]
+# first is manually tuned to fit the data; second is what scipy gives automatically
+P_beta = {"table0": [1.83701582842, 0.0, 0.150583961407], "table1": [2.8, 0.0, 0.4212940611], "coffee0": [1.67451171875, 0.0, 0.05], "coffee1": [2.8169921875, 0.0, 0.3], "human0": [2.14693459432, 0.0, 0.227738059531], "human1": [5.0458984375, 0.0, 0.25]}
+#P_beta = {"table0": [1.83701582842, 0.0, 0.150583961407], "table1": [2.0234735525, 0.0, 0.692004160793], "coffee0": [3.63132216184, 0.0, 0.0153839059284], "coffee1": [1.5373469636, 0.0, 0.80457639226], "human0": [2.14693459432, 0.0, 0.227738059531], "human1": [3.75489632455, 0.0, 0.363304137883]}
 
 # feature learning methods
 ALL = "ALL"					# updates all features
@@ -261,8 +259,8 @@ class Planner(object):
 	def coffee_features(self, waypt):
 		"""
 		Computes the distance to table cost for waypoint
-		by checking if the EE is oriented vertically.
-		Note: [0,0,1] in the first *column* corresponds to the cup upright
+		by checking if the EE is oriented vertically according to pitch.
+		Note: adding 1.5 to pitch to make it centered around 0
 		---
 		input trajectory, output scalar cost
 		"""
@@ -693,13 +691,15 @@ class Planner(object):
 				curr_weight = np.array([self.weights[i] for i in range(len(self.weights))])
 				curr_weight[max_idx] = curr_weight[max_idx] - update_gains[max_idx]*update[max_idx+1]
 			elif self.feat_method == BETA:
-				# Define minimization function
+				# beta-adaptive method
 				update = update[1:]
 				Phi_p = Phi_p[1:]
 				Phi = Phi[1:]
 
+				### First obtain the original beta rationality from the optimization problem ###
 				# Set up the unconstrained optimization problem:
 				def u_unconstrained(u):
+					# Optimized manually; lambda_u can be changed according to user preferences
 					if self.feat_list[i] == 'table':
 						lambda_u = 20000
 					elif self.feat_list[i] == 'human':
@@ -729,42 +729,49 @@ class Planner(object):
 
 				# Compute what the optimal action would have been wrt every feature
 				for i in range(self.num_features):
+					# Compute optimal action
+					# Every feature requires a different optimizer because every feature is different in scale
+					# Every feature also requires a different Newton-Rapson lambda
 					if self.feat_list[i] == 'table':
 						u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 10, 'ftol': 1e-6, 'disp': True})
-						#u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 5, 'disp': True})
+						l = math.pi
 					elif self.feat_list[i] == 'human':
-						#u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 20, 'ftol': 1e-6, 'disp': True})
 						u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 10, 'disp': True})
+						l = 15.0
 					elif self.feat_list[i] == 'coffee':
 						u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 10, 'ftol': 1e-6, 'disp': True})
-						#u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 10, 'disp': True})
+						l = math.pi
 					u_h_star = np.reshape(u_h_opt.x, (7, 1)) 
 
-					# Compute beta 
+					# Compute beta based on deviation from optimal action
 					beta_norm = 1.0/np.linalg.norm(u_h_star)**2
-					self.betas[i] = 1/(2*beta_norm*abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2))
+					self.betas[i] = self.num_features/(2*beta_norm*abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2))
 					print "here is beta:", self.betas
 
-					# Compute update using P(i|beta)
+					### Compute update using P(r|beta) for the beta estimate we just computed ###
+					# Compute P(r|beta)
 					mus1 = P_beta[self.feat_list[i]+"1"]
 					mus0 = P_beta[self.feat_list[i]+"0"]
+					p_r0 = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) / (chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) + chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2]))
+					p_r1 = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2]) / (chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) + chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2]))
 
-                    # Newton-Rapson setup; define function, derivative, and
-                    # call optimization method
-                    l = 1
-                    def f_theta(weights_p):
-					    num = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2])*np.exp(weights_p[i]*update[i])
-					    denom = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2])*(l/math.pi)**(self.num_feat/2)*np.exp(l*update[i]**2) + num
-                        return weights_p + update_gains[i]*num*update[i]/denom - self.weights[i]
-                    def df_theta(weights_p):
-                        num = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2])*(l/math.pi)**(self.num_feat/2)*np.exp(l*update[i]**2)
-                        denom = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2])*np.exp(weights_p[i]*update[i])
-                        return 1 + update_gains[i]*num/denom
-                    weight_p = newton(f_theta,self.weights[i],df_theta)
-                    num = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2])*np.exp(weight_p[i]*update[i])
-                    denom = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2])*(l/math.pi)**(self.num_feat/2)*np.exp(l*update[i]**2) + num
-                    self.betas_u[i] = num/denom
-					print "here is beta:", self.betas_u
+					# Newton-Rapson setup; define function, derivative, and
+					# call optimization method
+					def f_theta(weights_p):
+					    num = p_r1*np.exp(weights_p*update[i])
+					    denom = p_r0*(l/math.pi)**(self.num_features/2.0)*np.exp(-l*update[i]**2) + num
+					    return weights_p + update_gains[i]*num*update[i]/denom - self.weights[i]
+					def df_theta(weights_p):
+					    num = p_r0*(l/math.pi)**(self.num_features/2.0)*np.exp(-l*update[i]**2)
+					    denom = p_r1*np.exp(weights_p*update[i])
+					    return 1 + update_gains[i]*num/denom
+
+					weight_p = newton(f_theta,self.weights[i],df_theta,tol=1e-04,maxiter=1000)
+					
+					num = p_r1*np.exp(weight_p*update[i])
+					denom = p_r0*(l/math.pi)**(self.num_features/2.0)*np.exp(-l*update[i]**2) + num
+					self.betas_u[i] = num/denom
+					print "here is weighted beta:", self.betas_u
 				# Compute new weights
 				curr_weight = self.weights - np.array(self.betas_u)*update_gains*update
 
