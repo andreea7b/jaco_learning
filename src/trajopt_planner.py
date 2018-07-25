@@ -37,7 +37,8 @@ HUMAN_CENTER = [0.0, -0.4, 0.0]
 
 # fit a chi-squared distribution to p(beta|r); numers are [deg_of_freedom, loc, scale]
 # first is manually tuned to fit the data; second is what scipy gives automatically
-P_beta = {"table0": [1.83701582842, 0.0, 0.150583961407], "table1": [2.8, 0.0, 0.4212940611], "coffee0": [2.99482421875, 0.0, 0.02], "coffee1": [2.8169921875, 0.0, 0.3], "human0": [2.14693459432, 0.0, 0.227738059531], "human1": [3.75489632455, 0.0, 0.363304137883]}
+P_beta = {"table0": [1.83701582842, 0.0, 0.150583961407], "table1": [2.8, 0.0, 0.4212940611], "coffee0": [1.67451171875, 0.0, 0.05], "coffee1": [2.8169921875, 0.0, 0.3], "human0": [2.14693459432, 0.0, 0.227738059531], "human1": [5.0458984375, 0.0, 0.25]}
+#P_beta = {"table0": [1.83701582842, 0.0, 0.150583961407], "table1": [2.0234735525, 0.0, 0.692004160793], "coffee0": [3.63132216184, 0.0, 0.0153839059284], "coffee1": [1.5373469636, 0.0, 0.80457639226], "human0": [2.14693459432, 0.0, 0.227738059531], "human1": [3.75489632455, 0.0, 0.363304137883]}
 
 # feature learning methods
 ALL = "ALL"					# updates all features
@@ -729,18 +730,17 @@ class Planner(object):
 				# Compute what the optimal action would have been wrt every feature
 				for i in range(self.num_features):
 					# Compute optimal action
+					# Every feature requires a different optimizer because every feature is different in scale
+					# Every feature also requires a different Newton-Rapson lambda
 					if self.feat_list[i] == 'table':
 						u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 10, 'ftol': 1e-6, 'disp': True})
-						#u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 5, 'disp': True})
-						l = 0.1 # lambda for NR optimization
+						l = math.pi
 					elif self.feat_list[i] == 'human':
-						#u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 20, 'ftol': 1e-6, 'disp': True})
 						u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 10, 'disp': True})
-						l = 0.1 # lambda for NR optimization
+						l = 15.0
 					elif self.feat_list[i] == 'coffee':
 						u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 10, 'ftol': 1e-6, 'disp': True})
-						#u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 10, 'disp': True})
-						l = 10.0 # lambda for NR optimization
+						l = math.pi
 					u_h_star = np.reshape(u_h_opt.x, (7, 1)) 
 
 					# Compute beta based on deviation from optimal action
@@ -758,20 +758,20 @@ class Planner(object):
 					# Newton-Rapson setup; define function, derivative, and
 					# call optimization method
 					def f_theta(weights_p):
-					    num = p_r1*np.exp(-weights_p*update[i])
-					    denom = p_r0*(l/math.pi)**(self.num_features/2.0)*np.exp(l*update[i]**2) + num
+					    num = p_r1*np.exp(weights_p*update[i])
+					    denom = p_r0*(l/math.pi)**(self.num_features/2.0)*np.exp(-l*update[i]**2) + num
 					    return weights_p + update_gains[i]*num*update[i]/denom - self.weights[i]
 					def df_theta(weights_p):
-					    num = p_r0*(l/math.pi)**(self.num_features/2.0)*np.exp(l*update[i]**2)
-					    denom = p_r1*np.exp(-weights_p*update[i])
+					    num = p_r0*(l/math.pi)**(self.num_features/2.0)*np.exp(-l*update[i]**2)
+					    denom = p_r1*np.exp(weights_p*update[i])
 					    return 1 + update_gains[i]*num/denom
 
-					weight_p = newton(f_theta,self.weights[i],df_theta,tol=1e-04,maxiter=500)
+					weight_p = newton(f_theta,self.weights[i],df_theta,tol=1e-04,maxiter=1000)
 					
-					num = p_r1*np.exp(-weight_p*update[i])
-					denom = p_r0*(l/math.pi)**(self.num_features/2)*np.exp(l*update[i]**2) + num
+					num = p_r1*np.exp(weight_p*update[i])
+					denom = p_r0*(l/math.pi)**(self.num_features/2.0)*np.exp(-l*update[i]**2) + num
 					self.betas_u[i] = num/denom
-					print "here is beta:", np.exp(-weight_p*update[i]), (l/math.pi)**(self.num_features/2)*np.exp(l*update[i]**2), self.betas_u
+					print "here is weighted beta:", self.betas_u
 				# Compute new weights
 				curr_weight = self.weights - np.array(self.betas_u)*update_gains*update
 
