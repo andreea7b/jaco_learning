@@ -38,7 +38,6 @@ HUMAN_CENTER = [0.0, -0.4, 0.0]
 # fit a chi-squared distribution to p(beta|r); numers are [deg_of_freedom, loc, scale]
 # first is manually tuned to fit the data; second is what scipy gives automatically
 P_beta = {"table0": [1.83701582842, 0.0, 0.150583961407], "table1": [2.8, 0.0, 0.4212940611], "coffee0": [1.67451171875, 0.0, 0.05], "coffee1": [2.8169921875, 0.0, 0.3], "human0": [2.14693459432, 0.0, 0.227738059531], "human1": [5.0458984375, 0.0, 0.25]}
-#P_beta = {"table0": [1.83701582842, 0.0, 0.150583961407], "table1": [2.0234735525, 0.0, 0.692004160793], "coffee0": [3.63132216184, 0.0, 0.0153839059284], "coffee1": [1.5373469636, 0.0, 0.80457639226], "human0": [2.14693459432, 0.0, 0.227738059531], "human1": [3.75489632455, 0.0, 0.363304137883]}
 
 # feature learning methods
 ALL = "ALL"					# updates all features
