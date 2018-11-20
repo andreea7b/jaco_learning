@@ -1,9 +1,0 @@
-<KinBody name="cabinet">
-<Body type="static" name="cabinet_link">
-  <Geom type="box">
-    <Translation> 0 0 0 </Translation>
-    <extents> 0.381 0.1905 0.71 </extents>
-  </Geom>
-</Body>
-</KinBody>
-
