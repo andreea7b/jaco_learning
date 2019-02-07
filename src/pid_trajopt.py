@@ -1,7 +1,6 @@
 #! /usr/bin/env python
 """
-This node demonstrates velocity-based PID control by moving the Jaco
-so that it maintains a fixed distance to a target. 
+This node demonstrates velocity-based PID control by moving the Jaco so that it maintains a fixed distance to a target. 
 Authors: Andreea Bobu (abobu@eecs.berkeley.edu), Andrea Bajcsy (abajcsy@eecs.berkeley.edu)
 Based on: https://w3.cs.jmu.edu/spragunr/CS354_S15/labs/pid_lab/pid_lab.shtml
 """
@@ -16,7 +15,7 @@ import thread
 import argparse
 import actionlib
 import time
-import trajopt_planner
+import trajopt_planner, phri_planner, demo_planner
 import ros_utils
 import exp_utils.experiment_utils
 
@@ -33,33 +32,33 @@ from numpy import linalg
 import matplotlib.pyplot as plt
 import pickle
 
+# Jaco software name
 prefix = 'j2s7s300_driver'
 
+# Coordinates of 7DoF positions
 home_pos = [103.366,197.13,180.070,43.4309,265.11,257.271,287.9276]
 candlestick_pos = [180.0]*7
 
 pick_basic = [104.2, 151.6, 183.8, 101.8, 224.2, 216.9, 310.8]
 pick_basic_EEtilt = [104.2, 151.6, 183.8, 101.8, 224.2, 216.9, 225.0]
 pick_shelf = [210.8, 241.0, 209.2, 97.8, 316.8, 91.9, 322.8]
+
 place_lower = [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 322.0]
 place_higher = [210.5,118.5,192.5,105.4,229.15,245.47,316.4]
-
 place_lower_EEtilt = [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 400.0]
 place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 
-epsilon = 0.10							# epislon for when robot think it's at goal
-MAX_CMD_TORQUE = 40.0					# max command robot can send
+# Constants for pHRI
+epsilon = 0.10		# epsilon for when robot think it's at goal
 INTERACTION_TORQUE_THRESHOLD = [0.88414821, 17.22751856, -0.40134936,  6.23537946, -0.90013662, 1.32379884,  0.10218059]
 INTERACTION_TORQUE_EPSILON = [4.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
 
+# Method types based on which we determine the planner
 IMPEDANCE = 'A'
-LEARNING = 'B'
-DEMONSTRATION = 'C'
-
-ALL = "ALL"						# updates all features
-MAX = "MAX"						# updates only feature that changed the most
-BETA = "BETA"					# updates beta-adaptive
+PHRI_LEARNING = 'B'
+DEMONSTRATION_LEARNING = 'C'
+EXPERT = 'D'
 
 class PIDVelJaco(object):
 	"""
@@ -87,15 +86,75 @@ class PIDVelJaco(object):
 	"""
 
 	def __init__(self, ID, task, method_type, record, replay, feat_method, feat_list):
+		
+		# Load parameters
+		self.load_parameters(ID, task, method_type, record, replay, feat_method, feat_list)
+
+		# ---- ROS Setup ---- #
+
+		rospy.init_node("pid_trajopt")
+		self.register_callbacks()
+
+		# publish to ROS at 100hz
+		r = rospy.Rate(100)
+
+		print "----------------------------------"
+		print "Moving robot, press ENTER to quit:"
+
+		while not rospy.is_shutdown():
+
+			if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+				line = raw_input()
+				break
+
+			self.vel_pub.publish(ros_utils.cmd_to_JointVelocityMsg(self.cmd))
+			r.sleep()
+
+		print "----------------------------------"
+
+		# save experimental data (only if experiment started)
+		if self.record and self.reached_start:
+			print "Saving experimental data to file..."
+			if self.task == None:
+				settings_string = str(ID) + "_" + self.method_type + "_" + self.feat_method + "_" + "_".join(feat_list) + "_correction_" + replay + "_"
+			else:
+				settings_string = str(ID) + "_" + self.method_type + "_" + self.feat_method + "_" + "_".join(feat_list) + "_correction_" + task + "_"
+			weights_filename = "weights_" + settings_string
+			betas_filename = "betas_" + settings_string
+			betas_u_filename = "betas_u_" + settings_string
+			force_filename = "force_" + settings_string
+			interaction_pts_filename = "interaction_pts_" + settings_string
+			tracked_filename = "tracked_" + settings_string
+			deformed_filename = "deformed_" + settings_string
+			deformed_waypts_filename = "deformed_waypts_" + settings_string
+			replanned_filename = "replanned_" + settings_string
+			replanned_waypts_filename = "replanned_waypts_" + settings_string
+			updates_filename = "updates_" + settings_string
+
+			self.expUtil.pickle_weights(weights_filename)
+			self.expUtil.pickle_betas(betas_filename)
+			self.expUtil.pickle_betas_u(betas_u_filename)
+			self.expUtil.pickle_force(force_filename)
+			self.expUtil.pickle_interaction_pts(interaction_pts_filename)
+			self.expUtil.pickle_tracked_traj(tracked_filename)
+			self.expUtil.pickle_deformed_trajList(deformed_filename)
+			self.expUtil.pickle_deformed_wayptsList(deformed_waypts_filename)
+			self.expUtil.pickle_replanned_trajList(replanned_filename)
+			self.expUtil.pickle_replanned_wayptsList(replanned_waypts_filename)
+			self.expUtil.pickle_updates(updates_filename)
+
+		if self.replay == False:
+			# end admittance control mode
+			self.stop_admittance_mode()
+
+	def load_parameters(self, ID, task, method_type, record, replay, feat_method, feat_list):
 		"""
-		Setup of the ROS node. Publishing computed torques happens at 100Hz.
+		Loading parameters.
 		"""
 		# task, if any
-		self.task = task
-		if task == "None":
-			self.task = None
+		self.task = None if task == "None" else task
 
-		# method type - A=IMPEDANCE, B=LEARNING, C=DEMONSTRATION
+		# method type - A=IMPEDANCE, B=PHRI_LEARNING, C=DEMONSTRATION_LEARNING, D=EXPERT
 		self.method_type = method_type
 
 		# can be ALL, MAX, or BETA
@@ -117,12 +176,10 @@ class PIDVelJaco(object):
 		# replay experimental data mode 
 		if replay == "F" or replay == "f":
 			self.replay = False
-		else:
-			self.replay = replay
-
-		if self.replay == False:
 			# start admittance control mode
 			self.start_admittance_mode()
+		else:
+			self.replay = replay			
 
 		# ---- Trajectory Setup ---- #
 
@@ -160,7 +217,7 @@ class PIDVelJaco(object):
 		self.curr_pos = None
 
 		# if in demo mode, then set the weights to be optimal
-		if self.method_type == DEMONSTRATION:
+		if self.method_type == EXPERT:
 			if self.task == "table":
 				feat_list = ["table"]
 			elif self.task == "coffee":
@@ -168,8 +225,16 @@ class PIDVelJaco(object):
 			for feat in range(0,self.num_feat):
 				self.weights[feat] = MAX_WEIGHTS[feat_list[feat]]
 
-		# create the trajopt planner and plan from start to goal
-		self.planner = trajopt_planner.Planner(self.feat_method, self.feat_list, self.task, self.traj_cache)
+		# create the planner
+		if self.method_type == "PHRI_LEARNING":
+			# If physical interactions, use pHRI planner
+			self.planner = phri_planner.pHRIPlanner(self.feat_method, self.feat_list, self.task, self.traj_cache)
+		elif self.method_type == "DEMONSTRATION_LEARNING":
+			# If demonstrations, use demo planner
+			self.planner = demo_planner.demoPlanner(self.feat_method, self.feat_list, self.task, self.traj_cache)
+		else:
+			# Otherwise, use simple trajopt planner
+			self.planner = trajopt_planner.Planner(self.feat_list, self.task, self.traj_cache)
 
 		# stores the current trajectory we are tracking, produced by planner
 		self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=None)
@@ -193,8 +258,9 @@ class PIDVelJaco(object):
 
 		# ----- Controller Setup ----- #
 
-		# stores maximum COMMANDED joint torques		
-		self.max_cmd = MAX_CMD_TORQUE*np.eye(7)
+		# stores maximum COMMANDED joint torques
+		max_cmd_torque = 40.0		
+		self.max_cmd = max_cmd_torque*np.eye(7)
 		# stores current COMMANDED joint torques
 		self.cmd = np.eye(7) 
 		# stores current joint MEASURED joint torques
@@ -216,9 +282,10 @@ class PIDVelJaco(object):
 		# update the list of replanned waypoints with new waypoints
 		self.expUtil.update_replanned_wayptsList(0.0, self.planner.waypts)
 
-		# ---- ROS Setup ---- #
-
-		rospy.init_node("pid_trajopt")
+	def register_callbacks(self):
+		"""
+		Sets up all the publishers/subscribers needed.
+		"""
 
 		# create joint-velocity publisher
 		self.vel_pub = rospy.Publisher(prefix + '/in/joint_velocity', kinova_msgs.msg.JointVelocity, queue_size=1)
@@ -227,63 +294,7 @@ class PIDVelJaco(object):
 		rospy.Subscriber(prefix + '/out/joint_angles', kinova_msgs.msg.JointAngles, self.joint_angles_callback, queue_size=1)
 		# create subscriber to joint_torques
 		rospy.Subscriber(prefix + '/out/joint_torques', kinova_msgs.msg.JointTorque, self.joint_torques_callback, queue_size=1)
-
-		# publish to ROS at 100hz
-		r = rospy.Rate(100)
-
-		print "----------------------------------"
-		print "Moving robot, press ENTER to quit:"
-
-		while not rospy.is_shutdown():
-
-			if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
-				line = raw_input()
-				break
-
-			self.vel_pub.publish(ros_utils.cmd_to_JointVelocityMsg(self.cmd))
-			r.sleep()
-
-		print "----------------------------------"
-
-		# plot weight update over time
-		#self.planner.plot_feature_update()
-		#self.planner.plot_weight_update()
-
-		# save experimental data (only if experiment started)
-		if self.record and self.reached_start:
-			print "Saving experimental data to file..."
-			if self.task == None:
-				settings_string = str(ID) + "_" + self.method_type + "_" + self.feat_method + "_" + "_".join(feat_list) + "_correction_" + replay + "_"
-			else:
-				settings_string = str(ID) + "_" + self.method_type + "_" + self.feat_method + "_" + "_".join(feat_list) + "_correction_" + task + "_"
-			weights_filename = "weights_" + settings_string
-			betas_filename = "betas_" + settings_string
-			betas_u_filename = "betas_u_" + settings_string
-			force_filename = "force_" + settings_string
-			interaction_pts_filename = "interaction_pts_" + settings_string
-			tracked_filename = "tracked_" + settings_string
-			deformed_filename = "deformed_" + settings_string
-			deformed_waypts_filename = "deformed_waypts_" + settings_string
-			replanned_filename = "replanned_" + settings_string
-			replanned_waypts_filename = "replanned_waypts_" + settings_string
-			updates_filename = "updates_" + settings_string
-
-			self.expUtil.pickle_weights(weights_filename)
-			self.expUtil.pickle_betas(betas_filename)
-			self.expUtil.pickle_betas_u(betas_u_filename)
-			self.expUtil.pickle_force(force_filename)
-			self.expUtil.pickle_interaction_pts(interaction_pts_filename)
-			self.expUtil.pickle_tracked_traj(tracked_filename)
-			self.expUtil.pickle_deformed_trajList(deformed_filename)
-			self.expUtil.pickle_deformed_wayptsList(deformed_waypts_filename)
-			self.expUtil.pickle_replanned_trajList(replanned_filename)
-			self.expUtil.pickle_replanned_wayptsList(replanned_waypts_filename)
-			self.expUtil.pickle_updates(updates_filename)
-
-		if self.replay == False:
-			# end admittance control mode
-			self.stop_admittance_mode()
-
+	
 	def start_admittance_mode(self):
 		"""
 		Switches Jaco to admittance-control mode using ROS services
