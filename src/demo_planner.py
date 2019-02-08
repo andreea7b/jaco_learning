@@ -60,11 +60,7 @@ class demoPlanner(Planner):
 
 	def learnWeights(self, u_h):
 		"""
-		Deforms the trajectory given human force, u_h, and
-		updates features by computing difference between 
-		features of new trajectory and old trajectory
-		---
-		input is human force and returns updated weights 
+		TODO: OLD; IMPLEMENT ME! 
 		"""
 		(waypts_deform, waypts_prev) = self.deform(u_h)	
 

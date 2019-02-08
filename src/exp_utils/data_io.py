@@ -41,8 +41,7 @@ def parse_exp_data(dataType):
 	for filename in os.listdir(datapath):
 		# for each participant's data file, parse the participant's info
 		info = filename.split(dataType)[1]
-        import pdb;pdb.set_trace()
-        if len(info) > 6:
+		if len(info) > 6:
 			ID = int(info[0:2])
 			task = int(info[2])
 			method = info[3]

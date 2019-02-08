@@ -226,10 +226,10 @@ class PIDVelJaco(object):
 				self.weights[feat] = MAX_WEIGHTS[feat_list[feat]]
 
 		# create the planner
-		if self.method_type == "PHRI_LEARNING":
+		if self.method_type == PHRI_LEARNING:
 			# If physical interactions, use pHRI planner
 			self.planner = phri_planner.pHRIPlanner(self.feat_method, self.feat_list, self.task, self.traj_cache)
-		elif self.method_type == "DEMONSTRATION_LEARNING":
+		elif self.method_type == DEMONSTRATION_LEARNING:
 			# If demonstrations, use demo planner
 			self.planner = demo_planner.demoPlanner(self.feat_method, self.feat_list, self.task, self.traj_cache)
 		else:
@@ -350,7 +350,7 @@ class PIDVelJaco(object):
 				self.expUtil.update_tauH(timestamp, torque_curr)
 				self.expUtil.update_interaction_point(timestamp, self.curr_pos)
 
-				if self.method_type == LEARNING:
+				if self.method_type == PHRI_LEARNING:
 					self.weights = self.planner.learnWeights(torque_curr)
 					self.betas = self.planner.betas
 					self.betas_u = self.planner.betas_u
