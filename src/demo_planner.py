@@ -58,14 +58,13 @@ class demoPlanner(Planner):
 
 	# ---- here's our algorithms for modifying the trajectory ---- #
 
-	def learnWeights(self, u_h):
+	def learnWeights(self, waypts_h):
 		"""
 		TODO: OLD; IMPLEMENT ME! 
 		"""
-		(waypts_deform, waypts_prev) = self.deform(u_h)	
 
-		if waypts_deform is not None:
-			self.waypts_deform = waypts_deform
+		if waypts_h is not None:
+			self.waypts_h = waypts_h
 			new_features = self.featurize(waypts_deform)
 			old_features = self.featurize(waypts_prev)
 

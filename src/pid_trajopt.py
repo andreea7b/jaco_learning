@@ -85,7 +85,7 @@ class PIDVelJaco(object):
 		sim_flag                  - flag for if in simulation or not
 	"""
 
-	def __init__(self, ID, task, method_type, record, replay, feat_method, feat_list):
+	def __init__(self, ID, task, method_type, record, replay, feat_method, feat_list, feat_list_H):
 		
 		# Load parameters
 		self.load_parameters(ID, task, method_type, record, replay, feat_method, feat_list)
@@ -381,6 +381,10 @@ class PIDVelJaco(object):
 					deformed_traj_waypts = self.planner.waypts_deform
 					self.expUtil.update_deformed_wayptsList(timestamp, deformed_traj_waypts)
 
+	def joint_torques_demo_callback(self, msg):
+		# IMPLEMENT ME
+		pass
+
 	def joint_angles_callback(self, msg):
 		"""
 		Reads the latest position of the robot and publishes an
@@ -486,4 +490,5 @@ if __name__ == '__main__':
 		replay = sys.argv[5]
 		feat_method = sys.argv[6]
 		feat_list = [x.strip() for x in sys.argv[7].split(',')]
-	PIDVelJaco(ID,task,method_type,record,replay,feat_method,feat_list)
+		feat_list_H = None if sys.argv[8] == "None" else [x.strip() for x in sys.argv[8].split(',')]
+	PIDVelJaco(ID,task,method_type,record,replay,feat_method,feat_list,feat_list_H)
