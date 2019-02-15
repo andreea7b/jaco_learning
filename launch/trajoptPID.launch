@@ -21,7 +21,7 @@
 	<!-- List of string features that need correcting -->
 	<arg name="feat_list" default="table"/>
 
-	<! -- List of unknown features the human cares about -->
+	<!-- List of unknown features the human cares about -->
 	<arg name="feat_list_H" default="None"/>
 
 	<!-- velocity-based with trajopt planning PID -->

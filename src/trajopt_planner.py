@@ -395,7 +395,7 @@ class Planner(object):
 			the waypts_plan trajectory
 		"""
 
-		print "I'm in trajopt_PLANNER trajopt pose!"
+		print("I'm in trajopt_PLANNER trajopt pose!")
 
 		# plot goal point
 		#plotSphere(self.env, self.bodies, goal_pose, size=40)
@@ -493,7 +493,7 @@ class Planner(object):
 		self.waypts_plan = result.GetTraj()
 		self.step_time_plan = (self.final_time - self.start_time)/(self.num_waypts_plan - 1)	
 
-		print "I'm done with trajopt pose!"
+		print("I'm done with trajopt pose!")
 
 		return self.waypts_plan
 
@@ -506,7 +506,7 @@ class Planner(object):
 		input is start and goal pos, updates the waypts_plan
 		"""
 
-		print "I'm in normal trajOpt!"
+		print("I'm in normal trajOpt!")
 		if len(start) < 10:
 			aug_start = np.append(start.reshape(7), np.array([0,0,0]))
 		self.robot.SetDOFValues(aug_start)
@@ -515,12 +515,12 @@ class Planner(object):
 
 		# --- linear interpolation seed --- #
 		if traj_seed is None:
-			print "using straight line!"
+			print("using straight line!")
 			init_waypts = np.zeros((self.num_waypts_plan,7))
 			for count in range(self.num_waypts_plan):
 				init_waypts[count,:] = start + count/(self.num_waypts_plan - 1.0)*(goal - start)
 		else:
-			print "using traj seed!"
+			print("using traj seed!")
 			init_waypts = traj_seed
 
 		if self.traj_cache is not None:
@@ -610,7 +610,7 @@ class Planner(object):
 		self.final_time = final_time
 		self.curr_waypt_idx = 0
 		self.weights = weights
-		print "weights in replan: " + str(weights)
+		print("weights in replan: " + str(weights))
 
 		if 'coffee' in self.feat_list or self.task=="coffee":
 			place_pose = [-0.46513, 0.29041, 0.69497]

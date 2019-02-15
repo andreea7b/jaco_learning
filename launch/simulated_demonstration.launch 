@@ -1,0 +1,32 @@
+<launch>
+
+	<!-- Participant ID -->
+	<arg name="ID" default="0"/>
+
+	<!-- Method type ('A'- impedance, 'B'- learning, 'C'- demonstration) -->
+	<arg name="method_type" default="A"/>
+
+	<!-- Record data mode -->
+	<arg name="record" default="F"/>
+
+	<!-- Feature learning method (ALL, MAX, BETA)-->
+	<arg name="feat_method" default="ALL"/>
+
+	<!-- List of string features that need correcting -->
+	<arg name="feat_list" default="table"/>
+
+	<!-- List of unknown features the human cares about -->
+	<arg name="feat_list_H" default="table"/>
+
+	<!-- Location with trajectory cache -->
+	<arg name="traj_cache" default="None"/>
+	
+	<!-- Location with trajectory random -->
+	<arg name="traj_rand" default="None"/>
+
+	<!-- velocity-based with trajopt planning PID -->
+	<node name="demo_robot" pkg="beta_adaptive_pHRI" type="demo_robot.py"
+	args="$(arg ID) $(arg method_type) $(arg record)
+	$(arg feat_method) $(arg feat_list) $(arg feat_list_H) $(arg traj_cache) $(arg traj_rand)" output="screen"/>
+
+</launch>
