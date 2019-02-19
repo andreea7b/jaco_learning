@@ -10,7 +10,7 @@
 	<arg name="record" default="F"/>
 
 	<!-- Feature learning method (ALL, MAX, BETA)-->
-	<arg name="feat_method" default="ALL"/>
+	<arg name="feat_method" default="BETA"/>
 
 	<!-- List of string features that need correcting -->
 	<arg name="feat_list" default="table"/>
@@ -25,7 +25,7 @@
 	<arg name="traj_rand" default="None"/>
 
 	<!-- velocity-based with trajopt planning PID -->
-	<node name="demo_robot" pkg="beta_adaptive_pHRI" type="demo_robot.py"
+	<node name="simulated_demonstration" pkg="beta_adaptive_pHRI" type="simulated_demonstration.py"
 	args="$(arg ID) $(arg method_type) $(arg record)
 	$(arg feat_method) $(arg feat_list) $(arg feat_list_H) $(arg traj_cache) $(arg traj_rand)" output="screen"/>
 

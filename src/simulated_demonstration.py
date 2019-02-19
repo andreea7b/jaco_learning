@@ -1,5 +1,8 @@
+#! /usr/bin/env python
+
 import math
 #import human_demonstrator#
+import matplotlib.pyplot as plt
 import numpy as np
 import sys
 
@@ -92,16 +95,21 @@ class DemoJaco(object):
 		self.T = 20.0
 
 		# create the trajopt planner representing the human demonstrator
-		self.planner = Planner(self.feat_method, self.feat_list_H, None, self.traj_cache, self.traj_rand)
+		self.planner = Planner(self.feat_list_H, None, self.traj_cache)
 
 
 	def inferDemo(self, human_weights):
 		# stores the current trajectory we are tracking, produced by planner
+		print("\n\n----------- SIMULATED HUMAN NOW PLANNING -----------")
 		self.traj = self.planner.replan(self.start, self.goal, human_weights, 0.0, self.T, 0.5, seed=None)
-		print(str(self.traj))
+		print("\n\nTHIS IS THE HUMAN TRAJ: " + str(self.traj) + "\n\n")
 
-		self.weights = self.learnWeights(self.traj)
-		print(self.weights)
+		self.learnWeights(self.traj)
+		print("\n\nTHESE ARE THE WEIGHTS: ")
+		print(self.P_bt)
+		print("\n\n")
+		self.visualize_posterior(self.P_bt)
+		print("DONE\n")
 	
 
 	def featurize(self, waypts):
@@ -223,23 +231,35 @@ class DemoJaco(object):
 			self.weights = curr_weight
 			return self.weights
 
+	
+	def visualize_posterior(self, post):
+		fig2, ax2 = plt.subplots()
+		plt.imshow(post, cmap='RdBu', interpolation='nearest')
+		plt.colorbar()
+		plt.xticks(range(len(self.weights_dict)), list(self.weights_dict), rotation = 'vertical')
+		plt.yticks(range(len(self.betas_dict)), list(self.betas_dict))
+		plt.xlabel(r'$\theta$')
+		plt.ylabel(r'$\beta$')
+		plt.title("Joint posterior belief")
+		plt.show()
 
 
 if __name__ == '__main__':
-	ID = int(sys.argv[1])
-	method_type = sys.argv[2]
-	record = sys.argv[3]
-	feat_method = sys.argv[4]
-	feat_list = [x.strip() for x in sys.argv[5].split(',')]
-	feat_list_H = [x.strip() for x in sys.argv[6].split(',')]
+	ID = 0 #ID = int(sys.argv[1])
+	method_type = "A" #method_type = sys.argv[2]
+	record = "F" #record = sys.argv[3]
+	feat_method = "BETA" #feat_method = sys.argv[4]
+	feat_list = ["table"] #feat_list = [x.strip() for x in sys.argv[5].split(',')]
+	feat_list_H = ["table"] #feat_list_H = [x.strip() for x in sys.argv[6].split(',')]
 	traj_cache = traj_rand = None
-	if sys.argv[7] != 'None':
-		traj_cache = sys.argv[6]
-	if sys.argv[8] != 'None':
-		traj_rand = sys.argv[7]
+	traj_rand = np.load('./traj_dump/traj_cache_table.p')
+	#if sys.argv[7] != 'None':
+	#	traj_cache = sys.argv[6]
+	#if sys.argv[8] != 'None':
+	#	traj_rand = sys.argv[7]
 
 	robot = DemoJaco(ID,method_type,record,feat_method,feat_list,feat_list_H,traj_cache,traj_rand)
-	human_weights = [0.0]*robot.num_feats_H
+	human_weights = [1.0]*robot.num_feats_H
 	robot.inferDemo(human_weights)
 
 
