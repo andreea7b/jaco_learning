@@ -147,6 +147,13 @@ class PIDVelJaco(object):
 			# end admittance control mode
 			self.stop_admittance_mode()
 
+		# If we are performind demonstration learning, we just finished receiving a demonstration.
+		# Here we process the demonstration and perform inference on it.
+		if self.method_type == DEMONSTRATION_LEARNING:
+			pass
+			demo = self.expUtil.tracked_traj
+			self.planner.learnWeights(demo)
+
 	def load_parameters(self, ID, task, method_type, record, replay, feat_method, feat_list):
 		"""
 		Loading parameters.
@@ -237,6 +244,7 @@ class PIDVelJaco(object):
 			self.planner = trajopt_planner.Planner(self.feat_list, self.task, self.traj_cache)
 
 		# stores the current trajectory we are tracking, produced by planner
+		# If in DEMONSTRATION_LEARNING, this trajectory won't be used.
 		self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=None)
 		print "original traj: " + str(self.traj)
 
@@ -344,7 +352,6 @@ class PIDVelJaco(object):
 		# if experienced large enough interaction force, then deform traj
 		if interaction:
 			#print "--- INTERACTION ---"
-			#print "u_h: " + str(torque_curr)
 			if self.reached_start and not self.reached_goal:
 				timestamp = time.time() - self.path_start_T
 				self.expUtil.update_tauH(timestamp, torque_curr)
@@ -381,10 +388,6 @@ class PIDVelJaco(object):
 					deformed_traj_waypts = self.planner.waypts_deform
 					self.expUtil.update_deformed_wayptsList(timestamp, deformed_traj_waypts)
 
-	def joint_torques_demo_callback(self, msg):
-		# IMPLEMENT ME
-		pass
-
 	def joint_angles_callback(self, msg):
 		"""
 		Reads the latest position of the robot and publishes an
@@ -412,7 +415,11 @@ class PIDVelJaco(object):
 			self.expUtil.update_tracked_traj(timestamp, self.curr_pos)
 
 		# update cmd from PID based on current position
-		self.cmd = self.PID_control(self.curr_pos)
+		if self.reached_start and self.method_type == DEMONSTRATION_LEARNING:
+			# Allow the person to move the end effector with no control resistance.
+			self.cmd = np.zeros((7,7))
+		else:
+			self.cmd = self.PID_control(self.curr_pos)
 
 		# check if each angular torque is within set limits
 		for i in range(7):

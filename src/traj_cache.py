@@ -15,10 +15,10 @@ if __name__ == '__main__':
 	T = 20.0
 
 	feat_method = "ALL"
-	feat_list = "table,human"
+	feat_list = "laptop"
 	feat_list = [x.strip() for x in feat_list.split(',')]
 	num_features = len(feat_list)
-	planner = Planner(feat_method, feat_list)
+	planner = Planner(feat_list)
 	MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
 
 	# initialize start/goal based on features

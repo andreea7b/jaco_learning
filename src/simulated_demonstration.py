@@ -1,6 +1,9 @@
 #! /usr/bin/env python
+
+
 import math
 #import human_demonstrator#
+import matplotlib.pyplot as plt
 import numpy as np
 import sys
 
@@ -98,7 +101,7 @@ class DemoJaco(object):
 
 	def inferDemo(self, human_weights):
 		# stores the current trajectory we are tracking, produced by planner
-		print("\n\n----------- SIMULATED HUMAN NOW PLANNING ------------\n\n")
+		print("\n\n----------- SIMULATED HUMAN NOW PLANNING -----------")
 		self.traj = self.planner.replan(self.start, self.goal, human_weights, 0.0, self.T, 0.5, seed=None)
 		print("\n\nTHIS IS THE HUMAN TRAJ: " + str(self.traj) + "\n\n")
 
@@ -106,6 +109,7 @@ class DemoJaco(object):
 		print("\n\nTHESE ARE THE WEIGHTS: ")
 		print(self.P_bt)
 		print("\n\n")
+		self.visualize_posterior(self.P_bt)
 		print("DONE\n")
 	
 
@@ -228,6 +232,17 @@ class DemoJaco(object):
 			self.weights = curr_weight
 			return self.weights
 
+	
+	def visualize_posterior(self, post):
+		fig2, ax2 = plt.subplots()
+		plt.imshow(post, cmap='RdBu', interpolation='nearest')
+		plt.colorbar()
+		plt.xticks(range(len(self.weights_dict)), list(self.weights_dict), rotation = 'vertical')
+		plt.yticks(range(len(self.betas_dict)), list(self.betas_dict))
+		plt.xlabel(r'$\theta$')
+		plt.ylabel(r'$\beta$')
+		plt.title("Joint posterior belief")
+		plt.show()
 
 
 if __name__ == '__main__':
@@ -236,7 +251,7 @@ if __name__ == '__main__':
 	record = "F" #record = sys.argv[3]
 	feat_method = "BETA" #feat_method = sys.argv[4]
 	feat_list = ["table"] #feat_list = [x.strip() for x in sys.argv[5].split(',')]
-	feat_list_H = ["table"] #feat_list_H = [x.strip() for x in sys.argv[6].split(',')]
+	feat_list_H = ["table", "laptop"] #feat_list_H = [x.strip() for x in sys.argv[6].split(',')]
 	traj_cache = traj_rand = None
 	traj_rand = np.load('./traj_dump/traj_cache_table.p')
 	#if sys.argv[7] != 'None':
