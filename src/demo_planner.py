@@ -60,19 +60,16 @@ class demoPlanner(Planner):
 
 	def learnWeights(self, waypts_h):
 		"""
-		TODO: OLD; IMPLEMENT ME! 
+		TODO: OLD; IMPLEMENT ME!
 		"""
 
 		if waypts_h is not None:
 			self.waypts_h = waypts_h
-			new_features = self.featurize(waypts_deform)
-			old_features = self.featurize(waypts_prev)
+			new_features = self.featurize(self.waypts_h)
+			old_features = self.featurize(self.waypts)
 
-			Phi_p = np.array([new_features[0]] + [sum(x) for x in new_features[1:]])
-			Phi = np.array([old_features[0]] + [sum(x) for x in old_features[1:]])
-
-			self.prev_features = Phi_p
-			self.curr_features = Phi
+			Phi_H = np.array([new_features[0]] + [sum(x) for x in new_features[1:]])
+			Phi_R = np.array([old_features[0]] + [sum(x) for x in old_features[1:]])
 
 			# Determine alpha and max theta
 			update_gains = [0.0] * self.num_features
@@ -85,7 +82,7 @@ class demoPlanner(Planner):
 			update = Phi_p - Phi
 			self.updates = update[1:].tolist()
 
-			if self.feat_method == ALL:
+			if self.feat_method == ALL or self.feat_method == BETA:
 				# update all weights 
 				curr_weight = self.weights - update_gains * update[1:]
 			elif self.feat_method == MAX:
@@ -98,95 +95,16 @@ class demoPlanner(Planner):
 				# update only weight of feature with maximal change
 				curr_weight = np.array([self.weights[i] for i in range(len(self.weights))])
 				curr_weight[max_idx] = curr_weight[max_idx] - update_gains[max_idx]*update[max_idx+1]
-			elif self.feat_method == BETA:
-				# beta-adaptive method
-				update = update[1:]
-				Phi_p = Phi_p[1:]
-				Phi = Phi[1:]
-
-				### First obtain the original beta rationality from the optimization problem ###
-				# Set up the unconstrained optimization problem:
-				def u_unconstrained(u):
-					# Optimized manually; lambda_u can be changed according to user preferences
-					if self.feat_list[i] == 'table':
-						lambda_u = 20000
-					elif self.feat_list[i] == 'human':
-						lambda_u = 1500
-					elif self.feat_list[i] == 'coffee':	
-						lambda_u = 20000
-					u_p = np.reshape(u, (7,1))
-					(waypts_deform_p, waypts_prev) = self.deform(u_p)
-					H_features = self.featurize_single(waypts_deform_p,i)
-					Phi_H = sum(H_features)
-					cost = (Phi_H - Phi_p[i])**2
-					return cost
-
-				# Constrained variant of the optimization problem
-				def u_constrained(u):
-					cost = np.linalg.norm(u)**2
-					return cost
-
-				# Set up the constraints:
-				def u_constraint(u):
-					u_p = np.reshape(u, (7,1))
-					(waypts_deform_p, waypts_prev) = self.deform(u_p)
-					H_features = self.featurize_single(waypts_deform_p,i)
-					Phi_H = sum(H_features)
-					cost = (Phi_H - Phi_p[i])**2
-					return cost
-
-				# Compute what the optimal action would have been wrt every feature
-				for i in range(self.num_features):
-					# Compute optimal action
-					# Every feature requires a different optimizer because every feature is different in scale
-					# Every feature also requires a different Newton-Rapson lambda
-					if self.feat_list[i] == 'table':
-						u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 10, 'ftol': 1e-6, 'disp': True})
-						l = math.pi
-					elif self.feat_list[i] == 'human':
-						u_h_opt = minimize(u_unconstrained, np.zeros((7,1)), options={'maxiter': 10, 'disp': True})
-						l = 15.0
-					elif self.feat_list[i] == 'coffee':
-						u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', constraints=({'type': 'eq', 'fun': u_constraint}), options={'maxiter': 10, 'ftol': 1e-6, 'disp': True})
-						l = math.pi
-					u_h_star = np.reshape(u_h_opt.x, (7, 1)) 
-
-					# Compute beta based on deviation from optimal action
-					beta_norm = 1.0/np.linalg.norm(u_h_star)**2
-					self.betas[i] = self.num_features/(2*beta_norm*abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2))
-					print "here is beta:", self.betas
-
-					### Compute update using P(r|beta) for the beta estimate we just computed ###
-					# Compute P(r|beta)
-					mus1 = P_beta[self.feat_list[i]+"1"]
-					mus0 = P_beta[self.feat_list[i]+"0"]
-					p_r0 = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) / (chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) + chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2]))
-					p_r1 = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2]) / (chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) + chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2]))
-
-					# Newton-Rapson setup; define function, derivative, and
-					# call optimization method
-					def f_theta(weights_p):
-					    num = p_r1*np.exp(weights_p*update[i])
-					    denom = p_r0*(l/math.pi)**(self.num_features/2.0)*np.exp(-l*update[i]**2) + num
-					    return weights_p + update_gains[i]*num*update[i]/denom - self.weights[i]
-					def df_theta(weights_p):
-					    num = p_r0*(l/math.pi)**(self.num_features/2.0)*np.exp(-l*update[i]**2)
-					    denom = p_r1*np.exp(weights_p*update[i])
-					    return 1 + update_gains[i]*num/denom
-
-					weight_p = newton(f_theta,self.weights[i],df_theta,tol=1e-04,maxiter=1000)
-					
-					num = p_r1*np.exp(weight_p*update[i])
-					denom = p_r0*(l/math.pi)**(self.num_features/2.0)*np.exp(-l*update[i]**2) + num
-					self.betas_u[i] = num/denom
-					print "here is weighted beta:", self.betas_u
-				# Compute new weights
-				curr_weight = self.weights - np.array(self.betas_u)*update_gains*update
 
 			# clip values at max and min allowed weights
-			for i in range(self.num_features):
-				curr_weight[i] = np.clip(curr_weight[i], -max_weights[i], max_weights[i])
-			print "here is the update:", update
+            if self.feat_method == ALL or self.feat_method == MAX:
+                for i in range(self.num_features):
+				    curr_weight[i] = np.clip(curr_weight[i], -max_weights[i], max_weights[i])
+            else:
+                beta = np.linalg.norm(curr_weight)
+                curr_weight = curr_weight / beta
+                print "here is beta: ", beta
+            print "here is the update:", update
 			print "here are the old weights:", self.weights
 			print "here are the new weights:", curr_weight
 
