@@ -61,28 +61,7 @@ class demoPlanner(Planner):
 	def learnWeights(self, waypts_h):
 		if waypts_h is not None:
 			self.waypts_h = waypts_h
-
-			# Preprocess the demonstration:
-			# 1. find closest point to start and to goal
-			lo_dist = hi_dist = float("inf")
-			lo = hi = 0
-			for i, waypt in enumerate(demo):
-				dist_from_start = -((waypt - self.start_pos[0] + math.pi)%(2*math.pi) - math.pi)
-				dist_from_start = np.linalg.norm(dist_from_start)
-				print "waypoint ", i, " dist from START: ", dist_from_start
-				if dist_from_start <= lo_dist:
-					lo_dist = dist_from_start
-					lo = i
-
-				dist_from_goal = -((waypt - self.goal_pos[0] + math.pi)%(2*math.pi) - math.pi)
-				dist_from_goal = np.linalg.norm(dist_from_goal)
-				print "waypoint ", i, " dist from GOAL: ", dist_from_goal
-				if dist_from_goal < hi_dist:
-					hi_dist = dist_from_goal
-					hi = i
-			demo = demo[lo: hi+1, :]
-			# 2. Downsample to the same size as robot trajectory
-
+			import pdb;pdb.set_trace()
 			new_features = self.featurize(self.waypts_h)
 			old_features = self.featurize(self.waypts)
 

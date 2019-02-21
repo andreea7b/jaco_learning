@@ -150,8 +150,18 @@ class PIDVelJaco(object):
 		# If we are performind demonstration learning, we just finished receiving a demonstration.
 		# Here we process the demonstration and perform inference on it.
 		if self.method_type == DEMONSTRATION_LEARNING:
-			demo = self.expUtil.tracked_traj[:,1:]
-			self.planner.learnWeights(demo)
+			raw_demo = self.expUtil.tracked_traj[:,1:8]
+
+			# Downsample to the same size as robot trajectory
+			desired_length = self.planner.waypts.shape[0]
+			step_size = float(raw_demo.shape[0]) / desired_length
+			demo = []
+			counter = 0
+			while counter < raw_demo.shape[0]-1:
+				demo.append(raw_demo[int(counter), :])
+				counter += step_size
+
+			self.planner.learnWeights(np.array(demo))
 
 	def load_parameters(self, ID, task, method_type, record, replay, feat_method, feat_list):
 		"""
