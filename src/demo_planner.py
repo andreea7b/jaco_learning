@@ -59,12 +59,30 @@ class demoPlanner(Planner):
 	# ---- here's our algorithms for modifying the trajectory ---- #
 
 	def learnWeights(self, waypts_h):
-		"""
-		TODO: OLD; IMPLEMENT ME!
-		"""
-
 		if waypts_h is not None:
 			self.waypts_h = waypts_h
+
+			# Preprocess the demonstration:
+			# 1. find closest point to start and to goal
+			lo_dist = hi_dist = float("inf")
+			lo = hi = 0
+			for i, waypt in enumerate(demo):
+				dist_from_start = -((waypt - self.start_pos[0] + math.pi)%(2*math.pi) - math.pi)
+				dist_from_start = np.linalg.norm(dist_from_start)
+				print "waypoint ", i, " dist from START: ", dist_from_start
+				if dist_from_start <= lo_dist:
+					lo_dist = dist_from_start
+					lo = i
+
+				dist_from_goal = -((waypt - self.goal_pos[0] + math.pi)%(2*math.pi) - math.pi)
+				dist_from_goal = np.linalg.norm(dist_from_goal)
+				print "waypoint ", i, " dist from GOAL: ", dist_from_goal
+				if dist_from_goal < hi_dist:
+					hi_dist = dist_from_goal
+					hi = i
+			demo = demo[lo: hi+1, :]
+			# 2. Downsample to the same size as robot trajectory
+
 			new_features = self.featurize(self.waypts_h)
 			old_features = self.featurize(self.waypts)
 
@@ -79,7 +97,7 @@ class demoPlanner(Planner):
 				update_gains[feat] = UPDATE_GAINS[self.feat_list[feat]]
 				max_weights[feat] = MAX_WEIGHTS[self.feat_list[feat]]
 				feat_range[feat] = FEAT_RANGE[self.feat_list[feat]]
-			update = Phi_p - Phi
+			update = Phi_H - Phi_R
 			self.updates = update[1:].tolist()
 
 			if self.feat_method == ALL or self.feat_method == BETA:
@@ -97,14 +115,14 @@ class demoPlanner(Planner):
 				curr_weight[max_idx] = curr_weight[max_idx] - update_gains[max_idx]*update[max_idx+1]
 
 			# clip values at max and min allowed weights
-            if self.feat_method == ALL or self.feat_method == MAX:
-                for i in range(self.num_features):
-				    curr_weight[i] = np.clip(curr_weight[i], -max_weights[i], max_weights[i])
-            else:
-                beta = np.linalg.norm(curr_weight)
-                curr_weight = curr_weight / beta
-                print "here is beta: ", beta
-            print "here is the update:", update
+			if self.feat_method == ALL or self.feat_method == MAX:
+				for i in range(self.num_features):
+					curr_weight[i] = np.clip(curr_weight[i], -max_weights[i], max_weights[i])
+			else:
+				beta = np.linalg.norm(curr_weight)
+				curr_weight = curr_weight / beta
+				print "here is beta: ", beta
+			print "here is the update:", update
 			print "here are the old weights:", self.weights
 			print "here are the new weights:", curr_weight
 

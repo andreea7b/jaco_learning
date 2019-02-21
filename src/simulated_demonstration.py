@@ -22,9 +22,9 @@ place_lower_EEtilt = [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 400.0]
 place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 
 # feature constacts (update gains and max weights)
-UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0}
+UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0, 'human':20.0}
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
-FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554}
+FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554, 'human':3.2}
 
 IMPEDANCE = 'A'
 LEARNING = 'B'
@@ -110,7 +110,7 @@ class DemoJaco(object):
 		print(self.P_bt)
 		print("\n\n")
 		self.visualize_posterior(self.P_bt)
-		print("DONE\n")
+		print("\n------------ SIMULATED DEMONSTRATION DONE ------------\n")
 	
 
 	def featurize(self, waypts):
@@ -145,10 +145,10 @@ class DemoJaco(object):
 			self.traj = traj
 			new_features = self.featurize(self.traj)
 			Phi_p = np.array([new_features[0]] + [sum(x) for x in new_features[1:]])
+			print("\n\nPHI_P: ")
+			print(Phi_p)
+			print(" \n\n")
 			Phi = np.array([old_features[0]] + [sum(x) for x in old_features[1:]])
-
-			self.prev_features = Phi_p
-			self.curr_features = Phi
 
 			# Determine alpha and max theta
 			update_gains = [0.0] * self.num_feats
@@ -180,6 +180,7 @@ class DemoJaco(object):
 					for (beta_i, beta) in enumerate(self.betas_dict):
 						# Compute -beta*(weight^T*Phi(xi_H))
 						numerator = -beta * np.dot([1] + weight, Phi_p)
+						#import pdb;pdb.set_trace()
 
 						# Calculate the integral in log space
 						num_trajs = self.traj_rand.shape[0]
@@ -190,6 +191,9 @@ class DemoJaco(object):
 							curr_traj = self.traj_rand[rand_i]
 							rand_features = self.featurize(curr_traj)
 							Phi_rand = np.array([rand_features[0]] + [sum(x) for x in rand_features[1:]])
+
+							print("PHI_RAND: ")
+							print(Phi_rand)
 
 							# Compute each denominator log
 							logdenom[rand_i] = -beta * np.dot([1] + weight, Phi_rand)
@@ -250,10 +254,10 @@ if __name__ == '__main__':
 	method_type = "A" #method_type = sys.argv[2]
 	record = "F" #record = sys.argv[3]
 	feat_method = "BETA" #feat_method = sys.argv[4]
-	feat_list = ["table"] #feat_list = [x.strip() for x in sys.argv[5].split(',')]
-	feat_list_H = ["table", "laptop"] #feat_list_H = [x.strip() for x in sys.argv[6].split(',')]
+	feat_list = ["human"] #feat_list = [x.strip() for x in sys.argv[5].split(',')]
+	feat_list_H = ["table"] #feat_list_H = [x.strip() for x in sys.argv[6].split(',')]
 	traj_cache = traj_rand = None
-	traj_rand = np.load('./traj_dump/traj_cache_table.p')
+	traj_rand = np.load('./traj_dump/traj_cache_human.p')
 	#if sys.argv[7] != 'None':
 	#	traj_cache = sys.argv[6]
 	#if sys.argv[8] != 'None':

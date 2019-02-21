@@ -150,8 +150,7 @@ class PIDVelJaco(object):
 		# If we are performind demonstration learning, we just finished receiving a demonstration.
 		# Here we process the demonstration and perform inference on it.
 		if self.method_type == DEMONSTRATION_LEARNING:
-			pass
-			demo = self.expUtil.tracked_traj
+			demo = self.expUtil.tracked_traj[:,1:]
 			self.planner.learnWeights(demo)
 
 	def load_parameters(self, ID, task, method_type, record, replay, feat_method, feat_list):
