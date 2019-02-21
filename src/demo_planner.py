@@ -61,7 +61,7 @@ class demoPlanner(Planner):
 	def learnWeights(self, waypts_h):
 		if waypts_h is not None:
 			self.waypts_h = waypts_h
-			import pdb;pdb.set_trace()
+
 			new_features = self.featurize(self.waypts_h)
 			old_features = self.featurize(self.waypts)
 

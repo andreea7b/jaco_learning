@@ -151,8 +151,16 @@ class PIDVelJaco(object):
 		# Here we process the demonstration and perform inference on it.
 		if self.method_type == DEMONSTRATION_LEARNING:
 			raw_demo = self.expUtil.tracked_traj[:,1:8]
+			# 1. Trim ends of trajectory
+			lo = 0
+			hi = raw_demo.shape[0] - 1
+			while np.linalg.norm(raw_demo[lo] - raw_demo[lo + 1]) < 0.01 and lo < hi:
+				lo += 1
+			while np.linalg.norm(raw_demo[hi] - raw_demo[hi - 1]) < 0.01 and hi > 0:
+				hi -= 1
+			raw_demo = raw_demo[lo:hi+1, :]
 
-			# Downsample to the same size as robot trajectory
+			# 2. Downsample to the same size as robot trajectory
 			desired_length = self.planner.waypts.shape[0]
 			step_size = float(raw_demo.shape[0]) / desired_length
 			demo = []
