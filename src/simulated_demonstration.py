@@ -1,13 +1,15 @@
 #! /usr/bin/env python
 
-
+import itertools
 import math
 #import human_demonstrator#
 import matplotlib.pyplot as plt
 import numpy as np
+import pickle
 import sys
 
 from trajopt_planner import Planner
+import openrave_utils
 
 home_pos = [103.366,197.13,180.070,43.4309,265.11,257.271,287.9276]
 candlestick_pos = [180.0]*7
@@ -20,6 +22,8 @@ place_higher = [210.5,118.5,192.5,105.4,229.15,245.47,316.4]
 
 place_lower_EEtilt = [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 400.0]
 place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
+
+T = 20.0
 
 # feature constacts (update gains and max weights)
 UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0, 'human':20.0}
@@ -67,12 +71,17 @@ class DemoJaco(object):
 		self.weights = [0.0]*self.num_feats
 
 		# ---- important discrete variables ---- #
-		#self.weights_dict = [[-1.0, -1.0], [-1.0, 0.], [-1.0, 1.0], [0., -1.0], [0., 0.], [0., 1.0], [1.0, -1.0], [1.0, 0.], [1.0, 1.0]]
-		self.weights_dict = [[-1.0], [0.], [1.0]]
-		self.betas_dict = [0.01, 0.03, 0.1, 0.3, 1.0]
+		weights_span = [None]*self.num_feats
+		for feat in range(0,self.num_feats):
+			limit = MAX_WEIGHTS[self.feat_list[feat]]
+			weights_span[feat] = list(np.arange(-limit, limit+.1, limit))
 
-		self.num_betas = len(self.betas_dict)
-		self.num_weights = len(self.weights_dict)
+		weight_pairs = list(itertools.product(*weights_span))
+		self.weights_list = [list(i) for i in weight_pairs]
+		self.betas_list = [0.01, 0.03, 0.1, 0.3, 1.0]
+
+		self.num_betas = len(self.betas_list)
+		self.num_weights = len(self.weights_list)
 
 		# Construct uninformed prior
 		P_bt = np.ones((self.num_betas, self.num_weights))
@@ -80,11 +89,8 @@ class DemoJaco(object):
 
 		# initialize start/goal based on features
 		# by default for table and laptop, these are the pick and place
-		pick = pick_basic
+		pick = pick_basic_EEtilt
 		place = place_lower
-		if 'human' in self.feat_list:
-			pick = pick_shelf
-			place = place_higher
 		if 'coffee' in self.feat_list:
 			pick = pick_basic_EEtilt
 
@@ -93,7 +99,6 @@ class DemoJaco(object):
 		self.start = start
 		self.goal = goal
 
-		self.T = 20.0
 
 		# create the trajopt planner representing the human demonstrator
 		self.planner = Planner(self.feat_list_H, None, self.traj_cache)
@@ -102,7 +107,8 @@ class DemoJaco(object):
 	def inferDemo(self, human_weights):
 		# stores the current trajectory we are tracking, produced by planner
 		print("\n\n----------- SIMULATED HUMAN NOW PLANNING -----------")
-		self.traj = self.planner.replan(self.start, self.goal, human_weights, 0.0, self.T, 0.5, seed=None)
+		self.planner.replan(self.start, self.goal, human_weights, 0.0, T, 0.5, seed=None)
+		self.traj = self.planner.waypts
 		print("\n\nTHIS IS THE HUMAN TRAJ: " + str(self.traj) + "\n\n")
 
 		self.learnWeights(self.traj)
@@ -176,8 +182,8 @@ class DemoJaco(object):
 			elif self.feat_method == BETA:
 				# Now compute probabilities for each beta and theta in the dictionary
 				P_xi = np.zeros((self.num_betas, self.num_weights))
-				for (weight_i, weight) in enumerate(self.weights_dict):
-					for (beta_i, beta) in enumerate(self.betas_dict):
+				for (weight_i, weight) in enumerate(self.weights_list):
+					for (beta_i, beta) in enumerate(self.betas_list):
 						# Compute -beta*(weight^T*Phi(xi_H))
 						numerator = -beta * np.dot([1] + weight, Phi_p)
 						#import pdb;pdb.set_trace()
@@ -192,8 +198,9 @@ class DemoJaco(object):
 							rand_features = self.featurize(curr_traj)
 							Phi_rand = np.array([rand_features[0]] + [sum(x) for x in rand_features[1:]])
 
-							print("PHI_RAND: ")
-							print(Phi_rand)
+							if weight_i == 0 and beta_i == 0:
+								print("PHI_RAND: ")
+								print(Phi_rand)
 
 							# Compute each denominator log
 							logdenom[rand_i] = -beta * np.dot([1] + weight, Phi_rand)
@@ -216,10 +223,10 @@ class DemoJaco(object):
 
 				# Compute optimal expected weight
 				P_weight = sum(posterior, 0)
-				curr_weight = np.sum(np.transpose(self.weights_dict)*P_weight, 1)
+				curr_weight = np.sum(np.transpose(self.weights_list)*P_weight, 1)
 
 				P_beta = np.sum(posterior, axis=1)
-				self.beta = np.dot(self.betas_dict,P_beta)
+				self.beta = np.dot(self.betas_list,P_beta)
 				
 				self.P_bt = posterior
 				print("observation model:", P_obs)
@@ -241,31 +248,93 @@ class DemoJaco(object):
 		fig2, ax2 = plt.subplots()
 		plt.imshow(post, cmap='RdBu', interpolation='nearest')
 		plt.colorbar()
-		plt.xticks(range(len(self.weights_dict)), list(self.weights_dict), rotation = 'vertical')
-		plt.yticks(range(len(self.betas_dict)), list(self.betas_dict))
+		plt.xticks(range(len(self.weights_list)), list(self.weights_list), rotation = 'vertical')
+		plt.yticks(range(len(self.betas_list)), list(self.betas_list))
 		plt.xlabel(r'$\theta$')
 		plt.ylabel(r'$\beta$')
 		plt.title("Joint posterior belief")
 		plt.show()
 
 
-if __name__ == '__main__':
-	ID = 0 #ID = int(sys.argv[1])
-	method_type = "A" #method_type = sys.argv[2]
-	record = "F" #record = sys.argv[3]
-	feat_method = "BETA" #feat_method = sys.argv[4]
-	feat_list = ["human"] #feat_list = [x.strip() for x in sys.argv[5].split(',')]
-	feat_list_H = ["table"] #feat_list_H = [x.strip() for x in sys.argv[6].split(',')]
-	traj_cache = traj_rand = None
-	traj_rand = np.load('./traj_dump/traj_cache_human.p')
-	#if sys.argv[7] != 'None':
-	#	traj_cache = sys.argv[6]
-	#if sys.argv[8] != 'None':
-	#	traj_rand = sys.argv[7]
+#### End class
 
-	robot = DemoJaco(ID,method_type,record,feat_method,feat_list,feat_list_H,traj_cache,traj_rand)
-	human_weights = [1.0]*robot.num_feats_H
-	robot.inferDemo(human_weights)
+def generate_traj_rand():
+	traj_rand = []
+	all_feats = "table"
+	all_feats = [x.strip() for x in all_feats.split(',')]
+	feat_list = []
+	for i in range(len(all_feats)):
+		feats = list(itertools.combinations(all_feats, i + 1))
+		feat_list.extend(feats)
+	
+	planner = Planner([])
+	for i in range(len(feat_list)):
+		feats = list(feat_list[i])
+
+		num_features = len(feats)
+		planner.feat_list = feats
+
+		# initialize start/goal based on features
+		# by default for table and laptop, these are the pick and place
+		pick = pick_basic_EEtilt
+		place = place_lower
+		if 'coffee' in feats:
+			pick = pick_basic_EEtilt
+
+		start = np.array(pick)*(math.pi/180.0)
+		goal = np.array(place)*(math.pi/180.0)
+
+		weights_span = [None]*num_features
+		for feat in range(0,num_features):
+			limit = MAX_WEIGHTS[feats[feat]]
+			weights_span[feat] = list(np.arange(-limit, limit+.1, limit))
+
+		weight_pairs = list(itertools.product(*weights_span))
+		weight_pairs = [np.array(i) for i in weight_pairs]
+
+		for (w_i, weights) in enumerate(weight_pairs):
+			print(feats)
+			print(weights)
+			planner.replan(start, goal, list(weights), 0.0, T, 0.5)
+			traj = planner.waypts
+			traj_rand.append(traj)
+
+	print(traj_rand)
+	traj_rand = np.array(traj_rand)
+	#savestr = "_".join(feat_list)
+	savefile = "lalala.p"
+	pickle.dump(traj_rand, open( savefile, "wb" ) )
+
+	#return traj_rand
+
+
+if __name__ == '__main__':
+
+	generate_random_trajs = False
+
+	if (generate_random_trajs):
+		generate_traj_rand()
+	else:
+		ID = 0 #ID = int(sys.argv[1])
+		method_type = "A" #method_type = sys.argv[2]
+		record = "F" #record = sys.argv[3]
+		feat_method = "BETA" #feat_method = sys.argv[4]
+		feat_list = ["table"] #feat_list = [x.strip() for x in sys.argv[5].split(',')]
+		feat_list_H = ["table"] #feat_list_H = [x.strip() for x in sys.argv[6].split(',')]
+		traj_cache = traj_rand = None
+	
+		traj_rand = np.load('./lalala.p')
+		#traj_rand = generate_traj_rand()
+
+		#if sys.argv[7] != 'None':
+		#	traj_cache = sys.argv[6]
+		#if sys.argv[8] != 'None':
+		#	traj_rand = sys.argv[7]
+
+		robot = DemoJaco(ID,method_type,record,feat_method,feat_list,feat_list_H,traj_cache,traj_rand)
+		human_weights = [1.0]*robot.num_feats_H
+		robot.inferDemo(human_weights)
+
 	
 
 
