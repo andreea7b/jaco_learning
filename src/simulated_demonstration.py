@@ -27,7 +27,8 @@ T = 20.0
 
 # feature constacts (update gains and max weights)
 UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0, 'human':20.0}
-MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
+MIN_WEIGHTS = {'table':-1.0, 'coffee':0.0, 'laptop':0.0, 'human':0.0}
+MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':8.0, 'human':10.0}
 FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554, 'human':3.2}
 
 IMPEDANCE = 'A'
@@ -73,8 +74,7 @@ class DemoJaco(object):
 		# ---- important discrete variables ---- #
 		weights_span = [None]*self.num_feats
 		for feat in range(0,self.num_feats):
-			limit = MAX_WEIGHTS[self.feat_list[feat]]
-			weights_span[feat] = list(np.arange(-limit, limit+.1, limit))
+			weights_span[feat] = list(np.linspace(MIN_WEIGHTS[feat_list[feat]], MAX_WEIGHTS[feat_list[feat]], 5))
 
 		weight_pairs = list(itertools.product(*weights_span))
 		self.weights_list = [list(i) for i in weight_pairs]
@@ -107,10 +107,21 @@ class DemoJaco(object):
 	def inferDemo(self, human_weights):
 		# stores the current trajectory we are tracking, produced by planner
 		print("\n\n----------- SIMULATED HUMAN NOW PLANNING -----------")
+		'''
+		import openrave_utils
+		from openrave_utils import *
+		import pdb;pdb.set_trace()
+		plotTraj(self.planner.env,self.planner.robot,self.planner.bodies,self.traj, size=8,color=[0, 0, 1])
+		'''
+
 		self.planner.replan(self.start, self.goal, human_weights, 0.0, T, 0.5, seed=None)
 		self.traj = self.planner.waypts
+		import openrave_utils
+		from openrave_utils import *
+		import pdb;pdb.set_trace()
+		
 		print("\n\nTHIS IS THE HUMAN TRAJ: " + str(self.traj) + "\n\n")
-
+		
 		self.learnWeights(self.traj)
 		print("\n\nTHESE ARE THE WEIGHTS: ")
 		print(self.P_bt)
@@ -182,11 +193,14 @@ class DemoJaco(object):
 			elif self.feat_method == BETA:
 				# Now compute probabilities for each beta and theta in the dictionary
 				P_xi = np.zeros((self.num_betas, self.num_weights))
+				nums = np.zeros((self.num_betas, self.num_weights))
+				denoms = np.zeros((self.num_betas, self.num_weights))
+				logdenoms = {}
+				Phis = []
 				for (weight_i, weight) in enumerate(self.weights_list):
 					for (beta_i, beta) in enumerate(self.betas_list):
 						# Compute -beta*(weight^T*Phi(xi_H))
-						numerator = -beta * np.dot([1] + weight, Phi_p)
-						#import pdb;pdb.set_trace()
+						numerator = -beta * np.dot([1.0] + weight, Phi_p)
 
 						# Calculate the integral in log space
 						num_trajs = self.traj_rand.shape[0]
@@ -197,24 +211,23 @@ class DemoJaco(object):
 							curr_traj = self.traj_rand[rand_i]
 							rand_features = self.featurize(curr_traj)
 							Phi_rand = np.array([rand_features[0]] + [sum(x) for x in rand_features[1:]])
-
-							if weight_i == 0 and beta_i == 0:
-								print("PHI_RAND: ")
-								print(Phi_rand)
-
+							print("PHI_RAND: ")
+							print(Phi_rand)
 							# Compute each denominator log
-							logdenom[rand_i] = -beta * np.dot([1] + weight, Phi_rand)
-						
+							logdenom[rand_i] = -beta * np.dot([1.0] + weight, Phi_rand)
+							Phis.append(Phi_rand[1])
 						# Compute the sum in log space
 						A_max = max(logdenom)
 						expdif = logdenom - A_max
 						denom = A_max + np.log(sum(np.exp(expdif)))
-
+						nums[beta_i][weight_i] = numerator
+						denoms[beta_i][weight_i] = denom
+						logdenoms[(beta_i,weight_i)] = logdenom
 						# Get P(xi_H | beta, weight) by dividing them
 						P_xi[beta_i][weight_i] = np.exp(numerator - denom)
 
 				P_obs = P_xi / sum(sum(P_xi))
-
+				
 				# Compute P(weight, beta | xi_H) via Bayes rule
 				posterior = np.multiply(P_obs, self.P_bt)
 
@@ -227,7 +240,7 @@ class DemoJaco(object):
 
 				P_beta = np.sum(posterior, axis=1)
 				self.beta = np.dot(self.betas_list,P_beta)
-				
+				#import pdb;pdb.set_trace()
 				self.P_bt = posterior
 				print("observation model:", P_obs)
 				print("posterior", self.P_bt)
@@ -256,84 +269,29 @@ class DemoJaco(object):
 		plt.show()
 
 
-#### End class
-
-def generate_traj_rand():
-	traj_rand = []
-	all_feats = "table"
-	all_feats = [x.strip() for x in all_feats.split(',')]
-	feat_list = []
-	for i in range(len(all_feats)):
-		feats = list(itertools.combinations(all_feats, i + 1))
-		feat_list.extend(feats)
-	
-	planner = Planner([])
-	for i in range(len(feat_list)):
-		feats = list(feat_list[i])
-
-		num_features = len(feats)
-		planner.feat_list = feats
-
-		# initialize start/goal based on features
-		# by default for table and laptop, these are the pick and place
-		pick = pick_basic_EEtilt
-		place = place_lower
-		if 'coffee' in feats:
-			pick = pick_basic_EEtilt
-
-		start = np.array(pick)*(math.pi/180.0)
-		goal = np.array(place)*(math.pi/180.0)
-
-		weights_span = [None]*num_features
-		for feat in range(0,num_features):
-			limit = MAX_WEIGHTS[feats[feat]]
-			weights_span[feat] = list(np.arange(-limit, limit+.1, limit))
-
-		weight_pairs = list(itertools.product(*weights_span))
-		weight_pairs = [np.array(i) for i in weight_pairs]
-
-		for (w_i, weights) in enumerate(weight_pairs):
-			print(feats)
-			print(weights)
-			planner.replan(start, goal, list(weights), 0.0, T, 0.5)
-			traj = planner.waypts
-			traj_rand.append(traj)
-
-	print(traj_rand)
-	traj_rand = np.array(traj_rand)
-	#savestr = "_".join(feat_list)
-	savefile = "lalala.p"
-	pickle.dump(traj_rand, open( savefile, "wb" ) )
-
-	#return traj_rand
-
 
 if __name__ == '__main__':
 
-	generate_random_trajs = False
-
-	if (generate_random_trajs):
-		generate_traj_rand()
-	else:
-		ID = 0 #ID = int(sys.argv[1])
-		method_type = "A" #method_type = sys.argv[2]
-		record = "F" #record = sys.argv[3]
-		feat_method = "BETA" #feat_method = sys.argv[4]
-		feat_list = ["table"] #feat_list = [x.strip() for x in sys.argv[5].split(',')]
-		feat_list_H = ["table"] #feat_list_H = [x.strip() for x in sys.argv[6].split(',')]
-		traj_cache = traj_rand = None
+	ID = 0 
+	method_type = "A" 
+	record = "F" 
+	feat_method = "BETA" 
+	feat_list = ["coffee"] 
+	feat_list_H = ["table"] 
+	traj_cache = traj_rand = None
 	
-		traj_rand = np.load('./lalala.p')
-		#traj_rand = generate_traj_rand()
+	savestr = ""
+	for i in feat_list:
+		savestr = savestr + i
+		savestr = savestr + "_"
+	traj_rand_file = "./lala_" + savestr + ".p"
+	traj_rand = np.load(traj_rand_file)
 
-		#if sys.argv[7] != 'None':
-		#	traj_cache = sys.argv[6]
-		#if sys.argv[8] != 'None':
-		#	traj_rand = sys.argv[7]
-
-		robot = DemoJaco(ID,method_type,record,feat_method,feat_list,feat_list_H,traj_cache,traj_rand)
-		human_weights = [1.0]*robot.num_feats_H
-		robot.inferDemo(human_weights)
+	robot = DemoJaco(ID,method_type,record,feat_method,feat_list,feat_list_H,traj_cache,traj_rand)
+	human_weights = [0] * robot.num_feats_H
+	for feat in range(0,robot.num_feats_H):
+		human_weights[feat] = MIN_WEIGHTS[robot.feat_list_H[feat]]
+	robot.inferDemo(human_weights)
 
 	
 
