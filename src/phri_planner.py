@@ -25,7 +25,7 @@ from trajopt_planner import Planner
 
 # feature constacts (update gains and max weights)
 UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0, 'human':20.0}
-MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
+MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':8.0, 'human':10.0}
 FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554, 'human':3.2}
 
 # fit a chi-squared distribution to p(beta|r); numers are [deg_of_freedom, loc, scale]
@@ -205,7 +205,7 @@ class pHRIPlanner(Planner):
 
 			# clip values at max and min allowed weights
 			for i in range(self.num_features):
-				curr_weight[i] = np.clip(curr_weight[i], -max_weights[i], max_weights[i])
+				curr_weight[i] = np.clip(curr_weight[i], 0.0, max_weights[i])
 			print "here is the update:", update
 			print "here are the old weights:", self.weights
 			print "here are the new weights:", curr_weight

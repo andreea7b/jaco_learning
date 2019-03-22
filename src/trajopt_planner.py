@@ -17,7 +17,7 @@ import itertools
 import pickle
 
 # feature constants
-MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
+MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':8.0, 'human':10.0}
 
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [0.0, -0.4, 0.0]
@@ -32,6 +32,8 @@ class Planner(object):
 		# ---- important internal variables ---- #
 		self.feat_list = feat_list		# 'table', 'human', 'coffee', 'origin', 'laptop'
 		self.num_features = len(self.feat_list)
+		if 'efficiency' in self.feat_list:
+			assert (self.feat_list[0]=="efficiency"), "efficiency should be the first feature in the feature list!"
 
 		self.start_time = None
 		self.final_time = None
@@ -151,7 +153,7 @@ class Planner(object):
 		---
 		input trajectory, output scalar cost
 		"""
-		return self.velocity_features(mywaypts)
+		return self.velocity_features(waypts)
 
 	# -- Distance to Robot Base (origin of world) -- #
 
@@ -397,9 +399,6 @@ class Planner(object):
 
 		print("I'm in trajopt_PLANNER trajopt pose!")
 
-		# plot goal point
-		#plotSphere(self.env, self.bodies, goal_pose, size=40)
-
 		if len(start) < 10:
 			aug_start = np.append(start.reshape(7), np.array([0,0,0]))
 		self.robot.SetDOFValues(aug_start)
@@ -420,9 +419,9 @@ class Planner(object):
 			weights_span = [None]*self.num_features
 			min_dist_w = [None]*self.num_features
 			for feat in range(0,self.num_features):
-				limit = MAX_WEIGHTS[self.feat_list[feat]]
-				weights_span[feat] = list(np.arange(-limit, limit+.1, limit/2))
-				min_dist_w[feat] = -limit
+				hi = MAX_WEIGHTS[self.feat_list[feat]]
+				weights_span[feat] = list(np.linspace(0.0, hi, num=5))
+				min_dist_w[feat] = 0.0
 
 			weight_pairs = list(itertools.product(*weights_span))
 			weight_pairs = [np.array(i) for i in weight_pairs]
@@ -437,6 +436,12 @@ class Planner(object):
 					min_dist_idx = w_i
 
 			init_waypts = np.array(self.traj_cache[min_dist_idx])
+		# Check if efficiency is a feature; if not, use default weight.
+		if "efficiency" in self.feat_list:
+			coeff = self.weights[self.feat_list.index("efficiency")]
+		else:
+			coeff = 1.0
+
 		request = {
 			"basic_info": {
 				"n_steps": self.num_waypts_plan,
@@ -447,7 +452,7 @@ class Planner(object):
 			"costs": [
 			{
 				"type": "joint_vel",
-				"params": {"coeffs": [1.0]}
+				"params": {"coeffs": [coeff]}
 			}
 			],
 			"constraints": [
@@ -528,9 +533,9 @@ class Planner(object):
 			weights_span = [None]*self.num_features
 			min_dist_w = [None]*self.num_features
 			for feat in range(0,self.num_features):
-				limit = MAX_WEIGHTS[self.feat_list[feat]]
-				weights_span[feat] = list(np.arange(-limit, limit+.1, limit/2))
-				min_dist_w[feat] = -limit
+				hi = MAX_WEIGHTS[self.feat_list[feat]]
+				weights_span[feat] = list(np.linspace(0.0, hi, num=5))
+				min_dist_w[feat] = 0.0
 
 			weight_pairs = list(itertools.product(*weights_span))
 			weight_pairs = [np.array(i) for i in weight_pairs]
@@ -546,6 +551,12 @@ class Planner(object):
 
 			init_waypts = np.array(self.traj_cache[min_dist_idx])
 
+		# Check if efficiency is a feature; if not, use default weight.
+		if "efficiency" in self.feat_list:
+			coeff = self.weights[self.feat_list.index("efficiency")]
+		else:
+			coeff = 1.0
+
 		request = {
 			"basic_info": {
 				"n_steps": self.num_waypts_plan,
@@ -555,7 +566,7 @@ class Planner(object):
 			"costs": [
 			{
 				"type": "joint_vel",
-				"params": {"coeffs": [1.0]}
+				"params": {"coeffs": [coeff]}
 			}
 			],
 			"constraints": [

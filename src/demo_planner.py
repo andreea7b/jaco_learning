@@ -24,8 +24,8 @@ import matplotlib.mlab as mlab
 from trajopt_planner import Planner
 
 # feature constacts (update gains and max weights)
-UPDATE_GAINS = {'table':0.1, 'coffee':0.02, 'laptop':0.3, 'human':0.5}
-MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
+UPDATE_GAINS = {'table':0.05, 'coffee':0.002, 'laptop':0.01, 'human':0.01, 'efficiency':0.01}
+MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':8.0, 'human':10.0, 'efficiency':0.01}
 FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554, 'human':3.2}
 
 # table is relatively symmetric: [-1.0, 0.75]
@@ -64,6 +64,7 @@ class demoPlanner(Planner):
 	# ---- here's our algorithms for modifying the trajectory ---- #
 
 	def learnWeights(self, waypts_h):
+		import pdb;pdb.set_trace()
 		if waypts_h is not None:
 			self.waypts_h = waypts_h
 			new_features = self.featurize(self.waypts_h)
@@ -83,7 +84,7 @@ class demoPlanner(Planner):
 			update = Phi_H - Phi_R
 			self.updates = update[1:].tolist()
 
-			if self.feat_method == ALL or self.feat_method == BETA:
+			if self.feat_method == ALL:
 				# update all weights 
 				curr_weight = self.weights - update_gains * update[1:]
 			elif self.feat_method == MAX:
@@ -98,18 +99,20 @@ class demoPlanner(Planner):
 				curr_weight[max_idx] = curr_weight[max_idx] - update_gains[max_idx]*update[max_idx+1]
 
 			# clip values at max and min allowed weights
-			for i in range(self.num_features):
-				curr_weight[i] = np.clip(curr_weight[i], -max_weights[i], max_weights[i])
-
-			if self.feat_method == BETA:
-				l = 0
-				beta = np.linalg.norm(curr_weight)
+			if self.feat_method == ALL or self.feat_method == MAX:
+				for i in range(self.num_features):
+					curr_weight[i] = np.clip(curr_weight[i], 0, max_weights[i])
+			elif self.feat_method == BETA:
+				#beta = np.linalg.norm(curr_weight)
+				#print "here is beta1: ", beta
+				#beta = self.num_features / (2 * (curr_weight * update[1:] + l * (np.linalg.norm(waypts_h) ** 2 - np.linalg.norm(self.waypts) ** 2)))
+				#print "here is beta2: ", beta
+				#beta = 1 / np.abs(np.linalg.norm(waypts_h) ** 2 - np.linalg.norm(self.waypts) ** 2)
+				#print "here is beta3: ", beta
+				#beta = self.num_features / (2 * (1 + self.weights * update[1:]))
+				beta=1.0
+				curr_weight = self.weights - update_gains * update[1:]
 				print "here is beta1: ", beta
-				beta = 1 / (np.linalg.norm(np.array(self.weights) - curr_weight) ** 2 / (2 * np.array(update_gains)) /
-					- curr_weight * update[1:] + l * (np.linalg.norm(waypts_h) ** 2 - np.linalg.norm(self.waypts) ** 2))
-				print "here is beta2: ", beta
-				beta = 1 / np.abs(np.linalg.norm(waypts_h) ** 2 - np.linalg.norm(self.waypts) ** 2)
-				print "here is beta3: ", beta
 			print "here is the update:", update
 			print "here are the old weights:", self.weights
 			print "here are the new weights:", curr_weight
