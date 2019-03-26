@@ -15,11 +15,12 @@ if __name__ == '__main__':
 	T = 20.0
 
 	feat_method = "ALL"
-	feat_list = "efficiency,table,coffee,human"
+	feat_list = "efficiency,table,coffee,laptop,human"
 	feat_list = [x.strip() for x in feat_list.split(',')]
 	num_features = len(feat_list)
 	planner = Planner(feat_list)
 	MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':8.0, 'human':10.0, 'efficiency':1.0}
+	MIN_WEIGHTS = {'table':0.0, 'coffee':0.0, 'laptop':0.0, 'human':0.0, 'efficiency':0.0}
 
 	# initialize start/goal based on features
 	# by default for table and laptop, these are the pick and place
@@ -34,7 +35,8 @@ if __name__ == '__main__':
 	weights_span = [None]*num_features
 	for feat in range(0,num_features):
 		hi = MAX_WEIGHTS[feat_list[feat]]
-		weights_span[feat] = list(np.linspace(0.0, hi, num=5))
+		lo = MIN_WEIGHTS[feat_list[feat]]
+		weights_span[feat] = list(np.linspace(lo, hi, num=5))
 
 	# Create theta vectors and be careful to remove the degenerate case of all zeros.
 	weight_pairs = list(itertools.product(*weights_span))

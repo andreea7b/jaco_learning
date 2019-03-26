@@ -52,7 +52,8 @@ place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 epsilon = 0.10		# epsilon for when robot think it's at goal
 INTERACTION_TORQUE_THRESHOLD = [0.88414821, 17.22751856, -0.40134936,  6.23537946, -0.90013662, 1.32379884,  0.10218059]
 INTERACTION_TORQUE_EPSILON = [4.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]
-MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
+MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':8.0, 'human':10.0, 'efficiency':1.0}
+MIN_WEIGHTS = {'table':-1.0, 'coffee':0.0, 'laptop':0.0, 'human':0.0, 'efficiency':0.0}
 
 # Method types based on which we determine the planner
 IMPEDANCE = 'A'
@@ -177,8 +178,29 @@ class PIDVelJaco(object):
 				self.weights = self.planner.learnWeights(np.array(self.demo))
 				self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=None)
 				new_updates = np.array(self.planner.weights)
-				if np.linalg.norm(old_updates - new_updates) < 1e-3:
+				print "error: ",np.linalg.norm(old_updates - new_updates)
+				if np.linalg.norm(old_updates - new_updates) < 1e-6:
 					break
+			# Compute beta, the rationality coefficient.
+			# Version 1:
+			pi_new = self.planner.weights
+			beta_new = np.linalg.norm(pi_new)
+			theta_new = pi_new / beta_new
+			print "pi1, theta1, beta1: ", pi_new, theta_new, beta_new
+
+			# Version 2:
+			Phi_H = self.planner.featurize(self.demo)
+			Phi_R = self.planner.featurize(self.planner.waypts)
+			if 'efficiency' in self.feat_list:
+				Phi_H = np.array([Phi_H[0]] + [sum(x) for x in Phi_H[1:]])
+				Phi_R = np.array([Phi_R[0]] + [sum(x) for x in Phi_R[1:]])
+			else:
+				Phi_H = np.array([sum(x) for x in Phi_H])
+				Phi_R = np.array([sum(x) for x in Phi_R])
+			beta_new2 = 1.0 / (1.0 + np.abs(np.dot(pi_new, Phi_H - Phi_R)))
+			theta_new2 = pi_new / beta_new2
+			print "pi2, theta2, beta2: ", pi_new, theta_new2, beta_new2
+			import pdb;pdb.set_trace()
 
 	def load_parameters(self, ID, task, method_type, record, replay, simulate, feat_method, feat_list):
 		"""
@@ -240,7 +262,7 @@ class PIDVelJaco(object):
 		self.traj_cache = "/traj_dump/traj_cache_" + "_".join(self.feat_list) + ".p"
 		pick = pick_basic_EEtilt
 		if self.task is None:
-			self.traj_cache = "/traj_dump_offline/traj_cache_" + "_".join(self.feat_list) + ".p"
+			self.traj_cache = "/traj_cache/traj_cache_" + "_".join(self.feat_list) + ".p"
 			if "coffee" in self.feat_list:
 				pick = pick_basic_EEtilt
 		elif self.task == "coffee":
@@ -273,11 +295,11 @@ class PIDVelJaco(object):
 			self.planner = phri_planner.pHRIPlanner(self.feat_method, self.feat_list, self.task, self.traj_cache)
 		elif self.method_type == DEMONSTRATION_LEARNING:
 			# If demonstrations, use demo planner
-			self.planner = demo_planner.demoPlanner(self.feat_method, self.feat_list, self.task, self.traj_cache)
+			self.planner = demo_planner.demoPlanner(self.feat_list, self.task, self.traj_cache)
 
 			if self.simulate is not False:
 				# We must simulate an ideal human trajectory according to the human's features.
-				traj_cache_H = "/traj_dump_offline/traj_cache_" + "_".join(self.simulate) + ".p"
+				traj_cache_H = "/traj_cache/traj_cache_" + "_".join(self.simulate) + ".p"
 				here = os.path.dirname(os.path.realpath(__file__))
 				traj_cache_H = pickle.load( open( here + traj_cache_H, "rb" ) )
 				for feat in range(len(self.simulate)):

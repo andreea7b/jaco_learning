@@ -24,7 +24,9 @@ import matplotlib.mlab as mlab
 from trajopt_planner import Planner
 
 # feature constacts (update gains and max weights)
-UPDATE_GAINS = {'table':0.01, 'coffee':0.002, 'laptop':0.01, 'human':0.01, 'efficiency':0.1}
+UPDATE_GAINS = {'table':0.05, 'coffee':0.002, 'laptop':0.01, 'human':0.01, 'efficiency':0.1}
+MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':8.0, 'human':10.0, 'efficiency':1.0}
+MIN_WEIGHTS = {'table':-1.0, 'coffee':0.0, 'laptop':0.0, 'human':0.0, 'efficiency':0.0}
 
 class demoPlanner(Planner):
 	"""
@@ -59,14 +61,22 @@ class demoPlanner(Planner):
 
 			# Determine alpha and max theta
 			update_gains = [0.0] * self.num_features
+			max_weights = [0.0] * self.num_features
 			for feat in range(self.num_features):
 				update_gains[feat] = UPDATE_GAINS[self.feat_list[feat]]
+				max_weights[feat] = MAX_WEIGHTS[self.feat_list[feat]]
 			update = Phi_H - Phi_R
 			self.updates = update.tolist()
 
 			curr_weight = self.weights - update_gains * update
+
 			print "here is the update:", update
 			print "here are the old weights:", self.weights
+			print "here are the new UNCLIPPED weights:", curr_weight
+
+			for i in range(self.num_features):
+				curr_weight[i] = np.clip(curr_weight[i], 0.0, max_weights[i])
+
 			print "here are the new weights:", curr_weight
 
 			self.weights = curr_weight.tolist()
