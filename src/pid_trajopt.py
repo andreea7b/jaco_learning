@@ -173,13 +173,17 @@ class PIDVelJaco(object):
 					counter += step_size
 				self.demo = demo
 
+			num_iter = 0
 			while True:
 				old_updates = np.array(self.planner.weights)
 				self.weights = self.planner.learnWeights(np.array(self.demo))
 				self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=None)
 				new_updates = np.array(self.planner.weights)
+
+				num_iter += 1
 				print "error: ",np.linalg.norm(old_updates - new_updates)
 				if np.linalg.norm(old_updates - new_updates) < 1e-6:
+					print "Finished in {} iterations".format(num_iter)
 					break
 			# Compute beta, the rationality coefficient.
 			# Version 1:
