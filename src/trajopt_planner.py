@@ -17,7 +17,7 @@ import itertools
 import pickle
 
 # feature constants
-MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':8.0, 'human':10.0}
+MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':8.0, 'human':10.0, 'efficiency':1.0}
 
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [0.0, -0.4, 0.0]
@@ -96,40 +96,26 @@ class Planner(object):
 		---
 		input trajectory, output list of feature values
 		"""
-		features = [self.velocity_features(waypts)]
-		features += [[0.0 for _ in range(len(waypts)-1)] for _ in range(self.num_features)]
-		for index in range(0,len(waypts)-1):
-			for feat in range(1,self.num_features+1):
-				if self.feat_list[feat-1] == 'table':
-					features[feat][index] = self.table_features(waypts[index+1])
-				elif self.feat_list[feat-1] == 'coffee':
-					features[feat][index] = self.coffee_features(waypts[index+1])
-				elif self.feat_list[feat-1] == 'human':
-					features[feat][index] = self.human_features(waypts[index+1],waypts[index])
-				elif self.feat_list[feat-1] == 'laptop':
-					features[feat][index] = self.laptop_features(waypts[index+1],waypts[index])
-				elif self.feat_list[feat-1] == 'origin':
-					features[feat][index] = self.origin_features(waypts[index+1])
-		return features
+		if 'efficiency' in self.feat_list:
+			features = [self.velocity_features(waypts)]
+			i = 1
+		else:
+			features = []
+			i = 0
+		features += [[0.0 for _ in range(len(waypts)-1)] for _ in range(i, self.num_features)]
 
-	def featurize_single(self, waypts, feat_idx):
-		"""
-		Computes the user-defined features for a given trajectory and a given feature.
-		---
-		input trajectory, output list of feature values
-		"""
-		features = [0.0 for _ in range(len(waypts)-1)]
 		for index in range(0,len(waypts)-1):
-			if self.feat_list[feat_idx] == 'table':
-				features[index] = self.table_features(waypts[index+1])
-			elif self.feat_list[feat_idx] == 'coffee':
-				features[index] = self.coffee_features(waypts[index+1])
-			elif self.feat_list[feat_idx] == 'human':
-				features[index] = self.human_features(waypts[index+1],waypts[index])
-			elif self.feat_list[feat_idx] == 'laptop':
-				features[index] = self.laptop_features(waypts[index+1],waypts[index])
-			elif self.feat_list[feat_idx] == 'origin':
-				features[index] = self.origin_features(waypts[index+1])
+			for feat in range(i, self.num_features):
+				if self.feat_list[feat] == 'table':
+					features[feat][index] = self.table_features(waypts[index+1])
+				elif self.feat_list[feat] == 'coffee':
+					features[feat][index] = self.coffee_features(waypts[index+1])
+				elif self.feat_list[feat] == 'human':
+					features[feat][index] = self.human_features(waypts[index+1],waypts[index])
+				elif self.feat_list[feat] == 'laptop':
+					features[feat][index] = self.laptop_features(waypts[index+1],waypts[index])
+				elif self.feat_list[feat] == 'origin':
+					features[feat][index] = self.origin_features(waypts[index+1])
 		return features
 
 	# -- Velocity -- #
@@ -436,6 +422,7 @@ class Planner(object):
 					min_dist_idx = w_i
 
 			init_waypts = np.array(self.traj_cache[min_dist_idx])
+
 		# Check if efficiency is a feature; if not, use default weight.
 		if "efficiency" in self.feat_list:
 			coeff = self.weights[self.feat_list.index("efficiency")]

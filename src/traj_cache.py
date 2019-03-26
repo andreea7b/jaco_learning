@@ -15,11 +15,11 @@ if __name__ == '__main__':
 	T = 20.0
 
 	feat_method = "ALL"
-	feat_list = "laptop"
+	feat_list = "efficiency,table,coffee,human"
 	feat_list = [x.strip() for x in feat_list.split(',')]
 	num_features = len(feat_list)
 	planner = Planner(feat_list)
-	MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':10.0, 'human':10.0}
+	MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':8.0, 'human':10.0, 'efficiency':1.0}
 
 	# initialize start/goal based on features
 	# by default for table and laptop, these are the pick and place
@@ -33,21 +33,22 @@ if __name__ == '__main__':
 
 	weights_span = [None]*num_features
 	for feat in range(0,num_features):
-		limit = MAX_WEIGHTS[feat_list[feat]]
-		weights_span[feat] = list(np.arange(-limit, limit+.1, limit/2))
+		hi = MAX_WEIGHTS[feat_list[feat]]
+		weights_span[feat] = list(np.linspace(0.0, hi, num=5))
 
+	# Create theta vectors and be careful to remove the degenerate case of all zeros.
 	weight_pairs = list(itertools.product(*weights_span))
 	num_trajs = len(weight_pairs)
 	traj_cache = [0] * num_trajs
-	
+
 	for (w_i, w) in enumerate(weight_pairs):
-		traj = planner.replan(start, goal, w, 0.0, T, 0.5)	
+		traj = planner.replan(start, goal, w, 0.0, T, 0.5)
 		traj_cache[w_i] = traj
 
 	traj_cache = np.array(traj_cache)
 	print traj_cache
-
 	savestr = "_".join(feat_list)
 	savefile = "traj_cache_"+savestr+".p"
 	pickle.dump(traj_cache, open( savefile, "wb" ) )
 	print "Saved in: ", savefile
+	print "Used the following weight-combos: ", weight_pairs
