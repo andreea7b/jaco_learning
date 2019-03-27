@@ -24,7 +24,7 @@ import matplotlib.mlab as mlab
 from trajopt_planner import Planner
 
 # feature constacts (update gains and max weights)
-UPDATE_GAINS = {'table':0.05, 'coffee':0.002, 'laptop':0.01, 'human':0.01, 'efficiency':0.1}
+UPDATE_GAINS = {'table':0.01, 'coffee':0.005, 'laptop':0.01, 'human':0.01, 'efficiency':0.1}
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':8.0, 'human':10.0, 'efficiency':1.0}
 MIN_WEIGHTS = {'table':-1.0, 'coffee':0.0, 'laptop':0.0, 'human':0.0, 'efficiency':0.0}
 

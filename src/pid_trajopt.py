@@ -182,15 +182,17 @@ class PIDVelJaco(object):
 
 				num_iter += 1
 				print "error: ",np.linalg.norm(old_updates - new_updates)
-				if np.linalg.norm(old_updates - new_updates) < 1e-6:
+				if np.linalg.norm(old_updates - new_updates) < 1e-3:
 					print "Finished in {} iterations".format(num_iter)
 					break
 			# Compute beta, the rationality coefficient.
 			# Version 1:
-			pi_new = self.planner.weights
-			beta_new = np.linalg.norm(pi_new)
-			theta_new = pi_new / beta_new
-			print "pi1, theta1, beta1: ", pi_new, theta_new, beta_new
+			pi_new1 = self.planner.weights
+			for i in range(len(self.feat_list)):
+				pi_new1[i] = pi_new1[i] / MAX_WEIGHTS[self.feat_list[i]]
+			beta_new = np.linalg.norm(pi_new1)
+			theta_new = pi_new1 / beta_new
+			print "pi1, theta1, beta1: ", pi_new1, theta_new, beta_new
 
 			# Version 2:
 			Phi_H = self.planner.featurize(self.demo)
@@ -199,9 +201,10 @@ class PIDVelJaco(object):
 				Phi_H = np.array([Phi_H[0]] + [sum(x) for x in Phi_H[1:]])
 				Phi_R = np.array([Phi_R[0]] + [sum(x) for x in Phi_R[1:]])
 			else:
-				Phi_H = np.array([sum(x) for x in Phi_H])
-				Phi_R = np.array([sum(x) for x in Phi_R])
-			beta_new2 = 1.0 / (1.0 + np.abs(np.dot(pi_new, Phi_H - Phi_R)))
+				Phi_H = np.array([self.planner.velocity_features(self.demo)] + [sum(x) for x in Phi_H])
+				Phi_R = np.array([self.planner.velocity_features(self.planner.waypts)] + [sum(x) for x in Phi_R])
+			pi_new2 = self.planner.weights
+			beta_new2 = (len(self.feat_list) / 2.0) / (1.0 + np.abs(np.dot([1.0] + pi_new2, Phi_H - Phi_R)))
 			theta_new2 = pi_new / beta_new2
 			print "pi2, theta2, beta2: ", pi_new, theta_new2, beta_new2
 			import pdb;pdb.set_trace()
@@ -263,18 +266,12 @@ class PIDVelJaco(object):
 		# initialize start/goal based on features
 		# by default for table and laptop, these are the pick and place
 		# depending on the task for study, pick and place will be different
-		self.traj_cache = "/traj_dump/traj_cache_" + "_".join(self.feat_list) + ".p"
 		pick = pick_basic_EEtilt
 		if self.task is None:
-			self.traj_cache = "/traj_cache/traj_cache_" + "_".join(self.feat_list) + ".p"
 			if "coffee" in self.feat_list:
 				pick = pick_basic_EEtilt
 		elif self.task == "coffee":
 			pick = pick_basic_EEtilt
-			self.traj_cache = "/traj_dump/traj_cache_coffee.p"
-		elif self.task == "table":
-			if "coffee" in self.feat_list:
-				self.traj_cache = "/traj_dump/traj_cache_badcoffee.p"
 		place = place_lower
 
 		start = np.array(pick)*(math.pi/180.0)
@@ -296,22 +293,18 @@ class PIDVelJaco(object):
 		# create the planner
 		if self.method_type == PHRI_LEARNING:
 			# If physical interactions, use pHRI planner
-			self.planner = phri_planner.pHRIPlanner(self.feat_method, self.feat_list, self.task, self.traj_cache)
+			self.planner = phri_planner.pHRIPlanner(self.feat_method, self.feat_list, self.task)
 		elif self.method_type == DEMONSTRATION_LEARNING:
 			# If demonstrations, use demo planner
-			self.planner = demo_planner.demoPlanner(self.feat_list, self.task, self.traj_cache)
+			self.planner = demo_planner.demoPlanner(self.feat_list, self.task)
 
 			if self.simulate is not False:
 				# We must simulate an ideal human trajectory according to the human's features.
-				traj_cache_H = "/traj_cache/traj_cache_" + "_".join(self.simulate) + ".p"
-				here = os.path.dirname(os.path.realpath(__file__))
-				traj_cache_H = pickle.load( open( here + traj_cache_H, "rb" ) )
 				for feat in range(len(self.simulate)):
 					self.weights_H[feat] = MAX_WEIGHTS[self.simulate[feat]]
 
 				# Temporarily modify the planner in order to get simulated demonstration.
 				self.planner.feat_list = self.simulate
-				self.planner.traj_cache = traj_cache_H
 				self.planner.num_features = len(self.simulate)
 
 				self.planner.replan(self.start, self.goal, self.weights_H, 0.0, self.T, 0.5, seed=None)
@@ -320,12 +313,10 @@ class PIDVelJaco(object):
 				# Reset the planner to the robot's configuration
 				self.planner.feat_list = self.feat_list
 				self.planner.num_features = len(self.feat_list)
-				traj_cache_R = pickle.load( open( here + self.traj_cache, "rb" ) )
-				self.planner.traj_cache = traj_cache_R
 				self.planner.weights = self.weights
 		else:
 			# Otherwise, use simple trajopt planner
-			self.planner = trajopt_planner.Planner(self.feat_list, self.task, self.traj_cache)
+			self.planner = trajopt_planner.Planner(self.feat_list, self.task)
 
 		# stores the current trajectory we are tracking, produced by planner
 		# If in DEMONSTRATION_LEARNING, this trajectory won't be used.
