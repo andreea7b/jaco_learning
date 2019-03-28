@@ -7,7 +7,7 @@ Based on: https://w3.cs.jmu.edu/spragunr/CS354_S15/labs/pid_lab/pid_lab.shtml
 import roslib; roslib.load_manifest('kinova_demo')
 
 import rospy
-import math
+import math, copy
 import pid
 import tf
 import sys, select, os
@@ -54,12 +54,15 @@ INTERACTION_TORQUE_THRESHOLD = [0.88414821, 17.22751856, -0.40134936,  6.2353794
 INTERACTION_TORQUE_EPSILON = [4.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':8.0, 'human':10.0, 'efficiency':1.0}
 MIN_WEIGHTS = {'table':-1.0, 'coffee':0.0, 'laptop':0.0, 'human':0.0, 'efficiency':0.0}
+#FEAT_RANGE = {'table':0.270624619494, 'coffee':0.974212104025, 'laptop':0.30402465675, 'human':0.687767885424, 'efficiency':0.18665647143383943}
+FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.3706093, 'human':2.2249931, 'efficiency':0.20920897}
 
 # Method types based on which we determine the planner
 IMPEDANCE = 'A'
 PHRI_LEARNING = 'B'
 DEMONSTRATION_LEARNING = 'C'
-EXPERT = 'D'
+DISCRETE_DEMONSTRATION_LEARNING = 'D'
+EXPERT = 'E'
 
 class PIDVelJaco(object):
 	"""
@@ -150,29 +153,29 @@ class PIDVelJaco(object):
 
 		# If we are performind demonstration learning, we just finished receiving a demonstration.
 		# Here we process the demonstration and perform inference on it.
+		if self.simulate == False:
+			# We tracked a real human trajectory. It is not a simulation.
+			raw_demo = self.expUtil.tracked_traj[:,1:8]
+			# 1. Trim ends of trajectory
+			lo = 0
+			hi = raw_demo.shape[0] - 1
+			while np.linalg.norm(raw_demo[lo] - raw_demo[lo + 1]) < 0.01 and lo < hi:
+				lo += 1
+			while np.linalg.norm(raw_demo[hi] - raw_demo[hi - 1]) < 0.01 and hi > 0:
+				hi -= 1
+			raw_demo = raw_demo[lo:hi+1, :]
+
+			# 2. Downsample to the same size as robot trajectory
+			desired_length = self.planner.waypts.shape[0]
+			step_size = float(raw_demo.shape[0]) / desired_length
+			demo = []
+			counter = 0
+			while counter < raw_demo.shape[0]-1:
+				demo.append(raw_demo[int(counter), :])
+				counter += step_size
+			self.demo = demo
+
 		if self.method_type == DEMONSTRATION_LEARNING:
-			if self.simulate == False:
-				# We tracked a real human trajectory. It is not a simulation.
-				raw_demo = self.expUtil.tracked_traj[:,1:8]
-				# 1. Trim ends of trajectory
-				lo = 0
-				hi = raw_demo.shape[0] - 1
-				while np.linalg.norm(raw_demo[lo] - raw_demo[lo + 1]) < 0.01 and lo < hi:
-					lo += 1
-				while np.linalg.norm(raw_demo[hi] - raw_demo[hi - 1]) < 0.01 and hi > 0:
-					hi -= 1
-				raw_demo = raw_demo[lo:hi+1, :]
-
-				# 2. Downsample to the same size as robot trajectory
-				desired_length = self.planner.waypts.shape[0]
-				step_size = float(raw_demo.shape[0]) / desired_length
-				demo = []
-				counter = 0
-				while counter < raw_demo.shape[0]-1:
-					demo.append(raw_demo[int(counter), :])
-					counter += step_size
-				self.demo = demo
-
 			num_iter = 0
 			while True:
 				old_updates = np.array(self.planner.weights)
@@ -187,27 +190,34 @@ class PIDVelJaco(object):
 					break
 			# Compute beta, the rationality coefficient.
 			# Version 1:
-			pi_new1 = self.planner.weights
-			for i in range(len(self.feat_list)):
-				pi_new1[i] = pi_new1[i] / MAX_WEIGHTS[self.feat_list[i]]
-			beta_new = np.linalg.norm(pi_new1)
-			theta_new = pi_new1 / beta_new
-			print "pi1, theta1, beta1: ", pi_new1, theta_new, beta_new
+			pi_new = copy.deepcopy(self.planner.weights)
+			if 'efficiency' not in self.feat_list:
+				pi_new = [1.0] + pi_new
+			beta_new = np.linalg.norm(pi_new)
+			theta_new = pi_new / beta_new
+			print "pi1, theta1, beta1: ", pi_new, theta_new, beta_new
 
 			# Version 2:
 			Phi_H = self.planner.featurize(self.demo)
 			Phi_R = self.planner.featurize(self.planner.waypts)
-			if 'efficiency' in self.feat_list:
-				Phi_H = np.array([Phi_H[0]] + [sum(x) for x in Phi_H[1:]])
-				Phi_R = np.array([Phi_R[0]] + [sum(x) for x in Phi_R[1:]])
-			else:
-				Phi_H = np.array([self.planner.velocity_features(self.demo)] + [sum(x) for x in Phi_H])
-				Phi_R = np.array([self.planner.velocity_features(self.planner.waypts)] + [sum(x) for x in Phi_R])
-			pi_new2 = self.planner.weights
-			beta_new2 = (len(self.feat_list) / 2.0) / (1.0 + np.abs(np.dot([1.0] + pi_new2, Phi_H - Phi_R)))
-			theta_new2 = pi_new / beta_new2
-			print "pi2, theta2, beta2: ", pi_new, theta_new2, beta_new2
+			Phi_H = np.array([Phi_H[0]] + [sum(x) for x in Phi_H[1:]])
+			Phi_R = np.array([Phi_R[0]] + [sum(x) for x in Phi_R[1:]])
+			Phi_delta = Phi_H - Phi_R
+
+			# Normalize to make costs comparable.
+			print "Phi_H - Phi_R: ", Phi_delta
+			i = 1 if 'efficiency' in self.feat_list else 0
+			Phi_delta[0] = Phi_delta[0] / FEAT_RANGE['efficiency']
+			for feat in range(i, len(self.feat_list)):
+				Phi_delta[feat-i+1] = Phi_delta[feat-i+1] / FEAT_RANGE[self.feat_list[feat]]
+			print "Scaled Phi_H - Phi_R: ", Phi_delta
+
+			beta_new2 = (len(theta_new) / 2.0) / (1.0 + np.dot(theta_new, Phi_delta))
+			beta_new3 = 1 / np.abs(np.dot(theta_new, Phi_delta))
+			print "beta2, beta3: ", beta_new2, beta_new3
 			import pdb;pdb.set_trace()
+		elif self.method_type == DISCRETE_DEMONSTRATION_LEARNING:
+			self.weights = self.planner.learnWeights(np.array(self.demo))
 
 	def load_parameters(self, ID, task, method_type, record, replay, simulate, feat_method, feat_list):
 		"""
@@ -216,7 +226,7 @@ class PIDVelJaco(object):
 		# task, if any
 		self.task = None if task == "None" else task
 
-		# method type - A=IMPEDANCE, B=PHRI_LEARNING, C=DEMONSTRATION_LEARNING, D=EXPERT
+		# method type - A=IMPEDANCE, B=PHRI_LEARNING, C=DEMONSTRATION_LEARNING, D=DISCRETE_DEMONSTRATION_LEARNING ,E=EXPERT
 		self.method_type = method_type
 
 		# can be ALL, MAX, or BETA
@@ -249,6 +259,7 @@ class PIDVelJaco(object):
 		if simulate == "F" or simulate == "f":
 			self.simulate = False
 		else:
+			assert ((self.method_type == DEMONSTRATION_LEARNING) or (self.method_type == DISCRETE_DEMONSTRATION_LEARNING)), "Cannot use simulated demonstrations for a non-demonstration method."
 			self.simulate = simulate.split(",")
 			self.weights_H = [0.0]*len(self.simulate)		
 
@@ -260,6 +271,8 @@ class PIDVelJaco(object):
 		# initialize trajectory weights and betas
 
 		self.weights = [0.0]*self.num_feat
+		if 'efficiency' in self.feat_list:
+			self.weights[0] = 1.0
 		self.betas = [1.0]*self.num_feat
 		self.updates = [0.0]*self.num_feat
 
@@ -297,26 +310,27 @@ class PIDVelJaco(object):
 		elif self.method_type == DEMONSTRATION_LEARNING:
 			# If demonstrations, use demo planner
 			self.planner = demo_planner.demoPlanner(self.feat_list, self.task)
-
-			if self.simulate is not False:
-				# We must simulate an ideal human trajectory according to the human's features.
-				for feat in range(len(self.simulate)):
-					self.weights_H[feat] = MAX_WEIGHTS[self.simulate[feat]]
-
-				# Temporarily modify the planner in order to get simulated demonstration.
-				self.planner.feat_list = self.simulate
-				self.planner.num_features = len(self.simulate)
-
-				self.planner.replan(self.start, self.goal, self.weights_H, 0.0, self.T, 0.5, seed=None)
-				self.demo = self.planner.waypts
-
-				# Reset the planner to the robot's configuration
-				self.planner.feat_list = self.feat_list
-				self.planner.num_features = len(self.feat_list)
-				self.planner.weights = self.weights
+		elif self.method_type == DISCRETE_DEMONSTRATION_LEARNING:
+			# If discrete demonstrations, use discrete demo planner
+			self.planner = discrete_demo_planner.demoPlanner(self.feat_list, self.task)
 		else:
 			# Otherwise, use simple trajopt planner
 			self.planner = trajopt_planner.Planner(self.feat_list, self.task)
+
+		if self.simulate is not False:
+			# We must simulate an ideal human trajectory according to the human's features.
+			for feat in range(len(self.simulate)):
+				self.weights_H[feat] = MAX_WEIGHTS[self.simulate[feat]]
+
+			# Temporarily modify the planner in order to get simulated demonstration.
+			self.planner.feat_list = self.simulate
+			self.planner.num_features = len(self.simulate)
+
+			self.planner.replan(self.start, self.goal, self.weights_H, 0.0, self.T, 0.5, seed=None)
+			self.demo = self.planner.waypts
+
+			# Reset the planner to the robot's original configuration.
+			self.planner.__init__(self.feat_list, self.task)
 
 		# stores the current trajectory we are tracking, produced by planner
 		# If in DEMONSTRATION_LEARNING, this trajectory won't be used.

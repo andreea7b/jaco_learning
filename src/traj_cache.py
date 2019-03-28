@@ -14,7 +14,6 @@ if __name__ == '__main__':
 
 	T = 20.0
 
-	feat_method = "ALL"
 	feat_list = "efficiency,table,coffee,laptop,human"
 	feat_list = [x.strip() for x in feat_list.split(',')]
 	num_features = len(feat_list)

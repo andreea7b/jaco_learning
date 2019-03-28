@@ -97,26 +97,22 @@ class Planner(object):
 		---
 		input trajectory, output list of feature values
 		"""
-		if 'efficiency' in self.feat_list:
-			features = [self.velocity_features(waypts)]
-			i = 1
-		else:
-			features = []
-			i = 0
+		i = 1 if 'efficiency' in self.feat_list else 0
+		features = [self.velocity_features(waypts)]
 		features += [[0.0 for _ in range(len(waypts)-1)] for _ in range(i, self.num_features)]
 
 		for index in range(0,len(waypts)-1):
 			for feat in range(i, self.num_features):
 				if self.feat_list[feat] == 'table':
-					features[feat][index] = self.table_features(waypts[index+1])
+					features[feat-i+1][index] = self.table_features(waypts[index+1])
 				elif self.feat_list[feat] == 'coffee':
-					features[feat][index] = self.coffee_features(waypts[index+1])
+					features[feat-i+1][index] = self.coffee_features(waypts[index+1])
 				elif self.feat_list[feat] == 'human':
-					features[feat][index] = self.human_features(waypts[index+1],waypts[index])
+					features[feat-i+1][index] = self.human_features(waypts[index+1],waypts[index])
 				elif self.feat_list[feat] == 'laptop':
-					features[feat][index] = self.laptop_features(waypts[index+1],waypts[index])
+					features[feat-i+1][index] = self.laptop_features(waypts[index+1],waypts[index])
 				elif self.feat_list[feat] == 'origin':
-					features[feat][index] = self.origin_features(waypts[index+1])
+					features[feat-i+1][index] = self.origin_features(waypts[index+1])
 		return features
 
 	# -- Velocity -- #

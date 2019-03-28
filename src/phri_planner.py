@@ -49,7 +49,6 @@ class pHRIPlanner(Planner):
 
 		# ---- important internal variables ---- #
 		self.feat_method = feat_method	# can be ALL, MAX, or BETA
-		self.weights = [0.0]*self.num_features
 		self.betas = [1.0]*self.num_features
 		self.betas_u = [1.0]*self.num_features
 		self.waypts_prev = None

@@ -6,8 +6,7 @@ import sys
 
 from trajopt_planner import Planner
 
-
-def generate_rand_trajs(features):
+def generate_rand_trajs(feat_list):
 	# Before calling this function, you need to decide what features you care
     # about, from a choice of table, coffee, human, origin, and laptop
 
@@ -25,12 +24,8 @@ def generate_rand_trajs(features):
 
 	T = 20.0
 
-	feat_method = "ALL"
 	traj_rand = []
-	all_feats = features
-	feat_list = all_feats
-
-	
+	feat_list = [x.strip() for x in feat_list.split(',')]
 	planner = Planner(feat_list)
 	num_features = len(feat_list)
 
@@ -47,28 +42,23 @@ def generate_rand_trajs(features):
 		weights_span[feat] = list(np.linspace(MIN_WEIGHTS[feat_list[feat]], MAX_WEIGHTS[feat_list[feat]], num=5))
 
 	weight_pairs = list(itertools.product(*weights_span))
-	weight_pairs = [np.array(i) for i in weight_pairs]
-	import pdb;pdb.set_trace()
+
 	for (w_i, weights) in enumerate(weight_pairs):
-		print(feat_list)
-		print(weights)
-		planner.replan(start, goal, list(weights), 0.0, T, 0.5)
+		planner.replan(start, goal, weights, 0.0, T, 0.5)
 		traj = planner.waypts
 		traj_rand.append(traj)
 
-
 	print(traj_rand)
 	traj_rand = np.array(traj_rand)
-	savestr = "_".join(all_feats) + "_"
-	savefile = "lala_" + savestr + ".p"
-	pickle.dump(traj_rand, open( savefile, "wb" ) )
-
-	#return traj_rand
-
+	savestr = "_".join(feat_list)
+	savefile = "traj_rand_"+savestr+".p"
+	pickle.dump(traj_rand, open( savefile, "wb" ))
+	print "Saved in: ", savefile
+	print "Used the following weight-combos: ", weight_pairs
 
 if __name__ == '__main__':
-	features = sys.argv[1:]
-	generate_rand_trajs(features)
+	feat_list = sys.argv[1]
+	generate_rand_trajs(feat_list)
 
 
 
