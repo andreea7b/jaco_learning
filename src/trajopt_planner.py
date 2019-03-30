@@ -18,10 +18,10 @@ import pickle
 
 # feature constants
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':8.0, 'human':10.0, 'efficiency':1.0}
-MIN_WEIGHTS = {'table':-1.0, 'coffee':0.0, 'laptop':0.0, 'human':0.0, 'efficiency':0.0}
+FEAT_RANGE = {'table':0.69, 'coffee':1.87608702, 'laptop':1.3119385084172743, 'human':1.5630974027524693, 'efficiency':0.21}
 
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
-HUMAN_CENTER = [0.0, -0.4, 0.0]
+HUMAN_CENTER = [-0.3, -0.5, 0.0]
 
 class Planner(object):
 	"""
@@ -128,7 +128,7 @@ class Planner(object):
 			curr = waypts[i]
 			prev = waypts[i-1]
 			vel += np.linalg.norm(curr - prev)**2
-		return vel
+		return vel / FEAT_RANGE['efficiency']
 
 	def velocity_cost(self, waypts):
 		"""
@@ -181,7 +181,7 @@ class Planner(object):
 		self.robot.SetDOFValues(waypt)
 		coords = robotToCartesian(self.robot)
 		EEcoord_z = coords[6][2]
-		return EEcoord_z
+		return EEcoord_z / FEAT_RANGE['table']
 
 	def table_cost(self, waypt):
 		"""
@@ -244,7 +244,7 @@ class Planner(object):
 		for step in range(NUM_STEPS):
 			inter_waypt = prev_waypt + (1.0 + step)/(NUM_STEPS)*(waypt - prev_waypt)
 			feature += self.laptop_dist(inter_waypt)
-		return feature
+		return feature / FEAT_RANGE['laptop']
 
 	def laptop_dist(self, waypt):
 		"""
@@ -291,14 +291,14 @@ class Planner(object):
 		for step in range(NUM_STEPS):
 			inter_waypt = prev_waypt + (1.0 + step)/(NUM_STEPS)*(waypt - prev_waypt)
 			feature += self.human_dist(inter_waypt)
-		return feature
+		return feature / FEAT_RANGE['human']
 
 	def human_dist(self, waypt):
 		"""
 		Computes distance from end-effector to human in xy coords
 		input trajectory, output scalar distance where 
-			0: EE is at more than .7 meters away from human
-			+: EE is closer than .7 meters to human
+			0: EE is at more than 0.4 meters away from human
+			+: EE is closer than 0.4 meters to human
 		"""
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
@@ -307,7 +307,7 @@ class Planner(object):
 		coords = robotToCartesian(self.robot)
 		EE_coord_xy = coords[6][0:2]
 		human_xy = np.array(HUMAN_CENTER[0:2])
-		dist = np.linalg.norm(EE_coord_xy - human_xy) - 0.7
+		dist = np.linalg.norm(EE_coord_xy - human_xy) - 0.4
 		if dist > 0:
 			return 0
 		return -dist

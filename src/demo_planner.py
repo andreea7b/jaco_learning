@@ -23,11 +23,6 @@ import matplotlib.mlab as mlab
 
 from trajopt_planner import Planner
 
-# feature constacts (update gains and max weights)
-UPDATE_GAIN = 0.004
-#FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.3706093, 'human':2.2249931, 'efficiency':0.20920897}
-FEAT_RANGE = {'table':0.270624619494, 'coffee':0.974212104025, 'laptop':0.30402465675, 'human':0.687767885424, 'efficiency':0.18665647143383943}
-
 class demoPlanner(Planner):
 	"""
 	This class plans a trajectory from start to goal with TrajOpt.
@@ -55,17 +50,12 @@ class demoPlanner(Planner):
 			Phi_R = np.array([old_features[0]] + [sum(x) for x in old_features[1:]])
 
 			update = Phi_H - Phi_R
-			i = 1 if 'efficiency' in self.feat_list else 0
-			update[0] = update[0] / FEAT_RANGE['efficiency']
-
-			for feat in range(i, self.num_features):
-				update[feat-i+1] = update[feat-i+1] / FEAT_RANGE[self.feat_list[feat]]
 			self.updates = update.tolist()
 
 			if 'efficiency' not in self.feat_list:
 				update = update[1:]
 
-			curr_weight = self.weights - UPDATE_GAIN * update
+			curr_weight = self.weights - alpha * update
 
 			print "here is the update:", update
 			print "here are the old weights:", self.weights

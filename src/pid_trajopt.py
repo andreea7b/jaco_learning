@@ -15,7 +15,7 @@ import thread
 import argparse
 import actionlib
 import time
-import trajopt_planner, phri_planner, demo_planner
+import trajopt_planner, phri_planner, demo_planner, demo_planner_discrete
 import ros_utils
 import exp_utils.experiment_utils
 
@@ -52,10 +52,9 @@ place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 epsilon = 0.10		# epsilon for when robot think it's at goal
 INTERACTION_TORQUE_THRESHOLD = [0.88414821, 17.22751856, -0.40134936,  6.23537946, -0.90013662, 1.32379884,  0.10218059]
 INTERACTION_TORQUE_EPSILON = [4.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]
-MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':8.0, 'human':10.0, 'efficiency':1.0}
-MIN_WEIGHTS = {'table':-1.0, 'coffee':0.0, 'laptop':0.0, 'human':0.0, 'efficiency':0.0}
-#FEAT_RANGE = {'table':0.270624619494, 'coffee':0.974212104025, 'laptop':0.30402465675, 'human':0.687767885424, 'efficiency':0.18665647143383943}
-FEAT_RANGE = {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.3706093, 'human':2.2249931, 'efficiency':0.20920897}
+MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':7.0, 'human':20.0, 'efficiency':1.0}
+MIN_WEIGHTS = {'table':-1.0, 'coffee':0.0, 'laptop':-2.0, 'human':-1.0, 'efficiency':0.0}
+FEAT_RANGE = {'table':0.69, 'coffee':1.87608702, 'laptop':1.3119385084172743, 'human':1.5630974027524693, 'efficiency':0.21}
 
 # Method types based on which we determine the planner
 IMPEDANCE = 'A'
@@ -179,43 +178,43 @@ class PIDVelJaco(object):
 			num_iter = 0
 			while True:
 				old_updates = np.array(self.planner.weights)
-				self.weights = self.planner.learnWeights(np.array(self.demo))
-				self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=None)
+				self.weights = self.planner.learnWeights(np.array(self.demo),alpha=0.005)
+				self.traj = self.planner.replan(self.start, self.goal, self.weights, 0.0, self.T, 0.5, seed=self.demo_plan)
 				new_updates = np.array(self.planner.weights)
 
 				num_iter += 1
 				print "error: ",np.linalg.norm(old_updates - new_updates)
-				if np.linalg.norm(old_updates - new_updates) < 1e-3:
+				if np.linalg.norm(old_updates - new_updates) < 1e-4:
 					print "Finished in {} iterations".format(num_iter)
 					break
 			# Compute beta, the rationality coefficient.
-			# Version 1:
+			# Version 1 computes beta as a norm of pi:
 			pi_new = copy.deepcopy(self.planner.weights)
 			if 'efficiency' not in self.feat_list:
 				pi_new = [1.0] + pi_new
 			beta_new = np.linalg.norm(pi_new)
 			theta_new = pi_new / beta_new
-			print "pi1, theta1, beta1: ", pi_new, theta_new, beta_new
+			print "pi1, theta1, beta_norm: ", pi_new, theta_new, beta_new
 
-			# Version 2:
+			# Version 2 computes beta by looking at the difference in cost:
+			if 'efficiency' not in self.feat_list:
+				self.planner.feat_list = ['efficiency'] + self.feat_list
+				self.planner.num_features = len(self.feat_list) + 1
+
+			self.planner.replan(self.start, self.goal, theta_new, 0.0, self.T, 0.5, seed=self.demo_plan)
 			Phi_H = self.planner.featurize(self.demo)
 			Phi_R = self.planner.featurize(self.planner.waypts)
 			Phi_H = np.array([Phi_H[0]] + [sum(x) for x in Phi_H[1:]])
 			Phi_R = np.array([Phi_R[0]] + [sum(x) for x in Phi_R[1:]])
 			Phi_delta = Phi_H - Phi_R
 
-			# Normalize to make costs comparable.
 			print "Phi_H - Phi_R: ", Phi_delta
-			i = 1 if 'efficiency' in self.feat_list else 0
-			Phi_delta[0] = Phi_delta[0] / FEAT_RANGE['efficiency']
-			for feat in range(i, len(self.feat_list)):
-				Phi_delta[feat-i+1] = Phi_delta[feat-i+1] / FEAT_RANGE[self.feat_list[feat]]
-			print "Scaled Phi_H - Phi_R: ", Phi_delta
-
-			beta_new2 = (len(theta_new) / 2.0) / (1.0 + np.dot(theta_new, Phi_delta))
-			beta_new3 = 1 / np.abs(np.dot(theta_new, Phi_delta))
-			print "beta2, beta3: ", beta_new2, beta_new3
-			import pdb;pdb.set_trace()
+			beta_new2 = 1.0 / np.abs(np.dot(theta_new, Phi_delta))
+			print "beta_MLE: ", beta_new2
+			beta_new3 = 1.0 / np.linalg.norm(Phi_delta)
+			print "beta_phi: ", beta_new3
+			beta_new4 = 1.0 / np.linalg.norm(self.demo - self.planner.waypts)
+			print "beta_L2: ", beta_new4
 		elif self.method_type == DISCRETE_DEMONSTRATION_LEARNING:
 			self.weights = self.planner.learnWeights(np.array(self.demo))
 
@@ -312,7 +311,7 @@ class PIDVelJaco(object):
 			self.planner = demo_planner.demoPlanner(self.feat_list, self.task)
 		elif self.method_type == DISCRETE_DEMONSTRATION_LEARNING:
 			# If discrete demonstrations, use discrete demo planner
-			self.planner = discrete_demo_planner.demoPlanner(self.feat_list, self.task)
+			self.planner = demo_planner_discrete.demoPlannerDiscrete(self.feat_list, self.task)
 		else:
 			# Otherwise, use simple trajopt planner
 			self.planner = trajopt_planner.Planner(self.feat_list, self.task)
@@ -328,9 +327,12 @@ class PIDVelJaco(object):
 
 			self.planner.replan(self.start, self.goal, self.weights_H, 0.0, self.T, 0.5, seed=None)
 			self.demo = self.planner.waypts
+			self.demo_plan = self.planner.waypts_plan
 
 			# Reset the planner to the robot's original configuration.
-			self.planner.__init__(self.feat_list, self.task)
+			self.planner.feat_list = self.feat_list
+			self.planner.num_features = len(self.feat_list)
+			self.planner.weights = self.weights
 
 		# stores the current trajectory we are tracking, produced by planner
 		# If in DEMONSTRATION_LEARNING, this trajectory won't be used.
@@ -504,7 +506,7 @@ class PIDVelJaco(object):
 			self.expUtil.update_tracked_traj(timestamp, self.curr_pos)
 
 		# update cmd from PID based on current position
-		if self.reached_start and self.method_type == DEMONSTRATION_LEARNING:
+		if self.reached_start and (self.method_type == DEMONSTRATION_LEARNING or self.method_type == DISCRETE_DEMONSTRATION_LEARNING):
 			# Allow the person to move the end effector with no control resistance.
 			self.cmd = np.zeros((7,7))
 		else:

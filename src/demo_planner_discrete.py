@@ -19,7 +19,7 @@ import copy
 import os
 import itertools
 import pickle
-import matplotlib.mlab as mlab
+import matplotlib.pyplot as plt
 
 from trajopt_planner import Planner
 
@@ -48,7 +48,10 @@ class demoPlannerDiscrete(Planner):
 		self.beta = 1.0
 
 		# trajectory paths
-		self.traj_rand = traj_rand
+		here = os.path.dirname(os.path.realpath(__file__))
+		if traj_rand is None:
+			traj_rand = "/traj_rand/traj_rand_" + "_".join(self.feat_list) + ".p"
+		self.traj_rand = pickle.load( open( here + traj_rand, "rb" ) )
 
 		# ---- important discrete variables ---- #
 		#weights_span = [None]*self.num_feats
@@ -57,7 +60,7 @@ class demoPlannerDiscrete(Planner):
 
 		#weight_pairs = list(itertools.product(*weights_span))
 		#self.weights_list = [list(i) for i in weight_pairs]
-		self.weight_list = [[-1.0, 0.0], [-1.0, 4.0], [-1.0, 8.0], [0.0, 4.0], [0.0, 8.0], [1.0, 0.0], [1.0, 4.0], [1.0, 8.0]]
+		self.weights_list = [[-1.0, 0.0], [-1.0, 4.0], [-1.0, 8.0], [0.0, 4.0], [0.0, 8.0], [1.0, 0.0], [1.0, 4.0], [1.0, 8.0]]
 		self.betas_list = [0.01, 0.03, 0.1, 0.3, 1.0]
 
 		self.num_betas = len(self.betas_list)
@@ -72,18 +75,9 @@ class demoPlannerDiscrete(Planner):
 	def learnWeights(self, waypts_h):
 	
 		if waypts_h is not None:
-			old_features = self.featurize(self.waypts)
 			new_features = self.featurize(waypts_h)
-			import pdb;pdb.set_trace()
-			if 'efficiency' in self.feat_list:
-				Phi_H = np.array([new_features[0]] + [sum(x) for x in new_features[1:]])
-				Phi_R = np.array([old_features[0]] + [sum(x) for x in old_features[1:]])
-			else:
-				Phi_H = np.array([self.velocity_features(waypts_h)] + [sum(x) for x in new_features])
-				Phi_R = np.array([self.velocity_features(self.waypts)] + [sum(x) for x in old_features])
-
-			update = Phi_H - Phi_R
-
+			Phi_H = np.array([new_features[0]] + [sum(x) for x in new_features[1:]])
+			
 			# Now compute probabilities for each beta and theta in the dictionary
 			P_xi = np.zeros((self.num_betas, self.num_weights))
 			for (weight_i, weight) in enumerate(self.weights_list):
@@ -129,7 +123,6 @@ class demoPlannerDiscrete(Planner):
 			print("posterior", self.P_bt)
 			print("theta marginal:", P_weight)
 			print("beta average:", self.beta)
-			print("update:", update[1:])
 			print("curr_weight after = " + str(curr_weight))
 
 			self.weights = curr_weight
@@ -147,3 +140,4 @@ class demoPlannerDiscrete(Planner):
 		plt.ylabel(r'$\beta$')
 		plt.title("Joint posterior belief")
 		plt.show()
+		return
