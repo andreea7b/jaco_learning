@@ -322,6 +322,8 @@ class PIDVelJaco(object):
 			# We must simulate an ideal human trajectory according to the human's features.
 			for feat in range(len(self.simulate)):
 				self.weights_H[feat] = MAX_WEIGHTS[self.simulate[feat]]
+			if self.method_type == DISCRETE_DEMONSTRATION_LEARNING:
+				self.weights_H = [0.4]
 
 			# Temporarily modify the planner in order to get simulated demonstration.
 			self.planner.feat_list = self.simulate

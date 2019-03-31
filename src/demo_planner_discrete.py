@@ -60,7 +60,9 @@ class demoPlannerDiscrete(Planner):
 
 		#weight_pairs = list(itertools.product(*weights_span))
 		#self.weights_list = [list(i) for i in weight_pairs]
-		self.weights_list = [[-1.0, 0.0], [-1.0, 4.0], [-1.0, 8.0], [0.0, 4.0], [0.0, 8.0], [1.0, 0.0], [1.0, 4.0], [1.0, 8.0]]
+		#self.weights_list = [[-0.6, -0.4], [-0.6, 0.0], [-0.6, 0.6], [0.0, -0.4], [0.0, 0.6], [0.4, -0.4], [0.4, 0.0], [0.4, 0.6]]
+		#self.weights_list = [[-0.6, -0.2], [-0.6, 0.0], [-0.6, 0.8], [0.0, -0.2], [0.0, 0.8], [0.4, -0.2], [0.4, 0.0], [0.4, 0.8]]
+		self.weights_list = [[-0.4, -0.2], [-0.4, 0.0], [-0.4, 0.8], [0.0, -0.2], [0.0, 0.8], [0.6, -0.2], [0.6, 0.0], [0.6, 0.8]]
 		self.betas_list = [0.01, 0.03, 0.1, 0.3, 1.0]
 
 		self.num_betas = len(self.betas_list)

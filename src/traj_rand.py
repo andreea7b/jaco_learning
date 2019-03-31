@@ -19,8 +19,8 @@ def generate_rand_trajs(feat_list):
 	place_lower_EEtilt = [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 400.0]
 	place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 
-	MIN_WEIGHTS = {'table':-1.0, 'coffee':0.0, 'laptop':0.0, 'human':0.0}
-	MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':8.0, 'human':10.0}
+	MIN_WEIGHTS = {'table':-0.6, 'coffee':0.0, 'laptop':-0.4, 'human':-0.2}
+	MAX_WEIGHTS = {'table':0.4, 'coffee':1.0, 'laptop':0.6, 'human':0.8}
 
 	T = 20.0
 
@@ -39,7 +39,7 @@ def generate_rand_trajs(feat_list):
 
 	weights_span = [None]*num_features
 	for feat in range(0,num_features):
-		weights_span[feat] = list(np.linspace(MIN_WEIGHTS[feat_list[feat]], MAX_WEIGHTS[feat_list[feat]], num=5))
+		weights_span[feat] = list(np.linspace(MIN_WEIGHTS[feat_list[feat]], MAX_WEIGHTS[feat_list[feat]], num=6))
 
 	weight_pairs = list(itertools.product(*weights_span))
 
