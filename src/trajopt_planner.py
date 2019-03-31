@@ -17,11 +17,11 @@ import itertools
 import pickle
 
 # feature constants
-MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':8.0, 'human':10.0, 'efficiency':1.0}
-FEAT_RANGE = {'table':0.69, 'coffee':1.87608702, 'laptop':1.3119385084172743, 'human':1.5630974027524693, 'efficiency':0.21}
+MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':1.0, 'human':1.0, 'efficiency':1.0}
+FEAT_RANGE = {'table':0.69, 'coffee':1.87608702, 'laptop':0.4, 'human':0.4, 'efficiency':0.18553371264126534}
 
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
-HUMAN_CENTER = [-0.3, -0.5, 0.0]
+HUMAN_CENTER = [-0.5, -0.5, 0.0]
 
 class Planner(object):
 	"""
