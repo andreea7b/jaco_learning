@@ -23,7 +23,7 @@ if __name__ == '__main__':
 
 	# initialize start/goal based on features
 	# by default for table and laptop, these are the pick and place
-	pick = pick_basic_EEtilt
+	pick = pick_basic
 	place = place_lower
 	if 'coffee' in feat_list:
 		pick = pick_basic_EEtilt

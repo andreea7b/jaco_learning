@@ -52,7 +52,7 @@ place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 epsilon = 0.10		# epsilon for when robot think it's at goal
 INTERACTION_TORQUE_THRESHOLD = [0.88414821, 17.22751856, -0.40134936,  6.23537946, -0.90013662, 1.32379884,  0.10218059]
 INTERACTION_TORQUE_EPSILON = [4.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]
-MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':1.0, 'human':1.0, 'efficiency':1.0}
+MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':5.0, 'human':6.0, 'efficiency':1.0}
 
 # Method types based on which we determine the planner
 IMPEDANCE = 'A'
@@ -174,7 +174,6 @@ class PIDVelJaco(object):
 
 		if self.method_type == DEMONSTRATION_LEARNING:
 			num_iter = 0
-			min_error = 1000.0
 			while True:
 				old_updates = np.array(self.planner.weights)
 				self.weights = self.planner.learnWeights(np.array(self.demo),alpha=0.005)
@@ -183,11 +182,8 @@ class PIDVelJaco(object):
 
 				num_iter += 1
 				print "error: ",np.linalg.norm(old_updates - new_updates)
-				if np.linalg.norm(old_updates - new_updates) < min_error:
-					min_pi = copy.deepcopy(self.planner.weights)
-				if np.linalg.norm(old_updates - new_updates) < 3e-4 or num_iter > 1000:
+				if np.linalg.norm(old_updates - new_updates) < 5e-4 or np.linalg.norm(new_updates) < 0.1:
 					print "Finished in {} iterations".format(num_iter)
-					print "Min weights: ", min_pi
 					break
 			# Compute beta, the rationality coefficient.
 			# Version 1 computes beta as a norm of pi:
@@ -262,7 +258,7 @@ class PIDVelJaco(object):
 		else:
 			assert ((self.method_type == DEMONSTRATION_LEARNING) or (self.method_type == DISCRETE_DEMONSTRATION_LEARNING)), "Cannot use simulated demonstrations for a non-demonstration method."
 			self.simulate = simulate.split(",")
-			self.weights_H = [0.0]*len(self.simulate)		
+			self.weights_H = [0.0]*len(self.simulate)
 
 		# ---- Trajectory Setup ---- #
 
@@ -280,7 +276,7 @@ class PIDVelJaco(object):
 		# initialize start/goal based on features
 		# by default for table and laptop, these are the pick and place
 		# depending on the task for study, pick and place will be different
-		pick = pick_basic_EEtilt
+		pick = pick_basic
 		if self.task is None:
 			if "coffee" in self.feat_list:
 				pick = pick_basic_EEtilt
@@ -322,8 +318,6 @@ class PIDVelJaco(object):
 			# We must simulate an ideal human trajectory according to the human's features.
 			for feat in range(len(self.simulate)):
 				self.weights_H[feat] = MAX_WEIGHTS[self.simulate[feat]]
-			if self.method_type == DISCRETE_DEMONSTRATION_LEARNING:
-				self.weights_H = [0.4]
 
 			# Temporarily modify the planner in order to get simulated demonstration.
 			self.planner.feat_list = self.simulate

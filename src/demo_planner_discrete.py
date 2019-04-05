@@ -24,13 +24,9 @@ import matplotlib.pyplot as plt
 from trajopt_planner import Planner
 
 # feature constacts (update gains and max weights)
-MIN_WEIGHTS = {'table':-1.0, 'coffee':0.0, 'laptop':0.0, 'human':0.0}
-MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':8.0, 'human':10.0}
-
-# feature learning methods
-ALL = "ALL"					# updates all features
-MAX = "MAX"					# updates only feature that changed the most
-BETA = "BETA"				# updates beta-adaptive features 
+MIN_WEIGHTS = {'table':0, 'coffee':-1.0, 'laptop':0, 'human':0, 'efficiency':0.0}
+MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':1.0, 'human':1.0, 'efficiency':1.0}
+FEAT_RANGE = {'table':0.69, 'coffee':1.87608702, 'laptop':1.6, 'human':1.6, 'efficiency':0.01}
 
 class demoPlannerDiscrete(Planner):
 	"""
@@ -50,19 +46,20 @@ class demoPlannerDiscrete(Planner):
 		# trajectory paths
 		here = os.path.dirname(os.path.realpath(__file__))
 		if traj_rand is None:
-			traj_rand = "/traj_rand/traj_rand_" + "_".join(self.feat_list) + ".p"
+			traj_rand = "/traj_rand/traj_rand.p"
 		self.traj_rand = pickle.load( open( here + traj_rand, "rb" ) )
 
 		# ---- important discrete variables ---- #
-		#weights_span = [None]*self.num_feats
-		#for feat in range(0,self.num_feats):
-		#	weights_span[feat] = list(np.linspace(0.0, MAX_WEIGHTS[feat_list[feat]], num=5))
+		weights_span = [None]*self.num_features
+		for feat in range(0,self.num_features):
+			weights_span[feat] = list(np.linspace(MIN_WEIGHTS[feat_list[feat]], MAX_WEIGHTS[feat_list[feat]], num=3))
+		self.weights_list = list(itertools.product(*weights_span))
+		if (0.0,)*self.num_features in self.weights_list:
+			self.weights_list.remove((0.0,)*self.num_features)
+		self.weights_list = [w / np.linalg.norm(w) for w in self.weights_list]
+		self.weights_list = set([tuple(i) for i in self.weights_list])	     # Make tuples out of these to find uniques.
+		self.weights_list = [list(i) for i in self.weights_list]
 
-		#weight_pairs = list(itertools.product(*weights_span))
-		#self.weights_list = [list(i) for i in weight_pairs]
-		#self.weights_list = [[-0.6, -0.4], [-0.6, 0.0], [-0.6, 0.6], [0.0, -0.4], [0.0, 0.6], [0.4, -0.4], [0.4, 0.0], [0.4, 0.6]]
-		#self.weights_list = [[-0.6, -0.2], [-0.6, 0.0], [-0.6, 0.8], [0.0, -0.2], [0.0, 0.8], [0.4, -0.2], [0.4, 0.0], [0.4, 0.8]]
-		self.weights_list = [[-0.4, -0.2], [-0.4, 0.0], [-0.4, 0.8], [0.0, -0.2], [0.0, 0.8], [0.6, -0.2], [0.6, 0.0], [0.6, 0.8]]
 		self.betas_list = [0.01, 0.03, 0.1, 0.3, 1.0]
 
 		self.num_betas = len(self.betas_list)
@@ -75,34 +72,44 @@ class demoPlannerDiscrete(Planner):
 	# ---- here's our algorithms for modifying the trajectory ---- #
 
 	def learnWeights(self, waypts_h):
-	
 		if waypts_h is not None:
 			new_features = self.featurize(waypts_h)
-			Phi_H = np.array([new_features[0]] + [sum(x) for x in new_features[1:]])
-			
+			Phi_H = np.array([sum(x) for x in new_features])
+			print "Phi_H: ", Phi_H
+
+			# Compute features for the normalizing trajectories.
+			Phi_rands = []
+			num_trajs = self.traj_rand.shape[0]
+			for rand_i in range(num_trajs):
+				curr_traj = self.traj_rand[rand_i]
+				rand_features = self.featurize(curr_traj)
+				Phi_rand = np.array([sum(x) for x in rand_features])
+				print "Phi_rand",rand_i, ": ",Phi_rand
+				Phi_rands.append(Phi_rand)
+
 			# Now compute probabilities for each beta and theta in the dictionary
 			P_xi = np.zeros((self.num_betas, self.num_weights))
 			for (weight_i, weight) in enumerate(self.weights_list):
+				print "Initiating inference with the following weights: ", weight
 				for (beta_i, beta) in enumerate(self.betas_list):
 					# Compute -beta*(weight^T*Phi(xi_H))
-					numerator = -beta * np.dot([1.0] + weight, Phi_H)
+					numerator = -beta * np.dot(weight, Phi_H)
 
 					# Calculate the integral in log space
-					num_trajs = self.traj_rand.shape[0]
 					logdenom = np.zeros((num_trajs,1))
 
 					# Compute costs for each of the random trajectories
 					for rand_i in range(num_trajs):
-						curr_traj = self.traj_rand[rand_i]
-						rand_features = self.featurize(curr_traj)
-						Phi_rand = np.array([rand_features[0]] + [sum(x) for x in rand_features[1:]])
+						Phi_rand = Phi_rands[rand_i]
 
 						# Compute each denominator log
-						logdenom[rand_i] = -beta * np.dot([1.0] + weight, Phi_rand)
+						logdenom[rand_i] = -beta * np.dot(weight, Phi_rand)
+
 					# Compute the sum in log space
 					A_max = max(logdenom)
 					expdif = logdenom - A_max
 					denom = A_max + np.log(sum(np.exp(expdif)))
+					
 					# Get P(xi_H | beta, weight) by dividing them
 					P_xi[beta_i][weight_i] = np.exp(numerator - denom)
 
@@ -136,7 +143,8 @@ class demoPlannerDiscrete(Planner):
 		fig2, ax2 = plt.subplots()
 		plt.imshow(post, cmap='RdBu', interpolation='nearest')
 		plt.colorbar()
-		plt.xticks(range(len(self.weights_list)), list(self.weights_list), rotation = 'vertical')
+		weights_rounded = [[round(i,2) for i in j] for j in self.weights_list]
+		plt.xticks(range(len(self.weights_list)), weights_rounded, rotation = 'vertical')
 		plt.yticks(range(len(self.betas_list)), list(self.betas_list))
 		plt.xlabel(r'$\theta$')
 		plt.ylabel(r'$\beta$')

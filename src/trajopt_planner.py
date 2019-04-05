@@ -17,8 +17,7 @@ import itertools
 import pickle
 
 # feature constants
-MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':1.0, 'human':1.0, 'efficiency':1.0}
-FEAT_RANGE = {'table':0.69, 'coffee':1.87608702, 'laptop':0.4, 'human':0.4, 'efficiency':0.18553371264126534}
+FEAT_RANGE = {'table':0.69, 'coffee':1.87608702, 'laptop':0.2, 'human':0.2, 'efficiency':1.0}
 
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [-0.5, -0.5, 0.0]
@@ -28,13 +27,11 @@ class Planner(object):
 	This class plans a trajectory from start to goal with TrajOpt. No learning involved.
 	"""
 
-	def __init__(self, feat_list, task=None, traj_cache=None):
+	def __init__(self, feat_list, task=None):
 
 		# ---- important internal variables ---- #
 		self.feat_list = feat_list		# 'table', 'human', 'coffee', 'origin', 'laptop'
 		self.num_features = len(self.feat_list)
-		if 'efficiency' in self.feat_list:
-			assert (self.feat_list[0]=="efficiency"), "efficiency should be the first feature in the feature list!"
 
 		self.start_time = None
 		self.final_time = None
@@ -45,13 +42,6 @@ class Planner(object):
 		self.num_waypts_plan = None
 		self.step_time_plan = None
 		self.MAX_ITER = 40
-
-		# this is the cache of trajectories computed for all max/min weights
-		if traj_cache is not None:
-			here = os.path.dirname(os.path.realpath(__file__))
-			self.traj_cache = pickle.load( open( here + traj_cache, "rb" ) )
-		else:
-			self.traj_cache = None
 
 		# this is the task
 		self.task = task
@@ -97,22 +87,22 @@ class Planner(object):
 		---
 		input trajectory, output list of feature values
 		"""
-		i = 1 if 'efficiency' in self.feat_list else 0
-		features = [self.velocity_features(waypts)]
-		features += [[0.0 for _ in range(len(waypts)-1)] for _ in range(i, self.num_features)]
+		features = [[0.0 for _ in range(len(waypts)-1)] for _ in range(0, self.num_features)]
 
 		for index in range(0,len(waypts)-1):
-			for feat in range(i, self.num_features):
+			for feat in range(0, self.num_features):
 				if self.feat_list[feat] == 'table':
-					features[feat-i+1][index] = self.table_features(waypts[index+1])
+					features[feat][index] = self.table_features(waypts[index+1])
 				elif self.feat_list[feat] == 'coffee':
-					features[feat-i+1][index] = self.coffee_features(waypts[index+1])
+					features[feat][index] = self.coffee_features(waypts[index+1])
 				elif self.feat_list[feat] == 'human':
-					features[feat-i+1][index] = self.human_features(waypts[index+1],waypts[index])
+					features[feat][index] = self.human_features(waypts[index+1],waypts[index])
 				elif self.feat_list[feat] == 'laptop':
-					features[feat-i+1][index] = self.laptop_features(waypts[index+1],waypts[index])
+					features[feat][index] = self.laptop_features(waypts[index+1],waypts[index])
 				elif self.feat_list[feat] == 'origin':
-					features[feat-i+1][index] = self.origin_features(waypts[index+1])
+					features[feat][index] = self.origin_features(waypts[index+1])
+				elif self.feat_list[feat] == 'efficiency':
+					features[feat][index] = self.efficiency_features(waypts[index+1],waypts[index])
 		return features
 
 	# -- Velocity -- #
@@ -128,7 +118,7 @@ class Planner(object):
 			curr = waypts[i]
 			prev = waypts[i-1]
 			vel += np.linalg.norm(curr - prev)**2
-		return vel / FEAT_RANGE['efficiency']
+		return vel 
 
 	def velocity_cost(self, waypts):
 		"""
@@ -137,6 +127,28 @@ class Planner(object):
 		input trajectory, output scalar cost
 		"""
 		return self.velocity_features(waypts)
+
+	# -- Efficiency -- #
+
+	def efficiency_features(self, waypt, prev_waypt):
+		"""
+		Computes efficiency cost for waypoint, confirmed to match trajopt.
+		---
+		input waypoint, output scalar feature
+		"""
+		return np.linalg.norm(waypt - prev_waypt)**2 #/ FEAT_RANGE['efficiency']
+
+	def efficiency_cost(self, waypt):
+		"""
+		Computes the total efficiency cost
+		---
+		input trajectory, output scalar cost
+		"""
+		prev_waypt = waypt[0:7]
+		curr_waypt = waypt[7:14]
+		feature = self.efficiency_features(curr_waypt,prev_waypt)
+		feature_idx = self.feat_list.index('efficiency')
+		return feature*self.weights[feature_idx]
 
 	# -- Distance to Robot Base (origin of world) -- #
 
@@ -181,7 +193,7 @@ class Planner(object):
 		self.robot.SetDOFValues(waypt)
 		coords = robotToCartesian(self.robot)
 		EEcoord_z = coords[6][2]
-		return EEcoord_z / FEAT_RANGE['table']
+		return EEcoord_z #/ FEAT_RANGE['table']
 
 	def table_cost(self, waypt):
 		"""
@@ -244,7 +256,7 @@ class Planner(object):
 		for step in range(NUM_STEPS):
 			inter_waypt = prev_waypt + (1.0 + step)/(NUM_STEPS)*(waypt - prev_waypt)
 			feature += self.laptop_dist(inter_waypt)
-		return feature / FEAT_RANGE['laptop']
+		return feature #/ FEAT_RANGE['laptop']
 
 	def laptop_dist(self, waypt):
 		"""
@@ -291,7 +303,7 @@ class Planner(object):
 		for step in range(NUM_STEPS):
 			inter_waypt = prev_waypt + (1.0 + step)/(NUM_STEPS)*(waypt - prev_waypt)
 			feature += self.human_dist(inter_waypt)
-		return feature / FEAT_RANGE['human']
+		return feature #/ FEAT_RANGE['human']
 
 	def human_dist(self, waypt):
 		"""
@@ -397,32 +409,9 @@ class Planner(object):
 		for count in range(self.num_waypts_plan):
 			init_waypts[count,:] = start + count/(self.num_waypts_plan - 1.0)*(goal - start)
 
-		if self.traj_cache is not None:
-			# choose seeding trajectory from cache if the weights match
-			weights_span = [None]*self.num_features
-			min_dist_w = [None]*self.num_features
-			for feat in range(0,self.num_features):
-				hi = MAX_WEIGHTS[self.feat_list[feat]]
-				weights_span[feat] = list(np.linspace(0.0, hi, num=5))
-				min_dist_w[feat] = 0.0
-
-			weight_pairs = list(itertools.product(*weights_span))
-			weight_pairs = [np.array(i) for i in weight_pairs]
-
-			# current weights
-			cur_w = np.array(self.weights)
-			min_dist_idx = 0
-			for (w_i, w) in enumerate(weight_pairs):
-				dist = np.linalg.norm(cur_w - w)
-				if dist < np.linalg.norm(cur_w - min_dist_w):
-					min_dist_w = w
-					min_dist_idx = w_i
-
-			init_waypts = np.array(self.traj_cache[min_dist_idx])
-
 		# Check if efficiency is a feature; if not, use default weight.
 		if "efficiency" in self.feat_list:
-			coeff = self.weights[self.feat_list.index("efficiency")]
+			coeff = self.weights[self.feat_list.index("efficiency")] #/ FEAT_RANGE['efficiency']
 		else:
 			coeff = 1.0
 
@@ -512,32 +501,9 @@ class Planner(object):
 			print("using traj seed!")
 			init_waypts = traj_seed
 
-		if self.traj_cache is not None:
-			# choose seeding trajectory from cache if the weights match
-			weights_span = [None]*self.num_features
-			min_dist_w = [None]*self.num_features
-			for feat in range(0,self.num_features):
-				hi = MAX_WEIGHTS[self.feat_list[feat]]
-				weights_span[feat] = list(np.linspace(0.0, hi, num=5))
-				min_dist_w[feat] = 0.0
-
-			weight_pairs = list(itertools.product(*weights_span))
-			weight_pairs = [np.array(i) for i in weight_pairs]
-
-			# current weights
-			cur_w = np.array(self.weights)
-			min_dist_idx = 0
-			for (w_i, w) in enumerate(weight_pairs):
-				dist = np.linalg.norm(cur_w - w)
-				if dist < np.linalg.norm(cur_w - min_dist_w):
-					min_dist_w = w
-					min_dist_idx = w_i
-
-			init_waypts = np.array(self.traj_cache[min_dist_idx])
-
 		# Check if efficiency is a feature; if not, use default weight.
 		if "efficiency" in self.feat_list:
-			coeff = self.weights[self.feat_list.index("efficiency")]
+			coeff = 0.0 #self.weights[self.feat_list.index("efficiency")] / FEAT_RANGE['efficiency']
 		else:
 			coeff = 1.0
 
@@ -580,7 +546,8 @@ class Planner(object):
 				prob.AddCost(self.origin_cost, [(t,j) for j in range(7)], "origin%i"%t)
 			if 'human' in self.feat_list:
 				prob.AddCost(self.human_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "human%i"%t)
-
+			if 'efficiency' in self.feat_list:
+				prob.AddCost(self.efficiency_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "efficiency%i"%t)
 
 		for t in range(1,self.num_waypts_plan - 1):
 			prob.AddConstraint(self.table_constraint, [(t,j) for j in range(7)], "INEQ", "up%i"%t)

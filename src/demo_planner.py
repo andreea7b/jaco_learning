@@ -29,18 +29,17 @@ class demoPlanner(Planner):
 	It supports learning capabilities from demonstrated human trajectories.
 	"""
 
-	def __init__(self, feat_list, task=None, traj_cache=None):
+	def __init__(self, feat_list, task=None):
 
 		# Call parent initialization
-		super(demoPlanner, self).__init__(feat_list, task, traj_cache)
+		super(demoPlanner, self).__init__(feat_list, task)
 
 		# ---- important internal variables ---- #
 		self.updates = [0.0]*self.num_features
 
 	# ---- here's our algorithms for modifying the trajectory ---- #
 
-	def learnWeights(self, waypts_h):
-		import pdb;pdb.set_trace()
+	def learnWeights(self, waypts_h, alpha=0.002):
 		if waypts_h is not None:
 			self.waypts_h = waypts_h
 			new_features = self.featurize(self.waypts_h)
