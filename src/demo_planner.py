@@ -45,8 +45,8 @@ class demoPlanner(Planner):
 			new_features = self.featurize(self.waypts_h)
 			old_features = self.featurize(self.waypts)
 			
-			Phi_H = np.array([new_features[0]] + [sum(x) for x in new_features[1:]])
-			Phi_R = np.array([old_features[0]] + [sum(x) for x in old_features[1:]])
+			Phi_H = np.array([sum(x) for x in new_features])
+			Phi_R = np.array([sum(x) for x in old_features])
 
 			update = Phi_H - Phi_R
 			self.updates = update.tolist()

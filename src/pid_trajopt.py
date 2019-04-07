@@ -53,7 +53,7 @@ place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 epsilon = 0.10		# epsilon for when robot think it's at goal
 INTERACTION_TORQUE_THRESHOLD = [0.88414821, 17.22751856, -0.40134936,  6.23537946, -0.90013662, 1.32379884,  0.10218059]
 INTERACTION_TORQUE_EPSILON = [4.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]
-MAX_WEIGHTS = {'table':10.0, 'coffee':1.0, 'laptop':10.0, 'human':1.0, 'efficiency':1.0}
+MAX_WEIGHTS = {'table':20.0, 'coffee':1.0, 'laptop':10.0, 'human':1.0, 'efficiency':0.1}
 
 # Method types based on which we determine the planner
 IMPEDANCE = 'A'
@@ -114,8 +114,12 @@ class PIDVelJaco(object):
 
 		print "----------------------------------"
 
-		# save experimental data (only if experiment started)
-		if self.record and self.reached_start and self.method_type == PHRI_LEARNING:
+		if self.replay == False:
+			# end admittance control mode
+			self.stop_admittance_mode()
+
+		# save experimental data for pHRI corrections (only if experiment started)
+		if self.method_type == PHRI_LEARNING and self.record and self.reached_start:
 			print "Saving experimental data to file..."
 			if self.task == None:
 				settings_string = str(ID) + "_" + self.method_type + "_" + self.feat_method + "_" + "_".join(feat_list) + "_correction_" + replay + "_"
@@ -145,10 +149,6 @@ class PIDVelJaco(object):
 			self.expUtil.pickle_replanned_wayptsList(replanned_waypts_filename)
 			self.expUtil.pickle_updates(updates_filename)
 
-		if self.replay == False:
-			# end admittance control mode
-			self.stop_admittance_mode()
-
 		# If we are performing demonstration learning, we just finished receiving a demonstration.
 		# Here we process the demonstration and perform inference on it.
 		if (self.method_type == DEMONSTRATION_LEARNING or self.method_type == DISCRETE_DEMONSTRATION_LEARNING) and self.simulate == False:
@@ -177,6 +177,18 @@ class PIDVelJaco(object):
 					counter += step_size
 				self.demo = demo
 
+				# 3. Downsample to get trajopt plan
+				desired_length = self.planner.num_waypts_plan
+				step_size = float(raw_demo.shape[0]) / desired_length
+				demo_plan = []
+				counter = 0
+				while counter < raw_demo.shape[0]-1:
+					demo_plan.append(raw_demo[int(counter), :])
+					counter += step_size
+				demo_plan[0] = self.planner.waypts_plan[0]
+				demo_plan[-1] = self.planner.waypts_plan[-1]
+				self.demo_plan = np.array(demo_plan)
+
 				if self.record == True:
 					feat_string = "_".join(feat_list_H)
 					filename = "demo" + "_" + str(ID) + "_" + feat_string
@@ -203,7 +215,6 @@ class PIDVelJaco(object):
 				pi_new = [1.0] + pi_new
 			beta_new = np.linalg.norm(pi_new)
 			theta_new = pi_new / beta_new
-			print "pi1, theta1, beta_norm: ", pi_new, theta_new, beta_new
 
 			# Version 2 computes beta by looking at the difference in cost:
 			if 'efficiency' not in self.feat_list:
@@ -213,11 +224,12 @@ class PIDVelJaco(object):
 			self.planner.replan(self.start, self.goal, theta_new, 0.0, self.T, 0.5, seed=self.demo_plan)
 			Phi_H = self.planner.featurize(self.demo)
 			Phi_R = self.planner.featurize(self.planner.waypts)
-			Phi_H = np.array([Phi_H[0]] + [sum(x) for x in Phi_H[1:]])
-			Phi_R = np.array([Phi_R[0]] + [sum(x) for x in Phi_R[1:]])
+			Phi_H = np.array([sum(x) for x in Phi_H])
+			Phi_R = np.array([sum(x) for x in Phi_R])
 			Phi_delta = Phi_H - Phi_R
 
 			print "Phi_H - Phi_R: ", Phi_delta
+			print "pi1, theta1, beta_norm: ", pi_new, theta_new, beta_new
 			beta_new2 = 1.0 / np.abs(np.dot(theta_new, Phi_delta))
 			print "beta_MLE: ", beta_new2
 			beta_new3 = 1.0 / np.linalg.norm(Phi_delta)
@@ -279,7 +291,7 @@ class PIDVelJaco(object):
 		else:
 			assert ((self.method_type == DEMONSTRATION_LEARNING) or (self.method_type == DISCRETE_DEMONSTRATION_LEARNING)), "Cannot use simulated demonstrations for a non-demonstration method."
 			self.simulate = True
-			self.weights_H = [0.0]*len(self.simulate)
+			self.weights_H = [0.0]*len(self.feat_list_H)
 
 		# ---- Trajectory Setup ---- #
 
