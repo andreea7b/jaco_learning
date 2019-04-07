@@ -21,12 +21,15 @@
 	<!-- Feature learning method (ALL, MAX, BETA)-->
 	<arg name="feat_method" default="ALL"/>
 
-	<!-- List of string features that need correcting -->
+	<!-- List of string features that the robot corrects -->
 	<arg name="feat_list" default="table"/>
+
+	<!-- List of string features that the human corrects -->
+	<arg name="feat_list_H" default="table"/>
 
 	<!-- velocity-based with trajopt planning PID -->
 	<node name="pid_trajopt" pkg="beta_adaptive_pHRI" type="pid_trajopt.py"
     args="$(arg ID) $(arg task) $(arg method_type) $(arg record) $(arg replay)
-    $(arg simulate) $(arg feat_method) $(arg feat_list)" output="screen"/>
+    $(arg simulate) $(arg feat_method) $(arg feat_list) $(arg feat_list_H)" output="screen"/>
 
 </launch>

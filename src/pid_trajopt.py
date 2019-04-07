@@ -30,6 +30,7 @@ from sympy import Point, Line
 import numpy as np
 from numpy import linalg
 import matplotlib.pyplot as plt
+import openrave_utils
 import pickle
 
 # Jaco software name
@@ -52,7 +53,7 @@ place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 epsilon = 0.10		# epsilon for when robot think it's at goal
 INTERACTION_TORQUE_THRESHOLD = [0.88414821, 17.22751856, -0.40134936,  6.23537946, -0.90013662, 1.32379884,  0.10218059]
 INTERACTION_TORQUE_EPSILON = [4.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]
-MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':5.0, 'human':6.0, 'efficiency':1.0}
+MAX_WEIGHTS = {'table':10.0, 'coffee':1.0, 'laptop':10.0, 'human':1.0, 'efficiency':1.0}
 
 # Method types based on which we determine the planner
 IMPEDANCE = 'A'
@@ -86,10 +87,10 @@ class PIDVelJaco(object):
 		sim_flag                  - flag for if in simulation or not
 	"""
 
-	def __init__(self, ID, task, method_type, record, replay, simulate, feat_method, feat_list):
+	def __init__(self, ID, task, method_type, record, replay, simulate, feat_method, feat_list, feat_list_H):
 		
 		# Load parameters
-		self.load_parameters(ID, task, method_type, record, replay, simulate, feat_method, feat_list)
+		self.load_parameters(ID, task, method_type, record, replay, simulate, feat_method, feat_list, feat_list_H)
 
 		# ---- ROS Setup ---- #
 
@@ -114,7 +115,7 @@ class PIDVelJaco(object):
 		print "----------------------------------"
 
 		# save experimental data (only if experiment started)
-		if self.record and self.reached_start:
+		if self.record and self.reached_start and self.method_type == PHRI_LEARNING:
 			print "Saving experimental data to file..."
 			if self.task == None:
 				settings_string = str(ID) + "_" + self.method_type + "_" + self.feat_method + "_" + "_".join(feat_list) + "_correction_" + replay + "_"
@@ -148,29 +149,39 @@ class PIDVelJaco(object):
 			# end admittance control mode
 			self.stop_admittance_mode()
 
-		# If we are performind demonstration learning, we just finished receiving a demonstration.
+		# If we are performing demonstration learning, we just finished receiving a demonstration.
 		# Here we process the demonstration and perform inference on it.
-		if self.simulate == False:
-			# We tracked a real human trajectory. It is not a simulation.
-			raw_demo = self.expUtil.tracked_traj[:,1:8]
-			# 1. Trim ends of trajectory
-			lo = 0
-			hi = raw_demo.shape[0] - 1
-			while np.linalg.norm(raw_demo[lo] - raw_demo[lo + 1]) < 0.01 and lo < hi:
-				lo += 1
-			while np.linalg.norm(raw_demo[hi] - raw_demo[hi - 1]) < 0.01 and hi > 0:
-				hi -= 1
-			raw_demo = raw_demo[lo:hi+1, :]
+		if (self.method_type == DEMONSTRATION_LEARNING or self.method_type == DISCRETE_DEMONSTRATION_LEARNING) and self.simulate == False:
+			if self.replay is not False:
+				loadfile = os.path.dirname(os.path.realpath(__file__)) + "/data/demonstrations/demos/demo" + "_" + str(ID) + "_" + replay + ".p"
+				self.demo = np.load(loadfile)
+			else:
+				# We tracked a real human trajectory. It is not a simulation.
+				raw_demo = self.expUtil.tracked_traj[:,1:8]
+				# 1. Trim ends of trajectory
+				lo = 0
+				hi = raw_demo.shape[0] - 1
+				while np.linalg.norm(raw_demo[lo] - raw_demo[lo + 1]) < 0.01 and lo < hi:
+					lo += 1
+				while np.linalg.norm(raw_demo[hi] - raw_demo[hi - 1]) < 0.01 and hi > 0:
+					hi -= 1
+				raw_demo = raw_demo[lo:hi+1, :]
 
-			# 2. Downsample to the same size as robot trajectory
-			desired_length = self.planner.waypts.shape[0]
-			step_size = float(raw_demo.shape[0]) / desired_length
-			demo = []
-			counter = 0
-			while counter < raw_demo.shape[0]-1:
-				demo.append(raw_demo[int(counter), :])
-				counter += step_size
-			self.demo = demo
+				# 2. Downsample to the same size as robot trajectory
+				desired_length = self.planner.waypts.shape[0]
+				step_size = float(raw_demo.shape[0]) / desired_length
+				demo = []
+				counter = 0
+				while counter < raw_demo.shape[0]-1:
+					demo.append(raw_demo[int(counter), :])
+					counter += step_size
+				self.demo = demo
+
+				if self.record == True:
+					feat_string = "_".join(feat_list_H)
+					filename = "demo" + "_" + str(ID) + "_" + feat_string
+					savefile = self.expUtil.get_unique_filepath("demos",filename)
+					pickle.dump(self.demo, open(savefile, "wb" ))
 
 		if self.method_type == DEMONSTRATION_LEARNING:
 			num_iter = 0
@@ -215,8 +226,17 @@ class PIDVelJaco(object):
 			print "beta_L2: ", beta_new4
 		elif self.method_type == DISCRETE_DEMONSTRATION_LEARNING:
 			self.weights = self.planner.learnWeights(np.array(self.demo))
+			if self.record == True:
+				feat_string = "_".join(self.feat_list)
+				feat_H_string = "_".join(self.feat_list_H)
+				filename_w = "weights" + "_" + str(ID) + "_" + feat_string + "_demo_" + feat_H_string
+				filename_b = "betas" + "_" + str(ID) + "_" + feat_string + "_demo_" + feat_H_string
+				savefile_w = self.expUtil.get_unique_filepath("weights",filename_w)
+				savefile_b = self.expUtil.get_unique_filepath("betas",filename_b)
+				pickle.dump(self.weights, open(savefile_w, "wb" ))
+				pickle.dump(self.planner.beta, open(savefile_b, "wb" ))
 
-	def load_parameters(self, ID, task, method_type, record, replay, simulate, feat_method, feat_list):
+	def load_parameters(self, ID, task, method_type, record, replay, simulate, feat_method, feat_list, feat_list_H):
 		"""
 		Loading parameters.
 		"""
@@ -232,6 +252,7 @@ class PIDVelJaco(object):
 		# can be strings 'table', 'coffee', 'human', 'laptop'
 		self.feat_list = feat_list
 		self.num_feat = len(self.feat_list)
+		self.feat_list_H = feat_list_H
 
 		# record experimental data mode 
 		if record == "F" or record == "f":
@@ -257,7 +278,7 @@ class PIDVelJaco(object):
 			self.simulate = False
 		else:
 			assert ((self.method_type == DEMONSTRATION_LEARNING) or (self.method_type == DISCRETE_DEMONSTRATION_LEARNING)), "Cannot use simulated demonstrations for a non-demonstration method."
-			self.simulate = simulate.split(",")
+			self.simulate = True
 			self.weights_H = [0.0]*len(self.simulate)
 
 		# ---- Trajectory Setup ---- #
@@ -314,14 +335,14 @@ class PIDVelJaco(object):
 			# Otherwise, use simple trajopt planner
 			self.planner = trajopt_planner.Planner(self.feat_list, self.task)
 
-		if self.simulate is not False:
+		if self.simulate is True:
 			# We must simulate an ideal human trajectory according to the human's features.
-			for feat in range(len(self.simulate)):
-				self.weights_H[feat] = MAX_WEIGHTS[self.simulate[feat]]
+			for feat in range(len(self.feat_list_H)):
+				self.weights_H[feat] = MAX_WEIGHTS[self.feat_list_H[feat]]
 
 			# Temporarily modify the planner in order to get simulated demonstration.
-			self.planner.feat_list = self.simulate
-			self.planner.num_features = len(self.simulate)
+			self.planner.feat_list = self.feat_list_H
+			self.planner.num_features = len(self.feat_list_H)
 
 			self.planner.replan(self.start, self.goal, self.weights_H, 0.0, self.T, 0.5, seed=None)
 			self.demo = self.planner.waypts
@@ -576,7 +597,7 @@ class PIDVelJaco(object):
 				self.expUtil.set_endT(time.time())
 
 if __name__ == '__main__':
-	if len(sys.argv) < 8:
+	if len(sys.argv) < 9:
 		print "ERROR: Not enough arguments. Specify ID, method_type, record, replay, feat_method, feat_list"
 	else:
 		ID = int(sys.argv[1])
@@ -587,4 +608,5 @@ if __name__ == '__main__':
 		simulate = sys.argv[6]
 		feat_method = sys.argv[7]
 		feat_list = [x.strip() for x in sys.argv[8].split(',')]
-	PIDVelJaco(ID,task,method_type,record,replay,simulate,feat_method,feat_list)
+		feat_list_H = [x.strip() for x in sys.argv[9].split(',')]
+	PIDVelJaco(ID,task,method_type,record,replay,simulate,feat_method,feat_list,feat_list_H)

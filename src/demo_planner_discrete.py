@@ -20,11 +20,12 @@ import os
 import itertools
 import pickle
 import matplotlib.pyplot as plt
+import ast
 
 from trajopt_planner import Planner
 
 # feature constacts (update gains and max weights)
-MIN_WEIGHTS = {'table':0, 'coffee':-1.0, 'laptop':0, 'human':0, 'efficiency':0.0}
+MIN_WEIGHTS = {'table':0.0, 'coffee':-1.0, 'laptop':0.0, 'human':0.0, 'efficiency':0.0}
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':1.0, 'human':1.0, 'efficiency':1.0}
 FEAT_RANGE = {'table':0.69, 'coffee':1.87608702, 'laptop':1.6, 'human':1.6, 'efficiency':0.01}
 
@@ -34,10 +35,10 @@ class demoPlannerDiscrete(Planner):
 	It supports learning capabilities from demonstrated human trajectories.
 	"""
 
-	def __init__(self, feat_list, task=None, traj_cache=None, traj_rand=None):
+	def __init__(self, feat_list, task=None, traj_rand=None):
 
 		# Call parent initialization
-		super(demoPlannerDiscrete, self).__init__(feat_list, task, traj_cache)
+		super(demoPlannerDiscrete, self).__init__(feat_list, task)
 
 		# ---- important internal variables ---- #
 		self.weights = [0.0]*self.num_features
@@ -46,7 +47,7 @@ class demoPlannerDiscrete(Planner):
 		# trajectory paths
 		here = os.path.dirname(os.path.realpath(__file__))
 		if traj_rand is None:
-			traj_rand = "/traj_rand/traj_rand.p"
+			traj_rand = "/traj_rand/traj_rand_small.p"
 		self.traj_rand = pickle.load( open( here + traj_rand, "rb" ) )
 
 		# ---- important discrete variables ---- #
@@ -75,17 +76,21 @@ class demoPlannerDiscrete(Planner):
 		if waypts_h is not None:
 			new_features = self.featurize(waypts_h)
 			Phi_H = np.array([sum(x) for x in new_features])
+			Phi_H[0] /= 0.01
 			print "Phi_H: ", Phi_H
 
 			# Compute features for the normalizing trajectories.
 			Phi_rands = []
-			num_trajs = self.traj_rand.shape[0]
-			for rand_i in range(num_trajs):
-				curr_traj = self.traj_rand[rand_i]
+			weight_rands = []
+			num_trajs = len(self.traj_rand.keys())
+			for rand_i, traj_str in enumerate(self.traj_rand.keys()):
+				curr_traj = np.array(ast.literal_eval(traj_str))
 				rand_features = self.featurize(curr_traj)
 				Phi_rand = np.array([sum(x) for x in rand_features])
-				print "Phi_rand",rand_i, ": ",Phi_rand
+				Phi_rand[0] /= 0.01
+				print "Phi_rand",rand_i, ": ",Phi_rand, "; weights: ", self.traj_rand[traj_str]
 				Phi_rands.append(Phi_rand)
+				weight_rands.append(self.traj_rand[traj_str])
 
 			# Now compute probabilities for each beta and theta in the dictionary
 			P_xi = np.zeros((self.num_betas, self.num_weights))
@@ -128,11 +133,12 @@ class demoPlannerDiscrete(Planner):
 			P_beta = np.sum(posterior, axis=1)
 			self.beta = np.dot(self.betas_list,P_beta)
 			self.P_bt = posterior
-			print("observation model:", P_obs)
-			print("posterior", self.P_bt)
-			print("theta marginal:", P_weight)
-			print("beta average:", self.beta)
-			print("curr_weight after = " + str(curr_weight))
+			print("observation model: ", P_obs)
+			print("posterior: ", self.P_bt)
+			print("theta marginal: " + str(P_weight))
+			print("beta marginal: " + str(P_beta))
+			print("theta average: " + str(curr_weight))
+			print("beta average: " + str(self.beta))
 
 			self.weights = curr_weight
 			self.visualize_posterior(self.P_bt)

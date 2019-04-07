@@ -17,8 +17,8 @@ import itertools
 import pickle
 
 # feature constants
-FEAT_RANGE = {'table':0.69, 'coffee':1.87608702, 'laptop':0.2, 'human':0.2, 'efficiency':1.0}
-
+#FEAT_RANGE = {'table':0.98, 'coffee':1.87608702, 'laptop':1.00476554, 'human':1.27253431, 'efficiency':0.0227859767}
+FEAT_RANGE = {'table':1.0, 'coffee':1.0, 'laptop':1.0, 'human':1.0, 'efficiency':1.0}
 OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
 HUMAN_CENTER = [-0.5, -0.5, 0.0]
 
@@ -68,7 +68,7 @@ class Planner(object):
 		plotLaptop(self.env,self.bodies,OBS_CENTER)
 		plotCabinet(self.env)
 		plotSphere(self.env,self.bodies,OBS_CENTER,0.4)
-		plotSphere(self.env,self.bodies,HUMAN_CENTER,1.0)
+		plotSphere(self.env,self.bodies,HUMAN_CENTER,10.0)
 
 	# ---- utilities/getter functions ---- #
 
@@ -136,7 +136,24 @@ class Planner(object):
 		---
 		input waypoint, output scalar feature
 		"""
-		return np.linalg.norm(waypt - prev_waypt)**2 #/ FEAT_RANGE['efficiency']
+		return np.linalg.norm(waypt - prev_waypt)**2 / FEAT_RANGE['efficiency']
+		"""
+		if len(waypt) < 10:
+			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
+			waypt[2] += math.pi
+		self.robot.SetDOFValues(waypt)
+		coords = robotToCartesian(self.robot)
+		EEcoord1 = coords[6][:3]
+
+		if len(prev_waypt) < 10:
+			prev_waypt = np.append(prev_waypt.reshape(7), np.array([0,0,0]))
+			prev_waypt[2] += math.pi
+		self.robot.SetDOFValues(prev_waypt)
+		coords = robotToCartesian(self.robot)
+		EEcoord2 = coords[6][0:3]
+
+		return np.linalg.norm(EEcoord1 - EEcoord2)**2
+		"""
 
 	def efficiency_cost(self, waypt):
 		"""
@@ -193,7 +210,7 @@ class Planner(object):
 		self.robot.SetDOFValues(waypt)
 		coords = robotToCartesian(self.robot)
 		EEcoord_z = coords[6][2]
-		return EEcoord_z #/ FEAT_RANGE['table']
+		return EEcoord_z / FEAT_RANGE['table']
 
 	def table_cost(self, waypt):
 		"""
@@ -256,7 +273,7 @@ class Planner(object):
 		for step in range(NUM_STEPS):
 			inter_waypt = prev_waypt + (1.0 + step)/(NUM_STEPS)*(waypt - prev_waypt)
 			feature += self.laptop_dist(inter_waypt)
-		return feature #/ FEAT_RANGE['laptop']
+		return feature / FEAT_RANGE['laptop']
 
 	def laptop_dist(self, waypt):
 		"""
@@ -303,7 +320,7 @@ class Planner(object):
 		for step in range(NUM_STEPS):
 			inter_waypt = prev_waypt + (1.0 + step)/(NUM_STEPS)*(waypt - prev_waypt)
 			feature += self.human_dist(inter_waypt)
-		return feature #/ FEAT_RANGE['human']
+		return feature / FEAT_RANGE['human']
 
 	def human_dist(self, waypt):
 		"""
@@ -411,7 +428,7 @@ class Planner(object):
 
 		# Check if efficiency is a feature; if not, use default weight.
 		if "efficiency" in self.feat_list:
-			coeff = self.weights[self.feat_list.index("efficiency")] #/ FEAT_RANGE['efficiency']
+			coeff = self.weights[self.feat_list.index("efficiency")] / FEAT_RANGE['efficiency']
 		else:
 			coeff = 1.0
 
@@ -501,12 +518,6 @@ class Planner(object):
 			print("using traj seed!")
 			init_waypts = traj_seed
 
-		# Check if efficiency is a feature; if not, use default weight.
-		if "efficiency" in self.feat_list:
-			coeff = 0.0 #self.weights[self.feat_list.index("efficiency")] / FEAT_RANGE['efficiency']
-		else:
-			coeff = 1.0
-
 		request = {
 			"basic_info": {
 				"n_steps": self.num_waypts_plan,
@@ -516,7 +527,7 @@ class Planner(object):
 			"costs": [
 			{
 				"type": "joint_vel",
-				"params": {"coeffs": [coeff]}
+				"params": {"coeffs": [0.0]}
 			}
 			],
 			"constraints": [
