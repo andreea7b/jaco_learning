@@ -17,10 +17,11 @@ import itertools
 import pickle
 
 # feature constants
-#FEAT_RANGE = {'table':0.98, 'coffee':1.87608702, 'laptop':1.00476554, 'human':1.27253431, 'efficiency':0.0227859767}
-FEAT_RANGE = {'table':1.0, 'coffee':1.0, 'laptop':1.0, 'human':1.0, 'efficiency':1.0}
-OBS_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
-HUMAN_CENTER = [-0.5, -0.5, 0.0]
+LAPTOP_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]
+CLOSE_LAPTOP_CENTER = [-1.3858/2.0, -0.1, 0.0]
+HUMAN_CENTER = [-0.6, -0.55, 0.0]
+
+OBS_CENTER = LAPTOP_CENTER
 
 class Planner(object):
 	"""
@@ -136,24 +137,7 @@ class Planner(object):
 		---
 		input waypoint, output scalar feature
 		"""
-		return np.linalg.norm(waypt - prev_waypt)**2 / FEAT_RANGE['efficiency']
-		"""
-		if len(waypt) < 10:
-			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
-			waypt[2] += math.pi
-		self.robot.SetDOFValues(waypt)
-		coords = robotToCartesian(self.robot)
-		EEcoord1 = coords[6][:3]
-
-		if len(prev_waypt) < 10:
-			prev_waypt = np.append(prev_waypt.reshape(7), np.array([0,0,0]))
-			prev_waypt[2] += math.pi
-		self.robot.SetDOFValues(prev_waypt)
-		coords = robotToCartesian(self.robot)
-		EEcoord2 = coords[6][0:3]
-
-		return np.linalg.norm(EEcoord1 - EEcoord2)**2
-		"""
+		return np.linalg.norm(waypt - prev_waypt)**2
 
 	def efficiency_cost(self, waypt):
 		"""
@@ -210,7 +194,7 @@ class Planner(object):
 		self.robot.SetDOFValues(waypt)
 		coords = robotToCartesian(self.robot)
 		EEcoord_z = coords[6][2]
-		return EEcoord_z / FEAT_RANGE['table']
+		return EEcoord_z
 
 	def table_cost(self, waypt):
 		"""
@@ -273,7 +257,7 @@ class Planner(object):
 		for step in range(NUM_STEPS):
 			inter_waypt = prev_waypt + (1.0 + step)/(NUM_STEPS)*(waypt - prev_waypt)
 			feature += self.laptop_dist(inter_waypt)
-		return feature / FEAT_RANGE['laptop']
+		return feature
 
 	def laptop_dist(self, waypt):
 		"""
@@ -320,7 +304,7 @@ class Planner(object):
 		for step in range(NUM_STEPS):
 			inter_waypt = prev_waypt + (1.0 + step)/(NUM_STEPS)*(waypt - prev_waypt)
 			feature += self.human_dist(inter_waypt)
-		return feature / FEAT_RANGE['human']
+		return feature
 
 	def human_dist(self, waypt):
 		"""
@@ -428,7 +412,7 @@ class Planner(object):
 
 		# Check if efficiency is a feature; if not, use default weight.
 		if "efficiency" in self.feat_list:
-			coeff = self.weights[self.feat_list.index("efficiency")] / FEAT_RANGE['efficiency']
+			coeff = self.weights[self.feat_list.index("efficiency")]
 		else:
 			coeff = 1.0
 
@@ -506,7 +490,7 @@ class Planner(object):
 			aug_start = np.append(start.reshape(7), np.array([0,0,0]))
 		self.robot.SetDOFValues(aug_start)
 
-		self.num_waypts_plan = 4
+		self.num_waypts_plan = 5
 
 		# --- linear interpolation seed --- #
 		if traj_seed is None:

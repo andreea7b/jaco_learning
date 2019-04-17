@@ -19,9 +19,9 @@ def generate_rand_trajs(feat_list):
 	place_lower_EEtilt = [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 400.0]
 	place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 
-	MIN_WEIGHTS = {'table':-1.0, 'coffee':-1.0, 'laptop':-1.0, 'human':-1.0, 'efficiency':1.0}
-	MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':5.0, 'human':6.0, 'efficiency':1.0}
-	NUM_WEIGHTS = {'table':5, 'coffee':0, 'laptop':7, 'human':8, 'efficiency':1}
+	MIN_WEIGHTS = {'table':0.0, 'coffee':0.0, 'laptop':0.0, 'human':0.0, 'efficiency':1.0}
+	MAX_WEIGHTS = {'table':20.0, 'coffee':1.0, 'laptop':18.0, 'human':14.0, 'efficiency':1.0}
+	NUM_WEIGHTS = {'table':6, 'coffee':0, 'laptop':10, 'human':8, 'efficiency':1}
 
 	T = 20.0
 
@@ -40,22 +40,27 @@ def generate_rand_trajs(feat_list):
 
 	weights_span = [None]*num_features
 	for feat in range(0,num_features):
-		weights_span[feat] = list(np.linspace(MIN_WEIGHTS[feat_list[feat]], MAX_WEIGHTS[feat_list[feat]], num=NUM_WEIGHTS[feat_list[feat]]))
+		if feat_list[feat] == "table":
+			weights_span[feat] = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0, 7.0, 8.0]
+		elif feat_list[feat] == "laptop":
+			weights_span[feat] = [0.0, 20.0, 21.0, 22.0, 24.0, 26.0, 30.0, 40.0]
+		else:
+			weights_span[feat] = list(np.linspace(MIN_WEIGHTS[feat_list[feat]], MAX_WEIGHTS[feat_list[feat]], num=NUM_WEIGHTS[feat_list[feat]]))
 
 	weight_pairs = list(itertools.product(*weights_span)) 		 # Create all weight products
 	weight_pairs = [list(i) for i in weight_pairs]
 
 	for (w_i, weights) in enumerate(weight_pairs):
 		planner.replan(start, goal, weights, 0.0, T, 0.5)
+		Phi = planner.featurize(planner.waypts)
+		# Getting rid of bad, out-of-bounds trajectories
+		if sum(Phi[1]) < 0.0:
+			continue
 		traj = planner.waypts.tolist()
 		if repr(traj) not in traj_rand:
 			traj_rand[repr(traj)] = weights
-	#traj_rand_u = set([tuple(i.flatten().tolist()) for i in traj_rand])
-	#traj_rand_u = [np.asarray(i) for i in traj_rand_u]
-	#traj_rand = [i.reshape(len(i)/7,7) for i in traj_rand_u]
-	#traj_rand = np.array(traj_rand)
-	import pdb;pdb.set_trace()
-	savefile = "traj_rand_small.p"
+
+	savefile = "traj_rand.p"
 	pickle.dump(traj_rand, open( savefile, "wb" ))
 	print "Saved in: ", savefile
 	print "Used the following weight-combos: ", weight_pairs

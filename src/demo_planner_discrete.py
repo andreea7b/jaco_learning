@@ -20,6 +20,7 @@ import os
 import itertools
 import pickle
 import matplotlib.pyplot as plt
+import matplotlib
 import ast
 
 from trajopt_planner import Planner
@@ -27,7 +28,7 @@ from trajopt_planner import Planner
 # feature constacts (update gains and max weights)
 MIN_WEIGHTS = {'table':0.0, 'coffee':-1.0, 'laptop':0.0, 'human':0.0, 'efficiency':0.0}
 MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':1.0, 'human':1.0, 'efficiency':1.0}
-FEAT_RANGE = {'table':0.69, 'coffee':1.87608702, 'laptop':1.6, 'human':1.6, 'efficiency':0.01}
+FEAT_RANGE = {'table':1.0, 'coffee':1.0, 'laptop':1.6, 'human':1.6, 'efficiency':0.01}
 
 class demoPlannerDiscrete(Planner):
 	"""
@@ -47,7 +48,7 @@ class demoPlannerDiscrete(Planner):
 		# trajectory paths
 		here = os.path.dirname(os.path.realpath(__file__))
 		if traj_rand is None:
-			traj_rand = "/traj_rand/traj_rand_small.p"
+			traj_rand = "/traj_rand/traj_rand_merged_H.p"
 		self.traj_rand = pickle.load( open( here + traj_rand, "rb" ) )
 
 		# ---- important discrete variables ---- #
@@ -60,9 +61,8 @@ class demoPlannerDiscrete(Planner):
 		self.weights_list = [w / np.linalg.norm(w) for w in self.weights_list]
 		self.weights_list = set([tuple(i) for i in self.weights_list])	     # Make tuples out of these to find uniques.
 		self.weights_list = [list(i) for i in self.weights_list]
-
-		self.betas_list = [0.01, 0.03, 0.1, 0.3, 1.0]
-
+		self.betas_list = [0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0, 100.0]
+		self.betas_list.reverse()
 		self.num_betas = len(self.betas_list)
 		self.num_weights = len(self.weights_list)
 
@@ -75,8 +75,7 @@ class demoPlannerDiscrete(Planner):
 	def learnWeights(self, waypts_h):
 		if waypts_h is not None:
 			new_features = self.featurize(waypts_h)
-			Phi_H = np.array([sum(x) for x in new_features])
-			Phi_H[0] /= 0.01
+			Phi_H = np.array([sum(x)/FEAT_RANGE[self.feat_list[i]] for i,x in enumerate(new_features)])
 			print "Phi_H: ", Phi_H
 
 			# Compute features for the normalizing trajectories.
@@ -86,8 +85,7 @@ class demoPlannerDiscrete(Planner):
 			for rand_i, traj_str in enumerate(self.traj_rand.keys()):
 				curr_traj = np.array(ast.literal_eval(traj_str))
 				rand_features = self.featurize(curr_traj)
-				Phi_rand = np.array([sum(x) for x in rand_features])
-				Phi_rand[0] /= 0.01
+				Phi_rand = np.array([sum(x)/FEAT_RANGE[self.feat_list[i]] for i,x in enumerate(rand_features)])
 				print "Phi_rand",rand_i, ": ",Phi_rand, "; weights: ", self.traj_rand[traj_str]
 				Phi_rands.append(Phi_rand)
 				weight_rands.append(self.traj_rand[traj_str])
@@ -101,7 +99,8 @@ class demoPlannerDiscrete(Planner):
 					numerator = -beta * np.dot(weight, Phi_H)
 
 					# Calculate the integral in log space
-					logdenom = np.zeros((num_trajs,1))
+					logdenom = np.zeros((num_trajs+1,1))
+					logdenom[-1] = -beta * np.dot(weight, Phi_H)
 
 					# Compute costs for each of the random trajectories
 					for rand_i in range(num_trajs):
@@ -146,14 +145,20 @@ class demoPlannerDiscrete(Planner):
 			return self.weights
 
 	def visualize_posterior(self, post):
-		fig2, ax2 = plt.subplots()
-		plt.imshow(post, cmap='RdBu', interpolation='nearest')
-		plt.colorbar()
+		matplotlib.rcParams['font.sans-serif'] = "Arial"
+		matplotlib.rcParams['font.family'] = "Times New Roman"
+		matplotlib.rcParams.update({'font.size': 15})
+
+		plt.imshow(post, cmap='Blues', interpolation='nearest')
+		plt.colorbar(ticks=[0, 0.15, 0.3])
+		plt.clim(0, 0.3)
+
 		weights_rounded = [[round(i,2) for i in j] for j in self.weights_list]
 		plt.xticks(range(len(self.weights_list)), weights_rounded, rotation = 'vertical')
 		plt.yticks(range(len(self.betas_list)), list(self.betas_list))
-		plt.xlabel(r'$\theta$')
-		plt.ylabel(r'$\beta$')
-		plt.title("Joint posterior belief")
+		plt.xlabel(r'$\theta$', fontsize=15)
+		plt.ylabel(r'$\beta$',fontsize=15)
+		plt.title(r'Joint Posterior Belief b($\theta$, $\beta$)')
+		plt.tick_params(length=0)
 		plt.show()
 		return

@@ -103,7 +103,7 @@ def plotCupTraj(env,robot,bodies,waypts,color=[0,1,0], increment=1):
 				project='iact_control',
 				path='src/data',
 				first_match_only=True)[0]
-		env.Load('{:s}/mug1.dae'.format(objects_path))
+		env.Load('{:s}/mug.xml'.format(objects_path))
 		mug = env.GetKinBody('mug')
 		mug.GetLinks()[0].GetGeometries()[0].SetDiffuseColor(np.array(color))
 		angle = -np.pi/2
@@ -132,7 +132,7 @@ def plotMug(env, bodies, transform, color=[1,0,0]):
 				project='iact_control',
 				path='src/data',
 				first_match_only=True)[0]
-	env.Load('{:s}/mug1.dae'.format(objects_path))
+	env.Load('{:s}/mug.xml'.format(objects_path))
 	mug = env.GetKinBody('mug')
 	mug.GetLinks()[0].GetGeometries()[0].SetDiffuseColor(np.array(color))
 	mug.SetTransform(transform)
@@ -161,7 +161,7 @@ def plotSphere(env, bodies, coords, size=10, color=[0, 0, 1]):
 	"""
 	Plots a single sphere in OpenRAVE center at coords(x,y,z) location
 	"""
-	bodies.append(env.plot3(points=np.array((coords[0],coords[1],coords[2])), pointsize=size, colors=np.array(((color[0],color[1],color[2])))))
+	bodies.append(env.plot3(points=np.array((coords[0],coords[1],coords[2])), pointsize=size, colors=color, drawstyle=1))
 
 def plotTable(env):
 	"""

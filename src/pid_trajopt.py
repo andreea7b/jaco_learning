@@ -53,7 +53,7 @@ place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 epsilon = 0.10		# epsilon for when robot think it's at goal
 INTERACTION_TORQUE_THRESHOLD = [0.88414821, 17.22751856, -0.40134936,  6.23537946, -0.90013662, 1.32379884,  0.10218059]
 INTERACTION_TORQUE_EPSILON = [4.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]
-MAX_WEIGHTS = {'table':20.0, 'coffee':1.0, 'laptop':10.0, 'human':1.0, 'efficiency':0.1}
+MAX_WEIGHTS = {'table':25.0, 'coffee':1.0, 'laptop':40.0, 'human':12.0, 'efficiency':0.5}
 
 # Method types based on which we determine the planner
 IMPEDANCE = 'A'
@@ -155,6 +155,7 @@ class PIDVelJaco(object):
 			if self.replay is not False:
 				loadfile = os.path.dirname(os.path.realpath(__file__)) + "/data/demonstrations/demos/demo" + "_" + str(ID) + "_" + replay + ".p"
 				self.demo = np.load(loadfile)
+				openrave_utils.plotTraj(self.planner.env,self.planner.robot,self.planner.bodies, self.demo, size=0.015,color=[0, 0, 1])
 			else:
 				# We tracked a real human trajectory. It is not a simulation.
 				raw_demo = self.expUtil.tracked_traj[:,1:8]
@@ -176,6 +177,7 @@ class PIDVelJaco(object):
 					demo.append(raw_demo[int(counter), :])
 					counter += step_size
 				self.demo = demo
+				openrave_utils.plotTraj(self.planner.env,self.planner.robot,self.planner.bodies,self.demo, size=0.015,color=[0, 0, 1])
 
 				# 3. Downsample to get trajopt plan
 				desired_length = self.planner.num_waypts_plan
@@ -188,6 +190,12 @@ class PIDVelJaco(object):
 				demo_plan[0] = self.planner.waypts_plan[0]
 				demo_plan[-1] = self.planner.waypts_plan[-1]
 				self.demo_plan = np.array(demo_plan)
+
+				print "Type [yes/y/Y] if you're happy with the demonstration."
+				line = raw_input()
+				if (line is not "yes") and (line is not "Y") and (line is not "y"):
+					print "Not happy with demonstration. Terminating experiment."
+					return
 
 				if self.record == True:
 					feat_string = "_".join(feat_list_H)
@@ -238,15 +246,13 @@ class PIDVelJaco(object):
 			print "beta_L2: ", beta_new4
 		elif self.method_type == DISCRETE_DEMONSTRATION_LEARNING:
 			self.weights = self.planner.learnWeights(np.array(self.demo))
-			if self.record == True:
+
+			if self.record == True and self.replay is not False:
 				feat_string = "_".join(self.feat_list)
 				feat_H_string = "_".join(self.feat_list_H)
 				filename_w = "weights" + "_" + str(ID) + "_" + feat_string + "_demo_" + feat_H_string
-				filename_b = "betas" + "_" + str(ID) + "_" + feat_string + "_demo_" + feat_H_string
 				savefile_w = self.expUtil.get_unique_filepath("weights",filename_w)
-				savefile_b = self.expUtil.get_unique_filepath("betas",filename_b)
-				pickle.dump(self.weights, open(savefile_w, "wb" ))
-				pickle.dump(self.planner.beta, open(savefile_b, "wb" ))
+				pickle.dump(self.planner.P_bt, open(savefile_w, "wb" ))
 
 	def load_parameters(self, ID, task, method_type, record, replay, simulate, feat_method, feat_list, feat_list_H):
 		"""
@@ -359,6 +365,8 @@ class PIDVelJaco(object):
 			self.planner.replan(self.start, self.goal, self.weights_H, 0.0, self.T, 0.5, seed=None)
 			self.demo = self.planner.waypts
 			self.demo_plan = self.planner.waypts_plan
+			openrave_utils.plotTraj(self.planner.env,self.planner.robot,self.planner.bodies, self.demo, size=0.015,color=[0, 0, 1])
+			openrave_utils.plotCupTraj(self.planner.env,self.planner.robot,self.planner.bodies,[self.demo[-1]],color=[0,1,0])
 
 			# Reset the planner to the robot's original configuration.
 			self.planner.feat_list = self.feat_list
