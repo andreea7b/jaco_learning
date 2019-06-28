@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 """
-This node demonstrates velocity-based PID control by moving the Jaco so that it maintains a fixed distance to a target. 
+This node demonstrates velocity-based PID control by moving the Jaco so that it maintains a fixed distance to a target.
+Additionally, it supports human-robot interaction in the form of offline demonstrations and online corrections. 
 Authors: Andreea Bobu (abobu@eecs.berkeley.edu), Andrea Bajcsy (abajcsy@eecs.berkeley.edu)
 Based on: https://w3.cs.jmu.edu/spragunr/CS354_S15/labs/pid_lab/pid_lab.shtml
 """
@@ -8,16 +9,12 @@ import roslib; roslib.load_manifest('kinova_demo')
 
 import rospy
 import math, copy
-import pid
-import tf
 import sys, select, os
-import thread
-import argparse
-import actionlib
 import time
-import trajopt_planner, phri_planner, demo_planner, demo_planner_discrete
-import ros_utils
-import exp_utils.experiment_utils
+
+from planners import trajopt_planner, phri_planner, demo_planner, demo_planner_discrete
+from utils import pid, openrave_utils, ros_utils
+from data_processing import experiment_utils
 
 import kinova_msgs.msg
 import geometry_msgs.msg
@@ -28,9 +25,7 @@ from std_msgs.msg import Float32
 from sympy import Point, Line
 
 import numpy as np
-from numpy import linalg
 import matplotlib.pyplot as plt
-import openrave_utils
 import pickle
 
 # Jaco software name
@@ -212,7 +207,7 @@ class PIDVelJaco(object):
 				new_updates = np.array(self.planner.weights)
 
 				num_iter += 1
-				print "error: ",np.linalg.norm(old_updates - new_updates)
+				print "error: ", np.linalg.norm(old_updates - new_updates)
 				if np.linalg.norm(old_updates - new_updates) < 5e-4 or np.linalg.norm(new_updates) < 0.1:
 					print "Finished in {} iterations".format(num_iter)
 					break
@@ -414,7 +409,7 @@ class PIDVelJaco(object):
 		self.controller = pid.PID(self.P,self.I,self.D,0,0)
 
 		# ---- Experimental Utils ---- #
-		self.expUtil = exp_utils.experiment_utils.ExperimentUtils()
+		self.expUtil = experiment_utils.ExperimentUtils()
 		# update the list of replanned trajectories with new trajectory
 		self.expUtil.update_replanned_trajList(0.0, self.traj)
 		# update the list of replanned waypoints with new waypoints

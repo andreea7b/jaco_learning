@@ -4,7 +4,7 @@ import numpy as np
 import pickle
 import sys
 
-from trajopt_planner import Planner
+from planners.trajopt_planner import Planner
 
 def generate_rand_trajs(feat_list):
 	# Before calling this function, you need to decide what features you care

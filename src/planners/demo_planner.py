@@ -1,27 +1,12 @@
 import numpy as np
-from numpy import linalg
-import time
-import math
-import json
-
-from scipy.optimize import minimize, newton
-from scipy.stats import chi2
 
 import trajoptpy
 import or_trajopt
 import openravepy
 from openravepy import *
 
-import openrave_utils
-from openrave_utils import *
-
-import copy
-import os
-import itertools
-import pickle
-import matplotlib.mlab as mlab
-
-from trajopt_planner import Planner
+from utils.openrave_utils import *
+from planners.trajopt_planner import Planner
 
 class demoPlanner(Planner):
 	"""

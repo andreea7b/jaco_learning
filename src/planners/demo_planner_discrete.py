@@ -1,21 +1,4 @@
 import numpy as np
-from numpy import linalg
-import time
-import math
-import json
-
-from scipy.optimize import minimize, newton
-from scipy.stats import chi2
-
-import trajoptpy
-import or_trajopt
-import openravepy
-from openravepy import *
-
-import openrave_utils
-from openrave_utils import *
-
-import copy
 import os
 import itertools
 import pickle
@@ -23,7 +6,13 @@ import matplotlib.pyplot as plt
 import matplotlib
 import ast
 
-from trajopt_planner import Planner
+import trajoptpy
+import or_trajopt
+import openravepy
+from openravepy import *
+
+from utils.openrave_utils import *
+from planners.trajopt_planner import Planner
 
 # feature constacts (update gains and max weights)
 MIN_WEIGHTS = {'table':0.0, 'coffee':-1.0, 'laptop':0.0, 'human':0.0, 'efficiency':0.0}
@@ -48,7 +37,7 @@ class demoPlannerDiscrete(Planner):
 		# trajectory paths
 		here = os.path.dirname(os.path.realpath(__file__))
 		if traj_rand is None:
-			traj_rand = "/traj_rand/traj_rand_merged_H.p"
+			traj_rand = "/../traj_rand/traj_rand_merged_H.p"
 		self.traj_rand = pickle.load( open( here + traj_rand, "rb" ) )
 
 		# ---- important discrete variables ---- #

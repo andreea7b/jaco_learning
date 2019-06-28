@@ -1,8 +1,6 @@
 import numpy as np
-from numpy import linalg
-import time
 import math
-import json
+import copy
 
 from scipy.optimize import minimize, newton
 from scipy.stats import chi2
@@ -12,16 +10,7 @@ import or_trajopt
 import openravepy
 from openravepy import *
 
-import openrave_utils
-from openrave_utils import *
-
-import copy
-import os
-import itertools
-import pickle
-import matplotlib.mlab as mlab
-
-from trajopt_planner import Planner
+from planners.trajopt_planner import Planner
 
 # feature constacts (update gains and max weights)
 UPDATE_GAINS = {'table':2.0, 'coffee':2.0, 'laptop':100.0, 'human':20.0}

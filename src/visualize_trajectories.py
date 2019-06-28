@@ -1,12 +1,11 @@
 import numpy as np
+import sys, os
+
 import trajoptpy
 import or_trajopt
 import openravepy
 from openravepy import *
-import sys, select, os
-
-import openrave_utils
-from openrave_utils import *
+from utils.openrave_utils import *
 
 if __name__ == '__main__':
 	if len(sys.argv) < 1:

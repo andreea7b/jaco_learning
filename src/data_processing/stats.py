@@ -1,25 +1,18 @@
 import numpy as np
-from numpy import linalg
-from numpy import linspace
-from matplotlib import rc
-import matplotlib.pyplot as plt
-import time
-import scipy
-import math
-import logging
-import copy
 
+import math
+import copy
 import os
 import pickle
+
 import data_io
 
-import openrave_utils
-from openrave_utils import *
+from utils.openrave_utils import *
 
 import experiment_utils
 from experiment_utils import *
 
-import trajopt_planner
+from planners import trajopt_planner
 
 pick_basic = [104.2, 151.6, 183.8, 101.8, 224.2, 216.9, 310.8]
 place_lower = [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 322.0]

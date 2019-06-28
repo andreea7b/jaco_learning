@@ -1,24 +1,11 @@
 import numpy as np
-from numpy import linalg
-from numpy import linspace
-from matplotlib import rc
 import matplotlib.pyplot as plt
-import matplotlib.lines as lines
 import time
-import scipy
-import math
-
-import logging
-import copy
-
-import csv
 import os
 import pickle
 
-import openrave_utils
-from openrave_utils import *
-
 import data_io
+from utils.openrave_utils import *
 
 class ExperimentUtils(object):
 

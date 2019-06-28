@@ -1,20 +1,13 @@
 import numpy as np
-from numpy import linalg
-import time
 import math
 import json
+import copy
 
 import trajoptpy
 import openravepy
 from openravepy import *
 
-import openrave_utils
-from openrave_utils import *
-
-import copy
-import os
-import itertools
-import pickle
+from utils.openrave_utils import *
 
 # feature constants
 LAPTOP_CENTER = [-1.3858/2.0 - 0.1, -0.1, 0.0]

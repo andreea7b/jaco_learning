@@ -1,21 +1,18 @@
 import numpy as np
-from numpy import linalg
-from numpy import linspace
-from matplotlib import rc
-import matplotlib.pyplot as plt
-import matplotlib.lines as lines
-from matplotlib import gridspec
+
 import math
-import logging
 import copy
 import os
 import pickle
 import data_io
-import trajopt_planner
 import time
 
-import openrave_utils
-from openrave_utils import *
+from matplotlib import rc
+from matplotlib import gridspec
+import matplotlib.pyplot as plt
+
+from planners import trajopt_planner
+from utils.openrave_utils import *
 
 # UPDATE THIS WITH THE CORRECT NUMBER OF PEOPLE
 NUM_PPL = 12

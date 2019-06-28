@@ -1,17 +1,5 @@
 import numpy as np
-from numpy import linalg
-import time
 import math
-import json
-
-import trajoptpy
-import openravepy
-from openravepy import *
-
-import openrave_utils
-from openrave_utils import *
-
-import copy
 import os
 import itertools
 import pickle
@@ -20,6 +8,12 @@ import sys
 import ast
 import matplotlib
 import matplotlib.pyplot as plt
+
+import trajoptpy
+import openravepy
+from openravepy import *
+
+from utils.openrave_utils import *
 
 # feature constants
 MIN_WEIGHTS = {'table':0.0, 'coffee':-1.0, 'laptop':0.0, 'human':0.0, 'efficiency':0.0}

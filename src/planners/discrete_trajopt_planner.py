@@ -1,24 +1,14 @@
 import numpy as np
-from numpy import linalg
-from numpy import linspace
-import matplotlib.pyplot as plt
-import time
 import math
 import json
-
-from sympy import symbols
-from sympy import lambdify
 
 import trajoptpy
 import or_trajopt
 import openravepy
 from openravepy import *
 
-import openrave_utils
-from openrave_utils import *
+from utils.openrave_utils import *
 
-import logging
-import pid
 import copy
 import os
 import itertools
@@ -855,34 +845,7 @@ class DiscretePlanner(object):
 		curr_pos - 7x1 vector of current joint angles (degrees)
 		"""
 		pos = np.array([curr_pos[0][0],curr_pos[1][0],curr_pos[2][0]+math.pi,curr_pos[3][0],curr_pos[4][0],curr_pos[5][0],curr_pos[6][0],0,0,0])
-
 		self.robot.SetDOFValues(pos)
-
-	def plot_weight_update(self):
-		"""
-		Plots weight update over time.
-		"""
-
-		#plt.plot(self.update_time,self.weight_update.T[0],linewidth=4.0,label='Vel')
-		plt.plot(self.update_time,self.weight_update.T[0],linewidth=4.0,label='Coffee')
-		plt.plot(self.update_time,self.weight_update.T[1],linewidth=4.0,label='Table')
-		#plt.plot(self.update_time,self.weight_update.T[2],linewidth=4.0,label='Laptop')
-		plt.legend()
-		plt.title("Weight (for features) changes over time")
-		plt.show()		
-
-	def plot_feature_update(self):
-		"""
-		Plots feature change over time.
-		"""
-
-		#plt.plot(self.update_time,self.weight_update.T[0],linewidth=4.0,label='Vel')
-		plt.plot(self.update_time2,self.feature_update.T[1],linewidth=4.0,label='Coffee')
-		plt.plot(self.update_time2,self.feature_update.T[2],linewidth=4.0,label='Table')
-		#plt.plot(self.update_time2,self.feature_update.T[3],linewidth=4.0,label='Laptop')
-		plt.legend()
-		plt.title("Feature changes over time")
-		plt.show()		
 
 	def kill_planner(self):
 		"""
