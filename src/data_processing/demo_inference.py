@@ -86,8 +86,8 @@ class Infer(object):
 		if traj_rand is None:
 			traj_rand = "/traj_rand/traj_rand_merged_H.p"
 		self.traj_rand = pickle.load( open( here + traj_rand, "rb" ) )
-		import pdb;pdb.set_trace()
-		# Load in requested demonstrations.
+		
+        # Load in requested demonstrations.
 		self.demos = []
 		self.demo_names = []
 		if self.ID == "all":

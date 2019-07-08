@@ -10,46 +10,46 @@ from utils.openrave_utils import *
 class ExperimentUtils(object):
 
 	def __init__(self):
-		# stores dictionary of all the replanned trajectories
+		# Stores dictionary of all the replanned trajectories
 		self.replanned_trajList = {}
 
-		# stores dictionary of all the replanned waypoints
+		# Stores dictionary of all the replanned waypoints
 		self.replanned_wayptsList = {}
 
-		# stores trajectories as they are deformed
+		# Stores trajectories as they are deformed
 		self.deformed_trajList = {}
 
-		# stores trajectory waypoints as they are deformed
+		# Stores trajectory waypoints as they are deformed
 		self.deformed_wayptsList = {}
 
-		# stores the list of positions as the robot is moving 
+		# Stores the list of positions as the robot is moving 
 		# in the form [timestamp, j1, j2, ... , j7]
 		self.tracked_traj = None
 
-		# stores list of interaction waypoints
+		# Stores list of interaction waypoints
 		self.interaction_pts = None
 
-		# stores weights over time 
+		# Stores weights over time 
 		# always in the form [timestamp, weight1, ..., weightN]
 		self.weights = None
 
-		# stores betas over time 
+		# Stores betas over time 
 		# always in the form [timestamp, beta1, ..., betaN]
 		self.betas = None
 
-		# stores betas over time 
+		# Stores betas over time 
 		# always in the form [timestamp, beta1, ..., betaN]
 		self.betas_u = None
 
-		# stores updates over time 
+		# Stores updates over time 
 		# always in the form [timestamp, update1, ..., updateN]
 		self.updates = None
 
-		# stores running list of forces applied by human
+		# Stores running list of forces applied by human
 		# in the form [timestamp, j1, j2, ... , j7]
 		self.tauH = None 
 
-		# stores start and end time of the interaction
+		# Stores start and end time of the interaction
 		self.startT = 0.0
 		self.endT = 0.0
 
@@ -293,47 +293,3 @@ class ExperimentUtils(object):
 
 		filepath = self.get_unique_filepath("force",filename)
 		pickle.dump(self.tauH, open( filepath, "wb" ) )
-
-
-if __name__ == '__main__':
-	env, robot = openrave_utils.initialize(model_filename='jaco_dynamics')
-	bodies = []
-
-	#exp = ExperimentUtils()
-	
-	# ---- test replanned trajectory saving and parsing ---- #
-	"""	
-	filename = "replanned01B1.p"
-	trajList = exp.parse_replanned_trajList(filename)
-	for t in trajList.keys():
-		plotCupTraj(env,robot,bodies,trajList[t],color=[0,1,0],increment=1)
-	"""
-
-	# ---- test tracked/deformed trajectory saving and parsing ---- #
-
-	"""
-	filename = "tracked32B1.p"
-	waypts = data_io.parse_tracked_traj(filename)
-	#filename = "deformed01A1.p"
-	#waypts = exp.parse_deformed_traj(filename)	
-	plotCupTraj(env,robot,bodies,waypts,color=[0,1,0],increment=5)
-	time.sleep(20)
-	"""
-
-	"""	
-	# ---- test weights/force saving and parsing ---- #
-	filename = "weights02B1.p"
-	(time, weights) = exp.parse_weights(filename)
-	plt.plot(time,weights.T[0],linewidth=4.0,label='Coffee')
-	plt.plot(time,weights.T[1],linewidth=4.0,label='Table')
-	plt.legend()
-	plt.title("Weight (for features) changes over time")
-	plt.show()		
-
-	filename = "force02B1.p"
-	(time, force) = exp.parse_force(filename)
-	plt.plot(time,force,linewidth=4.0)
-	plt.legend()
-	plt.title("Force over time")
-	plt.show()		
-	"""
