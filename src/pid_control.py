@@ -1,6 +1,14 @@
-#! /usr/bin/env python
 """
-This node demonstrates velocity-based PID control by moving the Jaco so that it maintains a fixed distance to a target.
+This node demonstrates velocity-based PID control by moving the Jaco to track a given trajectory.
+
+The initial trajectory also serves as an indicator of the start and goal
+configurations. The controller first goes to the start of the trajectory, after
+which it tracks it until a) it reaches the end of the trajectory (the goal) OR 
+b) another trajectory is passed in.
+
+If a new trajectory is demanded, the controller will track it starting
+from the interpolated waypoint at the current time.
+
 Authors: Andreea Bobu (abobu@eecs.berkeley.edu), Andrea Bajcsy (abajcsy@eecs.berkeley.edu)
 Based on: https://w3.cs.jmu.edu/spragunr/CS354_S15/labs/pid_lab/pid_lab.shtml
 """
@@ -11,9 +19,7 @@ import math
 import sys, select, os
 import time
 
-from planners import trajopt_planner
-from utils import pid, openrave_utils, ros_utils
-from data_processing import experiment_utils
+from utils import pid, ros_utils
 
 import kinova_msgs.msg
 from kinova_msgs.srv import *
@@ -29,7 +35,7 @@ pick_tilted = [104.2, 151.6, 183.8, 101.8, 224.2, 216.9, 225.0]
 place_lower = [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 322.0]
 place_pose = [-0.46513, 0.29041, 0.69497] # x, y, z for pick_lower_EEtilt
 
-class PIDControl(object):
+class PIDController(object):
 	"""
 	This class represents a node that moves the Jaco with PID control.
 	The joint velocities are computed as:
@@ -44,7 +50,6 @@ class PIDControl(object):
 
 	Subscribes to:
 		/j2s7s300_driver/out/joint_angles	- Jaco sensed joint angles
-		/j2s7s300_driver/out/joint_torques	- Jaco sensed joint torques
 
 	Publishes to:
 		/j2s7s300_driver/in/joint_velocity	- Jaco commanded joint velocities
@@ -54,14 +59,14 @@ class PIDControl(object):
 		sim_flag                  - flag for if in simulation or not
 	"""
 
-	def __init__(self, task, feat_list, feat_weight):
+	def __init__(self, trajectory):
 		
 		# Load parameters
-		self.load_parameters(task, feat_list, feat_weight)
+		self.load_parameters(trajectory)
 
 		# ---- ROS Setup ---- #
 
-		rospy.init_node("pid_control")
+		rospy.init_node("pid_controller")
 		self.register_callbacks()
 
 		# publish to ROS at 100hz
@@ -81,7 +86,7 @@ class PIDControl(object):
 
 		print "----------------------------------"
 
-	def load_parameters(self, task, feat_list, feat_weight):
+	def load_parameters(self, task, trajectory):
 		"""
 		Loading parameters and setting up variables.
         Parameters:
@@ -94,16 +99,10 @@ class PIDControl(object):
         # Set task, if any.
         self.task = None if task == "None" else task
 
-        # Set feature list and initial feature weights.
-        assert len(feat_list) == len(feat_weight), "Feature list must have the same size as weights."
-        self.feat_list = feat_list
-        self.weights = feat_weight
-        self.num_feat = len(self.feat_list)
-
 		# ---- Trajectory Setup ---- #
+        self.traj = trajectory
 
 		# Set total time for trajectory
-        self.T = 20.0
 
 		# Initialize start/goal based on task
         pick = pick_tilted if self.task == "tilted" else pick_basic
@@ -151,13 +150,6 @@ class PIDControl(object):
 		self.D = d_gain*np.eye(7)
 		self.controller = pid.PID(self.P,self.I,self.D,0,0)
 
-        # ---- Experimental Utils ---- #
-		self.expUtil = experiment_utils.ExperimentUtils()
-		# update the list of replanned trajectories with new trajectory
-		self.expUtil.update_replanned_trajList(0.0, self.traj)
-		# update the list of replanned waypoints with new waypoints
-		self.expUtil.update_replanned_wayptsList(0.0, self.planner.waypts)
-
 	def register_callbacks(self):
 		"""
 		Sets up all the publishers/subscribers needed.
@@ -168,8 +160,6 @@ class PIDControl(object):
 
 		# create subscriber to joint_angles
 		rospy.Subscriber(prefix + '/out/joint_angles', kinova_msgs.msg.JointAngles, self.joint_angles_callback, queue_size=1)
-		# create subscriber to joint_torques
-		rospy.Subscriber(prefix + '/out/joint_torques', kinova_msgs.msg.JointTorque, self.joint_torques_callback, queue_size=1)
 	
 	def start_admittance_mode(self):
 		"""
@@ -203,14 +193,6 @@ class PIDControl(object):
 		"""
 		error = -((self.target_pos - pos + math.pi)%(2*math.pi) - math.pi)
 		return -self.controller.update_PID(error)
-
-	def joint_torques_callback(self, msg):
-		"""
-		Reads the latest torque sensed by the robot and records it for
-		plotting & analysis
-		"""
-		# read the current joint torques from the robot
-		torque_curr = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
 
 	def joint_angles_callback(self, msg):
 		"""

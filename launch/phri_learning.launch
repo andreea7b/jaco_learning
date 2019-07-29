@@ -1,0 +1,32 @@
+<launch>
+
+	<!-- Participant ID (integer) -->
+	<arg name="ID" default="0"/>
+
+    <!-- Task ('basic' - standard trajectory from shelf to table, 'tilted' -
+    same as basic, but the cup in the end effector is tilted) -->
+	<arg name="task" default="basic"/> 
+
+	<!-- Feature learning method (IMPEDANCE, ALL, MAX, BETA, BETA_DISCRETE)-->
+	<arg name="feat_method" default="ALL"/>
+
+	<!-- List of string features that the robot contains
+    ('efficiency', 'table', 'coffee', 'human', 'laptop', 'origin') -->
+	<arg name="feat_list" default="table"/>
+
+	<!-- List of feature weights the robot is initialized with. -->
+	<arg name="feat_weight" default="0"/>
+
+	<!-- Record data mode (T/F) -->
+	<arg name="record" default="F"/>
+
+	<!-- Replay data mode (File name that is being replayed) -->
+	<arg name="replay" default="None"/>
+
+	<!-- Trajopt PID planning with learning from human corrections -->
+	<node name="phri_control" pkg="beta_adaptive_pHRI" type="phri_control.py"
+    args="$(arg ID) $(arg task) $(arg feat_method) $(arg feat_list) 
+    $(arg feat_weight) $(arg record) $(arg replay)" output="screen"/>
+
+</launch>
+

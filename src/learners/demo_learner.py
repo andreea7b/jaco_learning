@@ -12,58 +12,46 @@ import openravepy
 from openravepy import *
 
 from utils.openrave_utils import *
-from planners.trajopt_planner import Planner
 
-# feature constacts (update gains and max weights)
-MIN_WEIGHTS = {'table':0.0, 'coffee':-1.0, 'laptop':0.0, 'human':0.0, 'efficiency':0.0}
-MAX_WEIGHTS = {'table':1.0, 'coffee':1.0, 'laptop':1.0, 'human':1.0, 'efficiency':1.0}
-FEAT_RANGE = {'table':1.0, 'coffee':1.0, 'laptop':1.6, 'human':1.6, 'efficiency':0.01}
-
-class demoPlannerDiscrete(Planner):
+class DemoLearner(object):
 	"""
-	This class plans a trajectory from start to goal with TrajOpt.
-	It supports learning capabilities from demonstrated human trajectories.
+    This class performs demonstration inference given a human trajectory.
 	"""
 
-	def __init__(self, feat_list, task=None, traj_rand=None):
+	def __init__(self, feat_method, feat_list, environment, constants):
 
-		# Call parent initialization
-		super(demoPlannerDiscrete, self).__init__(feat_list, task)
-
-		# ---- important internal variables ---- #
-		self.weights = [0.0]*self.num_features
+		# ---- Important internal variables ---- #
+		self.feat_method = feat_method
+        self.feat_list = feat_list
+        self.num_features = len(self.feat_list)
+		self.weights = [0.0] * self.num_features
 		self.beta = 1.0
+        self.environment = environment
 
-		# trajectory paths
-		here = os.path.dirname(os.path.realpath(__file__))
-		if traj_rand is None:
-			traj_rand = "/../traj_rand/traj_rand_merged_H.p"
-		self.traj_rand = pickle.load( open( here + traj_rand, "rb" ) )
-
-		# ---- important discrete variables ---- #
-		weights_span = [None]*self.num_features
-		for feat in range(0,self.num_features):
-			weights_span[feat] = list(np.linspace(MIN_WEIGHTS[feat_list[feat]], MAX_WEIGHTS[feat_list[feat]], num=3))
-		self.weights_list = list(itertools.product(*weights_span))
-		if (0.0,)*self.num_features in self.weights_list:
-			self.weights_list.remove((0.0,)*self.num_features)
-		self.weights_list = [w / np.linalg.norm(w) for w in self.weights_list]
-		self.weights_list = set([tuple(i) for i in self.weights_list])	     # Make tuples out of these to find uniques.
+		# ---- Important discrete variables ---- #
+        self.betas_list = constants["betas_list"].reverse()
+        weight_vals = constants["weight_vals"]
+		self.weights_list = list(iter.product(weight_vals, repeat=self.num_features))
+        if (0.0,)*self.num_features in self.weights_list:
+            self.weights_list.remove((0.0,)*self.num_features)
+        self.weights_list = [w / np.linalg.norm(w) for w in self.weights_list]
+		self.weights_list = set([tuple(i) for i in self.weights_list])
 		self.weights_list = [list(i) for i in self.weights_list]
-		self.betas_list = [0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0, 100.0]
-		self.betas_list.reverse()
 		self.num_betas = len(self.betas_list)
 		self.num_weights = len(self.weights_list)
 
 		# Construct uninformed prior
 		P_bt = np.ones((self.num_betas, self.num_weights))
 		self.P_bt = 1.0/self.num_betas * P_bt
+		
+        # Trajectory paths.
+		here = os.path.dirname(os.path.realpath(__file__))
+		self.traj_rand = pickle.load(open(here + constants["trajs_path"], "rb" ) )
 
 	# ---- here's our algorithms for modifying the trajectory ---- #
 
-	def learnWeights(self, waypts_h):
-		if waypts_h is not None:
-			new_features = self.featurize(waypts_h)
+	def learn_weights(self, trajs):
+        new_features = [self.environment.featurize(traj.waypts) for traj in trajs]
 			Phi_H = np.array([sum(x)/FEAT_RANGE[self.feat_list[i]] for i,x in enumerate(new_features)])
 			print "Phi_H: ", Phi_H
 
@@ -131,7 +119,30 @@ class demoPlannerDiscrete(Planner):
 
 			self.weights = curr_weight
 			self.visualize_posterior(self.P_bt)
-			print("\n------------ SIMULATED DEMONSTRATION DONE ------------\n")
+			return self.weights
+	
+    
+    def learnWeights_cont(self, waypts_h, alpha=0.002):
+		if waypts_h is not None:
+			new_features = self.featurize(self.waypts_h)
+			old_features = self.featurize(self.waypts)
+			
+			Phi_H = np.array([sum(x) for x in new_features])
+			Phi_R = np.array([sum(x) for x in old_features])
+
+			update = Phi_H - Phi_R
+			self.updates = update.tolist()
+
+			if 'efficiency' not in self.feat_list:
+				update = update[1:]
+
+			curr_weight = self.weights - alpha * update
+
+			print "here is the update:", update
+			print "here are the old weights:", self.weights
+			print "here are the new weights:", curr_weight
+
+			self.weights = curr_weight.tolist()
 			return self.weights
 
 	def visualize_posterior(self, post):

@@ -1,3 +1,4 @@
+import rospy
 import kinova_msgs.msg
 import geometry_msgs.msg
 from kinova_msgs.srv import *
@@ -53,3 +54,30 @@ def waypts_to_PoseArrayMsg(cart_waypts):
 		poseArray.poses.append(somePose)
 
 	return poseArray
+
+def start_admittance_mode(prefix):
+	"""
+	Switches Kinova arm to admittance-control mode using ROS services.
+	"""
+	service_address = prefix+'/in/start_force_control'
+	rospy.wait_for_service(service_address)
+	try:
+		startForceControl = rospy.ServiceProxy(service_address, Start)
+		startForceControl()
+	except rospy.ServiceException, e:
+		print "Service call failed: %s"%e
+		return None
+
+def stop_admittance_mode(prefix):
+    """
+    Switches Kinova arm to position-control mode using ROS services.
+    """
+    service_address = prefix+'/in/stop_force_control'
+    rospy.wait_for_service(service_address)
+    try:
+        stopForceControl = rospy.ServiceProxy(service_address, Stop)
+        stopForceControl()
+    except rospy.ServiceException, e:
+        print "Service call failed: %s"%e
+        return None
+

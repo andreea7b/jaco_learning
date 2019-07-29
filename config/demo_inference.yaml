@@ -1,0 +1,30 @@
+general:
+    prefix: 'j2s7s300_driver'
+    model_filename: "jaco_dynamics"
+    controller_type: "pid"
+    learner_type: "discrete"
+    ID: 0
+    record: "F"
+
+setup:
+    object_centers: {'HUMAN_CENTER': [-0.6,-0.55,0.0], 'LAPTOP_CENTER': [-1.3858/2.0-0.1,-0.1,0.0]}
+    start: [104.2, 151.6, 183.8, 101.8, 224.2, 216.9, 310.8]
+    goal: [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 322.0] # [-0.46513, 0.29041, 0.69497] if pose
+    feat_list: ["efficiency", "table", "laptop"]
+
+controller:
+    # These settings have been tuned for PID controller.
+    p_gain: 50.0
+    i_gain: 0.0
+    d_gain: 20.0
+    epsilon: 0.10
+    max_cmd: 40.0
+
+learner:
+    # These settings have been tuned for discrete learner.
+    trajs_path: "/traj_rand/traj_rand_merged_H.p"
+    betas_list: [0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0, 100.0]
+    weight_vals: [0.0, 0.5, 1.0] # Per feature theta options.
+    FEAT_RANGE: {'table':1.0, 'coffee':1.0, 'laptop':1.6, 'human':1.6, 'efficiency':0.01}
+    
+

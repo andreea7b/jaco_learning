@@ -49,7 +49,7 @@ def initialize(model_filename='jaco', envXML=None):
 	
 	return env, robot
 
-# ------- Plotting & Conversion Utils ------- #
+# ------- Conversion Utils ------- #
 
 def robotToCartesian(robot):
 	"""
@@ -83,11 +83,33 @@ def manipToCartesian(robot, offset_z):
 	offset = np.array([0,0,offset_z]).T
 	return xyz
 
+def poseToRobot(robot, pose):
+    manip = robot.GetActiveManipulator()
+    ikmodel = databases.inversekinematics.InverseKinematicsModel(robot,iktype=IkParameterization.Type.Translation3D)
+    if not ikmodel.load():
+        ikmodel.autogenerate()
+
+    with robot: # lock environment and save robot state
+        ikparam = IkParameterization(pose,ikmodel.iktype) # build up the translation3d ik query
+        sols = manip.FindIKSolutions(ikparam, IkFilterOptions.CheckEnvCollisions) # get all solutions
+        return sols[0]
+
+def executePathSim(env,robot,waypts):
+	"""
+	Executes in the planned trajectory in simulation
+	"""
+	traj = RaveCreateTrajectory(env,'')
+	traj.Init(robot.GetActiveConfigurationSpecification())
+	for i in range(len(waypts)):
+		traj.Insert(i, waypts[i])
+	robot.ExecutePath(traj)
+
+# ------- Plotting Utils ------- #
+
 def plotCupTraj(env,robot,bodies,waypts,color=[0,1,0], increment=1):
 	"""
-	Plots trajectory of the cup
+	Plots trajectory of the cup.
 	"""
-
 	for i in range(0,len(waypts),increment):
 		waypoint = waypts[i]
 		print "waypt: " +str(waypoint)
@@ -126,7 +148,7 @@ def plotCupTraj(env,robot,bodies,waypts,color=[0,1,0], increment=1):
 
 def plotMug(env, bodies, transform, color=[1,0,0]):
 	"""
-	Plots mug at specific transform
+	Plots mug at specific transform.
 	"""
 	objects_path = find_in_workspaces(
 				project='iact_control',
@@ -144,7 +166,7 @@ def plotMug(env, bodies, transform, color=[1,0,0]):
 
 def plotTraj(env,robot,bodies,waypts, size=10, color=[0, 1, 0]):
 	"""
-	Plots the best trajectory found or planned
+	Plots the best trajectory found or planned.
 	"""
 	for i in range(0,len(waypts),1):
 		waypoint = waypts[i]
@@ -153,13 +175,11 @@ def plotTraj(env,robot,bodies,waypts, size=10, color=[0, 1, 0]):
 		print dof
 		robot.SetDOFValues(dof)
 		coord = robotToCartesian(robot)
-		# sz=0.015
-		# 0.009
 		plotSphere(env, bodies, coord[6], size, color)
 
 def plotSphere(env, bodies, coords, size=10, color=[0, 0, 1]):
 	"""
-	Plots a single sphere in OpenRAVE center at coords(x,y,z) location
+	Plots a single sphere in OpenRAVE center at coords(x,y,z) location.
 	"""
 	bodies.append(env.plot3(points=np.array((coords[0],coords[1],coords[2])), pointsize=size, colors=color, drawstyle=1))
 
@@ -167,7 +187,7 @@ def plotTable(env):
 	"""
 	Plots the robot table in OpenRAVE.
 	"""
-	# load table into environment
+	# Load table into environment
 	objects_path = find_in_workspaces(
 			project='iact_control',
 			path='src/data',
@@ -185,7 +205,7 @@ def plotCabinet(env):
 	"""
 	Plots the cabinet in OpenRAVE.
 	"""
-	# load table into environment
+	# Load table into environment
 	objects_path = find_in_workspaces(
 			project='iact_control',
 			path='src/data',
@@ -199,33 +219,30 @@ def plotCabinet(env):
 	color = np.array([0.05,0.6,0.3])
 	cabinet.GetLinks()[0].GetGeometries()[0].SetDiffuseColor(color)
 
-
 def plotMug(env):
-	# load table into environment
+	# Load table into environment
 	objects_path = find_in_workspaces(
 			project='iact_control',
 			path='src/data',
 			first_match_only=True)[0]
 	env.Load('{:s}/mug.xml'.format(objects_path))
 
-
 def plotMan(env):
 	"""
 	Plots a human in OpenRAVE.
 	"""
-	# load table into environment
+	# Load table into environment
 	objects_path = find_in_workspaces(
 			project='iact_control',
 			path='src/data',
 			first_match_only=True)[0]
 	env.Load('{:s}/manifest.xml'.format(objects_path))
 
-
 def plotTableMount(env,bodies):
 	"""
 	Plots the robot table mount in OpenRAVE.
 	"""
-	# create robot base attachment
+	# Create robot base attachment
 	body = RaveCreateKinBody(env, '')
 	body.InitFromBoxes(np.array([[0,0,0, 0.3048/2,0.8128/2,0.1016/2]]))
 	body.SetTransform(np.array([[1.0, 0.0,  0.0, 0],
@@ -243,7 +260,7 @@ def plotLaptop(env,bodies,pos):
 	"""
 	Plots the robot table mount in OpenRAVE.
 	"""
-	# create robot base attachment
+	# Create robot base attachment
 	body = RaveCreateKinBody(env, '')
 	#12 x 9 x 1 in, 0.3048 x 0.2286 x 0.0254 m
 	# divide by 2: 0.1524 x 0.1143 x 0.0127
@@ -253,23 +270,10 @@ def plotLaptop(env,bodies,pos):
 			                     [0.0, 1.0,  0.0, pos[1]+0.1],
 			                     [0.0, 0.0,  1.0, pos[2]-0.1016],
 			                     [0.0, 0.0,  0.0, 1.0]]))
-#	body.SetTransform(np.array([[1.0, 0.0,  0.0, (-1.3858/2 - 0.1)],
-#			                     [0.0, 1.0,  0.0, 0],
-#			                     [0.0, 0.0,  1.0, -0.1016],
-#			                     [0.0, 0.0,  0.0, 1.0]]))
 	body.SetName("laptop")
 	env.Add(body, True)
 	color = np.array([0, 0, 0])
 	body.GetLinks()[0].GetGeometries()[0].SetDiffuseColor(color)
 	bodies.append(body)
 
-def executePathSim(env,robot,waypts):
-	"""
-	Executes in the planned trajectory in simulation
-	"""
-	traj = RaveCreateTrajectory(env,'')
-	traj.Init(robot.GetActiveConfigurationSpecification())
-	for i in range(len(waypts)):
-		traj.Insert(i, waypts[i])
-	robot.ExecutePath(traj)
-	
+

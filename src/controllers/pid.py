@@ -49,13 +49,12 @@ import numpy as np
 #  POSSIBILITY OF SUCH DAMAGE.
 #******************************************************************* 
 
-
-
 class PID(object):
-    """ A basic adapted pid class for 7Dof robot.
+    """ 
+    A basic adapted PID class for a 7DoF robot.
 
     This class implements a generic structure that can be used to
-    create a wide range of pid controllers. It can function
+    create a wide range of PID controllers. It can function
     independently or be subclassed to provide more specific controls
     based on a particular control loop.
 
@@ -77,7 +76,8 @@ class PID(object):
     """
 
     def __init__(self, p_gain, i_gain, d_gain, i_min, i_max):
-        """Constructor, zeros out Pid values when created and
+        """
+        Constructor, zeros out Pid values when created and
         initialize Pid-gains and integral term limits. All gains are 
 		7x7 matrices.
 
@@ -92,7 +92,7 @@ class PID(object):
         self.reset()
 
     def reset(self):
-        """  Reset the state of this PID controller """
+        """ Reset the state of this PID controller """
         self._p_error_last = np.zeros((7,1)) # Save position state for derivative
                                  # state calculation.
         self._p_error = np.zeros((7,1))  # Position error.
@@ -102,7 +102,8 @@ class PID(object):
         self._last_time = None # Used for automatic calculation of dt.
         
     def set_gains(self, p_gain, i_gain, d_gain, i_min, i_max): 
-        """ Set PID gains for the controller. 
+        """ 
+        Set PID gains for the controller. 
 
          Parameters:
           p_gain     The proportional gain.
@@ -183,7 +184,8 @@ class PID(object):
         
     def update_PID(self, p_error, dt=None):
 
-        """  Update the Pid loop with nonuniform time step size.
+        """
+        Update the Pid loop with nonuniform time step size.
 
         Parameters:
           p_error  Error since last call (target - state)
@@ -199,61 +201,26 @@ class PID(object):
             dt = cur_time - self._last_time
             self._last_time = cur_time
 
-        #print "in update_PID(): dt: " + str(dt)
-
         self._p_error = p_error
         if dt == 0 or math.isnan(dt) or math.isinf(dt):
-            return np.zeros((7,7)) # TODO or shold it be 0.0??
+            return np.zeros((7,7))
 
         # Calculate proportional contribution to command
         p_term = self._p_gain * self._p_error
 		
-        #print "in update_PID(): p_term: " + str(p_term)
-        #print "in update_PID(): p_gain:" + str(self._p_gain)
-
         # Calculate the integral error
         self._i_error += dt * self._p_error 
         
         # Calculate integral contribution to command
         i_term = self._i_gain * self._i_error
         
-        # Limit i_term so that the limit is meaningful in the output
-        """
-        if i_term > self._i_max and self._i_gain != 0:
-            i_term = self._i_max
-            self._i_error = i_term / self._i_gain
-        elif i_term < self._i_min and self._i_gain != 0:
-            i_term = self._i_min
-            self._i_error = i_term / self._i_gain
-        """
-    
         # Calculate the derivative error
         self._d_error = (self._p_error - self._p_error_last) / dt
         self._p_error_last = self._p_error
 
-        #print "in update_PID(): p_error: " + str(self._p_error)
-        #print "in update_PID(): i_error: " + str(self._i_error)
-        #print "in update_PID(): d_error: " + str(self._d_error)
-        
         # Calculate derivative contribution to command 
         d_term = self._d_gain * self._d_error
         
         self._cmd = p_term + i_term + d_term
 
         return self._cmd
-
-if __name__ == "__main__":
-    P = np.eye(7)
-    I = np.zeros((7,7))
-    D = np.eye(7)
-
-    controller = PID(P, I, D, -1.0, 1.0)
-    print controller
-	
-    error = np.array([1,2,3,4,5,6,7]).reshape((7,1))
-    controller.update_PID(error)
-
-    error = np.array([-0.1,-0.2,-0.3,-0.4,-0.5,-0.6,-0.7]).reshape((7,1))
-    controller.update_PID(error)
-
-

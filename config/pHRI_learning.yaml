@@ -1,0 +1,41 @@
+general:
+    prefix: 'j2s7s300_driver'
+    model_filename: "jaco_dynamics"
+    planner_type: "trajopt"
+    controller_type: "pid"
+    learner_type: "all"
+    ID: 0
+    record: "F"
+    # These constants have been tuned for the task tested.
+    INTERACTION_TORQUE_THRESHOLD: [0.88414821, 17.22751856, -0.40134936,  6.23537946, -0.90013662, 1.32379884,  0.10218059]
+    INTERACTION_TORQUE_EPSILON: [4.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]
+    
+setup:
+    object_centers: {'HUMAN_CENTER': [-0.6,-0.55,0.0], 'LAPTOP_CENTER': [-1.3858/2.0-0.1,-0.1,0.0]}
+    start: [104.2, 151.6, 183.8, 101.8, 224.2, 216.9, 310.8]
+    goal: [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 322.0] # [-0.46513, 0.29041, 0.69497] if pose
+    T: 20.0
+    timestep: 0.5
+    feat_list: ["efficiency", "table", "laptop"]
+    feat_weights: [1.0,0.0,0.0]
+
+planner:
+    # These settings have been tuned for trajopt planner.
+    max_iter: 50
+    num_waypts: 5
+
+controller:
+    # These settings have been tuned for PID controller.
+    p_gain: 50.0
+    i_gain: 0.0
+    d_gain: 20.0
+    epsilon: 0.10
+    max_cmd: 40.0
+
+learner:
+    # These settings have been tuned for beta learner.
+    UPDATE_GAINS: {'table':2.0, 'coffee':2.0, 'laptop':100.0, 'human':20.0}
+    MAX_WEIGHTS: {'table':1.0, 'coffee':1.0, 'laptop':8.0, 'human':10.0}
+    FEAT_RANGE: {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554, 'human':3.2}
+    P_beta: {"table0": [1.83701582842, 0.0, 0.150583961407], "table1": [2.8, 0.0, 0.4212940611], "coffee0": [1.67451171875, 0.0, 0.05], "coffee1": [2.8169921875, 0.0, 0.3], "human0": [2.14693459432, 0.0, 0.227738059531], "human1": [5.0458984375, 0.0, 0.25]}
+    
