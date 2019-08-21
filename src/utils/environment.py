@@ -19,7 +19,7 @@ class Environment(object):
 		# Insert any objects you want into environment.
 		self.bodies = []
 		self.object_centers = object_centers
-		import pdb;pdb.set_trace()
+
 		# Plot the table and table mount, and other desired objects.
 		plotTable(self.env)
 		plotTableMount(self.env,self.bodies)

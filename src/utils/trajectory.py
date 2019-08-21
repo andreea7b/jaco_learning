@@ -1,5 +1,8 @@
 import numpy as np
 
+import openravepy
+from openravepy import *
+
 class Trajectory(object):
 	"""
 	This class represents a trajectory object, supporting operations such as
@@ -22,7 +25,7 @@ class Trajectory(object):
 		Returns:
 			upsampled_waypts [Trajectory] -- Downsampled trajectory.
 		"""
-		assert num_waypts <= len(self.waypts), "Upsampling requires a larger number of waypoints to upsample to. Your number is smaller."
+		assert num_waypts >= len(self.waypts), "Upsampling requires a larger number of waypoints to upsample to. Your number is smaller."
 
 		timestep = (self.waypts_time[-1] - self.waypts_time[0]) / (num_waypts - 1)
 		waypts = np.zeros((num_waypts,7))

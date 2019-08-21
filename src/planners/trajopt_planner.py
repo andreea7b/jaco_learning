@@ -5,7 +5,6 @@ import copy
 
 import trajoptpy
 from utils.trajectory import Trajectory
-from utils.openrave_utils import *
 
 class TrajoptPlanner(object):
 	"""
@@ -181,18 +180,18 @@ class TrajoptPlanner(object):
 
 		for t in range(1,self.num_waypts):
 			if 'coffee' in self.feat_list:
-				prob.AddCost(self.environment.coffee_cost, [(t,j) for j in range(7)], "coffee%i"%t)
+				prob.AddCost(self.coffee_cost, [(t,j) for j in range(7)], "coffee%i"%t)
 			if 'table' in self.feat_list:
-				prob.AddCost(self.environment.table_cost, [(t,j) for j in range(7)], "table%i"%t)
+				prob.AddCost(self.table_cost, [(t,j) for j in range(7)], "table%i"%t)
 			if 'laptop' in self.feat_list:
-				prob.AddErrorCost(self.environment.laptop_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "HINGE", "laptop%i"%t)
-				prob.AddCost(self.environment.laptop_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "laptop%i"%t)
+				prob.AddErrorCost(self.laptop_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "HINGE", "laptop%i"%t)
+				prob.AddCost(self.laptop_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "laptop%i"%t)
 			if 'origin' in self.feat_list:
-				prob.AddCost(self.environment.origin_cost, [(t,j) for j in range(7)], "origin%i"%t)
+				prob.AddCost(self.origin_cost, [(t,j) for j in range(7)], "origin%i"%t)
 			if 'human' in self.feat_list:
-				prob.AddCost(self.environment.human_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "human%i"%t)
+				prob.AddCost(self.human_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "human%i"%t)
 			if 'efficiency' in self.feat_list:
-				prob.AddCost(self.environment.efficiency_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "efficiency%i"%t)
+				prob.AddCost(self.efficiency_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "efficiency%i"%t)
 
 		for t in range(1,self.num_waypts - 1):
 			prob.AddConstraint(self.environment.table_constraint, [(t,j) for j in range(7)], "INEQ", "up%i"%t)
@@ -219,5 +218,5 @@ class TrajoptPlanner(object):
 		waypts = self.trajOpt(start, goal, traj_seed=seed)
 		waypts_time = np.linspace(0.0, T, self.num_waypts)
 		traj = Trajectory(waypts, waypts_time)
-		return traj.upsample(T/timestep + 1)
+		return traj.upsample(int(T/timestep) + 1)
 

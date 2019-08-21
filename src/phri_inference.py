@@ -255,6 +255,8 @@ class pHRIInference():
 
                 self.traj = self.planner.replan(self.start, self.goal, self.weights, self.T, 
                                                 self.timestep, seed=self.traj_plan.waypts)
+                self.traj_plan = self.traj.downsample(self.planner.num_waypts)
+				self.controller.set_trajectory(self.traj)
 
                 # Update the experimental data with new weights and new betas.
                 timestamp = time.time() - self.controller.path_start_T

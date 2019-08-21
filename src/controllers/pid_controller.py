@@ -44,7 +44,7 @@ class PIDController(object):
 		self.traj = trajectory
 
 		# Save the intermediate target configuration. 
-		self.target_pos = self.traj.waypts[0]
+		self.target_pos = self.traj.waypts[0].reshape((7,1))
 
 		# Tracks running time since beginning and end of the path.
 		self.path_start_T = None
@@ -65,7 +65,7 @@ class PIDController(object):
 		# First update the target position if needed.
 		# Check if the arm is at the start of the path to execute.
 		if self.path_start_T is None:
-			dist_from_start = -((current_pos - self.traj.waypts[0] + math.pi)%(2*math.pi) - math.pi)
+			dist_from_start = -((current_pos - self.traj.waypts[0].reshape((7,1)) + math.pi)%(2*math.pi) - math.pi)
 			dist_from_start = np.fabs(dist_from_start)
 
 			# Check if every joint is close enough to start configuration.
@@ -80,7 +80,7 @@ class PIDController(object):
 
 			# Check if the arm reached the goal.
 			if self.path_end_T is None:
-				dist_from_goal = -((current_pos - self.traj.waypts[-1] + math.pi)%(2*math.pi) - math.pi)
+				dist_from_goal = -((current_pos - self.traj.waypts[-1].reshape((7,1)) + math.pi)%(2*math.pi) - math.pi)
 				dist_from_goal = np.fabs(dist_from_goal)
 
 				# Check if every joint is close enough to goal configuration.
@@ -94,9 +94,9 @@ class PIDController(object):
 
 		# Check if each angular torque is within set limits.
 		for i in range(7):
-			if self.cmd[i][i] > self.max_cmd[i][i]:
-				self.cmd[i][i] = self.max_cmd[i][i]
-			if self.cmd[i][i] < -self.max_cmd[i][i]:
-				self.cmd[i][i] = -self.max_cmd[i][i]
+			if cmd[i][i] > self.max_cmd[i][i]:
+				cmd[i][i] = self.max_cmd[i][i]
+			if cmd[i][i] < -self.max_cmd[i][i]:
+				cmd[i][i] = -self.max_cmd[i][i]
 
 		return cmd
