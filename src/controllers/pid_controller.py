@@ -1,8 +1,7 @@
 import math
-import sys, select, os
 import time
 
-from utils import pid, ros_utils
+import pid
 
 import numpy as np
 
@@ -28,10 +27,10 @@ class PIDController(object):
 	def __init__(self, P, I, D, epsilon, max_cmd):
 		# ----- PID Parameter Setup ----- #
 		
-        # Basic PID controller initialization
+        # Basic PID controller initialization.
 		self.pid = pid.PID(P,I,D,0,0)
 		
-        # Stores proximity theshold.
+        # Stores proximity threshold.
         self.epsilon = epsilon
 
         # Stores maximum COMMANDED joint torques.

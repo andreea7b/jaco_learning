@@ -5,11 +5,6 @@ import copy
 from scipy.optimize import minimize, newton
 from scipy.stats import chi2
 
-import trajoptpy
-import or_trajopt
-import openravepy
-from openravepy import *
-
 class PHRILearner(object):
 	"""
     This class performs correction inference given a trajectory and an input
@@ -23,10 +18,9 @@ class PHRILearner(object):
         self.feat_list = feat_list
         self.num_features = len(self.feat_list)
         self.weights = [0.0] * self.num_features
-		self.betas = [1.0]*self.num_features
-		self.betas_u = [1.0]*self.num_features
-		self.updates = [0.0]*self.num_features
-		self.waypts_deform = None
+		self.betas = [1.0] * self.num_features
+		self.betas_u = [1.0] * self.num_features
+		self.updates = [0.0] * self.num_features
         self.environment = environment
 
         self.alpha = constants["alpha"]
@@ -44,15 +38,21 @@ class PHRILearner(object):
 		"""
 		Deforms the trajectory given human force, u_h, and
 		updates features by computing difference between 
-		features of new trajectory and old trajectory
+		features of new trajectory and old trajectory.
 		---
-		input is human force and returns updated weights 
-		"""
-		self.waypts_deform = traj.deform(u_h, self.alpha, self.n).waypts
-        self.waypts = traj.waypts
+        
+        Params:
+            traj [Trajectory] -- Current trajectory that force was applied to.
+            u_h [array] -- Human force applied onto the trajectory.
 
-		new_features = self.environment.featurize(self.waypts_deform)
-		old_features = self.environment.featurize(self.waypts)
+        Returns:
+            weights [list] -- Learned weights.
+        """
+        self.traj = traj
+		self.traj_deform = traj.deform(u_h, self.alpha, self.n)
+
+		new_features = self.environment.featurize(self.traj_deform.waypts, self.feat_list)
+		old_features = self.environment.featurize(traj.waypts, self.feat_list)
 
 		Phi_p = np.array([sum(x) for x in new_features])
 		Phi = np.array([sum(x) for x in old_features])
@@ -68,13 +68,15 @@ class PHRILearner(object):
             curr_weight = self.max_update(update)
 		elif self.feat_method == BETA:
             curr_weight = self.beta_update(update)
-
-		# clip values at max and min allowed weights
+        else
+            raise Exception('Learning method {} not implemented.'.format(self.feat_method))
+        
+		# Clip values at max and min allowed weights.
 		for i in range(self.num_features):
 			curr_weight[i] = np.clip(curr_weight[i], 0.0, self.max_weights[i])
-		print "here is the update:", update
-		print "here are the old weights:", self.weights
-		print "here are the new weights:", curr_weight
+		print "Here is the update:", update
+		print "Here are the old weights:", self.weights
+		print "Here are the new weights:", curr_weight
 
 		self.weights = curr_weight.tolist()
 		return self.weights
@@ -104,8 +106,8 @@ class PHRILearner(object):
             elif self.feat_list[i] == 'coffee':	
                 lambda_u = 20000
             u_p = np.reshape(u, (7,1))
-            waypts_deform_p = self.waypts.deform(u_p, self.alpha, self.n).waypts
-            H_features = self.environment.featurize_single(waypts_deform_p,i)
+            waypts_deform_p = self.traj.deform(u_p, self.alpha, self.n).waypts
+            H_features = self.environment.featurize(waypts_deform_p, [self.feat_list[i]])
             Phi_H = sum(H_features)
             cost = (Phi_H - Phi_p[i])**2
             return cost
@@ -118,8 +120,8 @@ class PHRILearner(object):
         # Set up the constraints:
         def u_constraint(u):
             u_p = np.reshape(u, (7,1))
-            waypts_deform_p = self.waypts.deform(u_p, self.alpha, self.n).waypts
-            H_features = self.environment.featurize_single(waypts_deform_p,i)
+            waypts_deform_p = self.traj.deform(u_p, self.alpha, self.n).waypts
+            H_features = self.environment.featurize(waypts_deform_p, [self.feat_list[i]])
             Phi_H = sum(H_features)
             cost = (Phi_H - Phi_p[i])**2
             return cost
@@ -148,8 +150,8 @@ class PHRILearner(object):
 
 			### Compute update using P(r|beta) for the beta estimate we just computed ###
 			# Compute P(r|beta)
-			mus1 = P_beta[self.feat_list[i]+"1"]
-			mus0 = P_beta[self.feat_list[i]+"0"]
+			mus1 = self.P_beta[self.feat_list[i]+"1"]
+			mus0 = self.P_beta[self.feat_list[i]+"0"]
 			p_r0 = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) / (chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) + chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2]))
 			p_r1 = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2]) / (chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) + chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2]))
 
@@ -168,6 +170,6 @@ class PHRILearner(object):
 			num = p_r1*np.exp(weight_p*update[i])
 			denom = p_r0*(l/math.pi)**(self.num_features/2.0)*np.exp(-l*update[i]**2) + num
 			self.betas_u[i] = num/denom
-			print "here is weighted beta:", self.betas_u
+			print "Here is weighted beta:", self.betas_u
 		# Compute new weights
-        return self.weights - np.array(self.betas_u)*update_gains*update
+        return self.weights - np.array(self.betas_u) * update_gains * update

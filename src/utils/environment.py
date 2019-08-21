@@ -12,11 +12,9 @@ class Environment(object):
 	This class creates an OpenRave environment and contains all the
     functionality needed for custom features and constraints.
     """
-	def __init__(self, feat_list, model_filename, object_centers):
+	def __init__(self, model_filename, object_centers):
 
-		# ---- Important internal variables ---- #
-		self.feat_list = feat_list		# 'efficiency', 'table', 'human', 'coffee', 'origin', 'laptop'
-		self.num_features = len(self.feat_list)
+		# ---- Create environment ---- #
 		self.env, self.robot = initialize(model_filename)
 
 		# Insert any objects you want into environment.
@@ -31,51 +29,29 @@ class Environment(object):
 		plotSphere(self.env,self.bodies,object_centers['HUMAN_CENTER'], 0.015)
 
 	# ---- Custom environmental features ---- #
-    def featurize_single(self, traj, feat_idx):
-		"""
-		Computes the user-defined features for a given trajectory and a given feature.
-		---
-		input trajectory, output list of feature values
-		"""
-        waypts = traj.waypts
-		features = [0.0 for _ in range(len(waypts)-1)]
-		for index in range(len(waypts)-1):
-			if self.feat_list[feat_idx] == 'table':
-				features[index] = self.table_features(waypts[index+1])
-			elif self.feat_list[feat_idx] == 'coffee':
-				features[index] = self.coffee_features(waypts[index+1])
-			elif self.feat_list[feat_idx] == 'human':
-				features[index] = self.human_features(waypts[index+1],waypts[index])
-			elif self.feat_list[feat_idx] == 'laptop':
-				features[index] = self.laptop_features(waypts[index+1],waypts[index])
-			elif self.feat_list[feat_idx] == 'origin':
-				features[index] = self.origin_features(waypts[index+1])
-			elif self.feat_list[feat] == 'efficiency':
-				features[index] = self.efficiency_features(waypts[index+1],waypts[index])
-		return features
-
-	def featurize(self, traj):
+	def featurize(self, traj, feat_list):
 		"""
 		Computes the user-defined features for a given trajectory.
 		---
 		input trajectory, output list of feature values
 		"""
         waypts = traj.waypts
-		features = [[0.0 for _ in range(len(waypts)-1)] for _ in range(0, self.num_features)]
+        num_features = len(feat_list)
+		features = [[0.0 for _ in range(len(waypts)-1)] for _ in range(0, num_features)]
 
 		for index in range(len(waypts)-1):
-			for feat in range(self.num_features):
-				if self.feat_list[feat] == 'table':
+			for feat in range(num_features):
+				if feat_list[feat] == 'table':
 					features[feat][index] = self.table_features(waypts[index+1])
-				elif self.feat_list[feat] == 'coffee':
+				elif feat_list[feat] == 'coffee':
 					features[feat][index] = self.coffee_features(waypts[index+1])
-				elif self.feat_list[feat] == 'human':
+				elif feat_list[feat] == 'human':
 					features[feat][index] = self.human_features(waypts[index+1],waypts[index])
-				elif self.feat_list[feat] == 'laptop':
+				elif feat_list[feat] == 'laptop':
 					features[feat][index] = self.laptop_features(waypts[index+1],waypts[index])
-				elif self.feat_list[feat] == 'origin':
+				elif feat_list[feat] == 'origin':
 					features[feat][index] = self.origin_features(waypts[index+1])
-				elif self.feat_list[feat] == 'efficiency':
+				elif feat_list[feat] == 'efficiency':
 					features[feat][index] = self.efficiency_features(waypts[index+1],waypts[index])
 		return features
 

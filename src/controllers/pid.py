@@ -185,7 +185,7 @@ class PID(object):
     def update_PID(self, p_error, dt=None):
 
         """
-        Update the Pid loop with nonuniform time step size.
+        Update the PID loop with nonuniform time step size.
 
         Parameters:
           p_error  Error since last call (target - state)

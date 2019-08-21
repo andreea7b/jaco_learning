@@ -1,0 +1,9 @@
+<launch>
+	
+	<rosparam command="load" file="$(find beta_adaptive_pHRI)/config/demo_recorder.yaml" />
+	
+	<!-- Node for demonstration recording on Jaco arm. -->
+	<node name="demo_recorder" pkg="beta_adaptive_pHRI" type="demo_recorder.py" output="screen"/>
+
+</launch>
+

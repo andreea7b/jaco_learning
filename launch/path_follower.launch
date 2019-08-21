@@ -1,0 +1,9 @@
+<launch>
+	
+	<rosparam command="load" file="$(find beta_adaptive_pHRI)/config/path_follower.yaml" />
+	
+	<!-- Trajopt PID control following a planned trajectory. -->
+	<node name="path_follower" pkg="beta_adaptive_pHRI" type="path_follower.py" output="screen"/>
+
+</launch>
+

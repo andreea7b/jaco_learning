@@ -4,6 +4,7 @@ import json
 import copy
 
 import trajoptpy
+from trajectory import Trajectory
 
 from utils.openrave_utils import *
 
