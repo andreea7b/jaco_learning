@@ -1,7 +1,7 @@
 setup:
     prefix: 'j2s7s300_driver'
     model_filename: "jaco_dynamics"
-    object_centers: {'HUMAN_CENTER': [-0.6,-0.55,0.0], 'LAPTOP_CENTER': [-1.3858/2.0-0.1,-0.1,0.0]}
+    object_centers: {'HUMAN_CENTER': [-0.6,-0.55,0.0], 'LAPTOP_CENTER': [-0.7929,-0.1,0.0]}
     feat_list: ["efficiency", "table", "laptop"]
     feat_weights: [1.0,0.0,0.0]
     start: [104.2, 151.6, 183.8, 101.8, 224.2, 216.9, 310.8]
