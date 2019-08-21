@@ -110,7 +110,6 @@ class DemoRecorder(object):
         pick = rospy.get_param("setup/start")
         place = rospy.get_param("setup/goal")
 		self.start = np.array(pick)*(math.pi/180.0)
-		self.goal = np.array(place)*(math.pi/180.0)
         self.T = rospy.get_param("setup/T")
         self.timestep = rospy.get_param("setup/timestep")
         
@@ -139,7 +138,7 @@ class DemoRecorder(object):
             raise Exception('Controller {} not implemented.'.format(controller_type))
             
         # Tell controller to move to start.
-        self.controller.set_trajectory(Trajectory([start], [0.0]))
+        self.controller.set_trajectory(Trajectory([self.start], [0.0]))
 
 		# Stores current COMMANDED joint torques.
 		self.cmd = np.eye(7)

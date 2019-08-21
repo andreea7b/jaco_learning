@@ -2,13 +2,14 @@ setup:
     prefix: 'j2s7s300_driver'
     model_filename: "jaco_dynamics"
     object_centers: {'HUMAN_CENTER': [-0.6,-0.55,0.0], 'LAPTOP_CENTER': [-0.7929,-0.1,0.0]}
-    feat_list: ["efficiency", "table", "laptop"]
-    feat_weights: [1.0,0.0,0.0]
-    start: [104.2, 151.6, 183.8, 101.8, 224.2, 216.9, 310.8]
-    goal: [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 322.0] # [-0.46513, 0.29041, 0.69497] if pose
+    feat_list: ["efficiency", "table", "coffee"]
+    feat_weights: [1.0,0.0,1.0]
+    start: [104.2, 151.6, 183.8, 101.8, 224.2, 216.9, 225.0]
+    goal: [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 322.0]
+    goal_pose: [-0.46513, 0.29041, 0.69497]
     T: 20.0
     timestep: 0.5
-    
+
 planner:
     # These settings have been tuned for trajopt planner.
     type: "trajopt"

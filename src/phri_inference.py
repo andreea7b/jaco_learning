@@ -111,6 +111,7 @@ class pHRIInference():
         place = rospy.get_param("setup/goal")
 		self.start = np.array(pick)*(math.pi/180.0)
 		self.goal = np.array(place)*(math.pi/180.0)
+		self.goal_pose = None if rospy.get_param("setup/goal_pose") == "None" else rospy.get_param("setup/goal_pose")
         self.T = rospy.get_param("setup/T")
         self.timestep = rospy.get_param("setup/timestep")
         self.feat_list = rospy.get_param("setup/feat_list")
@@ -135,7 +136,7 @@ class pHRIInference():
         else:
             raise Exception('Planner {} not implemented.'.format(planner_type))
 		
-        self.traj = self.planner.replan(self.start, self.goal, self.weights, self.T, self.timestep)
+        self.traj = self.planner.replan(self.start, self.goal, self.goal_pose, self.weights, self.T, self.timestep)
         self.traj_plan = self.traj.downsample(self.planner.num_waypts)
 
         # Track if you have reached the start/goal of the path.
@@ -253,8 +254,8 @@ class pHRIInference():
                 betas_u = self.learner.betas_u
                 updates = self.learner.updates
 
-                self.traj = self.planner.replan(self.start, self.goal, self.weights, self.T, 
-                                                self.timestep, seed=self.traj_plan.waypts)
+                self.traj = self.planner.replan(self.start, self.goal, self.goal_pose, self.weights, 
+												self.T, self.timestep, seed=self.traj_plan.waypts)
                 self.traj_plan = self.traj.downsample(self.planner.num_waypts)
 				self.controller.set_trajectory(self.traj)
 

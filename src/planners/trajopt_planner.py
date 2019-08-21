@@ -4,6 +4,8 @@ import json
 import copy
 
 import trajoptpy
+
+from utils.openrave_utils import *
 from utils.trajectory import Trajectory
 
 class TrajoptPlanner(object):
@@ -95,14 +97,15 @@ class TrajoptPlanner(object):
 
 	# ---- Here's TrajOpt --- #
 
-	def trajOpt(self, start, goal, traj_seed=None):
+	def trajOpt(self, start, goal, goal_pose, traj_seed=None):
 		"""
 		Computes a plan from start to goal using trajectory optimizer.
 		Reference: http://joschu.net/docs/trajopt-paper.pdf
 		---
 		Paramters:
 			start -- The start position.
-			goal -- The goal position OR pose.
+			goal -- The goal position.
+			goal_pose -- The goal pose (optional: can be None).
 			traj_seed [optiona] -- An optional initial trajectory seed.
 
 		Returns:
@@ -111,15 +114,9 @@ class TrajoptPlanner(object):
 		"""
 
 		# --- Initialization --- #
-		print("I'm in TrajOpt!")
 		if len(start) < 10:
 			aug_start = np.append(start.reshape(7), np.array([0,0,0]))
 		self.environment.robot.SetDOFValues(aug_start)
-		if len(goal) < 7:
-			goal_pose = goal
-			goal = poseToRobot(robot, goal_pose)
-		else:
-			goal_pose = None
 
 		# --- Linear interpolation seed --- #
 		if traj_seed is None:
@@ -134,6 +131,7 @@ class TrajoptPlanner(object):
 		# --- Request construction --- #
 		# If pose is given, must include pose constraint.
 		if goal_pose is not None:
+			print("Using goal pose for trajopt computation.")
 			xyz_target = goal_pose
 			quat_target = [1,0,0,0] # wxyz
 			constraint = [
@@ -148,6 +146,7 @@ class TrajoptPlanner(object):
 				}
 			]
 		else:
+			print("Using goal for trajopt computation.")
 			constraint = [
 				{
 					"type": "joint",
@@ -199,13 +198,14 @@ class TrajoptPlanner(object):
 		result = trajoptpy.OptimizeProblem(prob)
 		return result.GetTraj()
 
-	def replan(self, start, goal, weights, T, timestep, seed=None):
+	def replan(self, start, goal, goal_pose, weights, T, timestep, seed=None):
 		"""
 		Replan the trajectory from start to goal given weights.
 		---
 		Parameters:
 			start -- Start position
-			goal -- Goal position OR pose.
+			goal -- Goal position.
+			goal_pose -- Goal pose (optional: can be None).
 			weights -- Weights used for the planning objective.
 			T [float] -- Time horizon for the desired trajectory.
 			timestep [float] -- Frequency of waypoints in desired trajectory.
@@ -215,7 +215,7 @@ class TrajoptPlanner(object):
 		assert weights is not None, "The weights vector is empty. Cannot plan without a cost preference."
 		self.weights = weights
 
-		waypts = self.trajOpt(start, goal, traj_seed=seed)
+		waypts = self.trajOpt(start, goal, goal_pose, traj_seed=seed)
 		waypts_time = np.linspace(0.0, T, self.num_waypts)
 		traj = Trajectory(waypts, waypts_time)
 		return traj.upsample(int(T/timestep) + 1)

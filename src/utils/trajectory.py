@@ -1,8 +1,5 @@
 import numpy as np
 
-import openravepy
-from openravepy import *
-
 class Trajectory(object):
 	"""
 	This class represents a trajectory object, supporting operations such as
