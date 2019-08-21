@@ -75,6 +75,7 @@ class PathFollower(object):
 		place = rospy.get_param("setup/goal")
 		self.start = np.array(pick)*(math.pi/180.0)
 		self.goal = np.array(place)*(math.pi/180.0)
+		self.goal_pose = None if rospy.get_param("setup/goal_pose") == "None" else rospy.get_param("setup/goal_pose")
 		self.T = rospy.get_param("setup/T")
 		self.timestep = rospy.get_param("setup/timestep")
 		self.feat_list = rospy.get_param("setup/feat_list")
@@ -97,7 +98,7 @@ class PathFollower(object):
 		else:
 			raise Exception('Planner {} not implemented.'.format(planner_type))
 		
-		self.traj = self.planner.replan(self.start, self.goal, self.weights, self.T, self.timestep)
+		self.traj = self.planner.replan(self.start, self.goal, self.goal_pose, self.weights, self.T, self.timestep)
 
 		# Save the intermediate target configuration. 
 		self.curr_pos = None
@@ -154,4 +155,4 @@ class PathFollower(object):
 		self.cmd = self.controller.get_command(self.curr_pos)
 		
 if __name__ == '__main__':
-	path_follower = PathFollower()
+	PathFollower()

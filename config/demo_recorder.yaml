@@ -3,9 +3,9 @@ setup:
     model_filename: "jaco_dynamics"
     object_centers: {'HUMAN_CENTER': [-0.6,-0.55,0.0], 'LAPTOP_CENTER': [-0.7929,-0.1,0.0]}
     start: [104.2, 151.6, 183.8, 101.8, 224.2, 216.9, 310.8]
-    goal: [210.8, 101.6, 192.0, 114.7, 222.2, 246.1, 322.0] # [-0.46513, 0.29041, 0.69497] if pose
     T: 20.0
     timestep: 0.5
+    save_dir: "/data/demonstrations/"
 
 controller:
     # These settings have been tuned for PID controller.

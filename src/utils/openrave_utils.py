@@ -46,7 +46,7 @@ def initialize(model_filename='jaco', envXML=None):
 		   [ 0.04076329, -0.72657133, -0.68588079,  1.67818344],
 		   [ 0.        ,  0.        ,  0.        ,  1.        ]])
 	viewer.SetCamera(cam_params)
-	
+
 	return env, robot
 
 # ------- Conversion Utils ------- #

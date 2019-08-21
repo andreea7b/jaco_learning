@@ -1,15 +1,13 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import time
 import os
 import pickle
 
-import data_io
 from utils.openrave_utils import *
 
 class ExperimentUtils(object):
 
-	def __init__(self):
+	def __init__(self, save_dir):
 		# Stores dictionary of all the replanned trajectories
 		self.replanned_trajList = {}
 
@@ -53,6 +51,10 @@ class ExperimentUtils(object):
 		self.startT = 0.0
 		self.endT = 0.0
 
+		# Store saved directory path
+		here = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../../'))
+		self.save_dir = here + save_dir + "/"
+
 	# ----- Data saving/tracking utils ----- 
 
 	def update_replanned_trajList(self, timestamp, traj):
@@ -71,22 +73,22 @@ class ExperimentUtils(object):
 
 	def update_deformed_trajList(self, timestamp, waypts):
 		"""
-		Updates the deformed trajectory
+		Updates the deformed trajectory.
 		"""
 		if timestamp not in self.deformed_trajList:
 			self.deformed_trajList[timestamp] = waypts
 
 	def update_deformed_wayptsList(self, timestamp, waypts):
 		"""
-		Updates the deformed trajectory waypoints
+		Updates the deformed trajectory waypoints.
 		"""
 		if timestamp not in self.deformed_wayptsList:
 			self.deformed_wayptsList[timestamp] = waypts
 
 	def update_tracked_traj(self, timestamp, curr_pos):
 		"""
-		Uses current position read from the robot to update the trajectory
-		Saves timestamp when this position was read
+		Uses current position read from the robot to update the trajectory.
+		Saves timestamp when this position was read.
 		""" 
 		currTraj = np.append([timestamp], curr_pos.reshape(7))
 		if self.tracked_traj is None:
@@ -96,8 +98,8 @@ class ExperimentUtils(object):
 
 	def update_tauH(self, timestamp, tau_h):
 		"""
-		Uses current joint torque reading from the robot during interaction
-		Saves timestamp when this torque was read
+		Uses current joint torque reading from the robot during interaction.
+		Saves timestamp when this torque was read.
 		""" 
 		currTau = np.append([timestamp], tau_h.reshape(7))
 		if self.tauH is None:
@@ -107,8 +109,8 @@ class ExperimentUtils(object):
 
 	def update_interaction_point(self, timestamp, interaction_point):
 		"""
-		Uses current position reading from the robot during interaction
-		Saves timestamp when this position was read
+		Uses current position reading from the robot during interaction.
+		Saves timestamp when this position was read.
 		""" 
 		curr_iact_pt = np.append([timestamp], interaction_point.reshape(7))
 		if self.interaction_pts is None:
@@ -118,10 +120,10 @@ class ExperimentUtils(object):
 
 	def update_weights(self, timestamp, new_weight):
 		"""
-		Updates list of timestamped weights
+		Updates list of timestamped weights.
 		"""
 		if new_weight is None:
-			print "in update_weights: new_weights are None..."
+			print "In update_weights: new_weights are None..."
 			return 
 		new_w = np.array([timestamp] + new_weight)
 		if self.weights is None:
@@ -131,10 +133,10 @@ class ExperimentUtils(object):
 
 	def update_betas(self, timestamp, new_beta):
 		"""
-		Updates list of timestamped betas
+		Updates list of timestamped betas.
 		"""
 		if new_beta is None:
-			print "in update_betas: new_beta is None..."
+			print "In update_betas: new_beta is None..."
 			return 
 		new_b = np.array([timestamp] + new_beta)
 		if self.betas is None:
@@ -144,10 +146,10 @@ class ExperimentUtils(object):
 
 	def update_betas_u(self, timestamp, new_beta_u):
 		"""
-		Updates list of timestamped betas_u
+		Updates list of timestamped betas_u.
 		"""
 		if new_beta_u is None:
-			print "in update_betas_u: new_beta_u is None..."
+			print "In update_betas_u: new_beta_u is None..."
 			return 
 		new_b_u = np.array([timestamp] + new_beta_u)
 		if self.betas_u is None:
@@ -157,10 +159,10 @@ class ExperimentUtils(object):
 	
 	def update_updates(self, timestamp, new_update):
 		"""
-		Updates list of timestamped updates
+		Updates list of timestamped updates.
 		"""
 		if new_update is None:
-			print "in update_updates: new_update is None..."
+			print "In update_updates: new_update is None..."
 			return 
 		new_u = np.array([timestamp] + new_update)
 		if self.updates is None:
@@ -170,38 +172,36 @@ class ExperimentUtils(object):
 
 	def set_startT(self,start_t):
 		"""
-		Records start time for experiment
+		Records start time for experiment.
 		"""
 		self.startT = start_t
 
 	def set_endT(self,end_t):
 		"""
-		Records end time for experiment
+		Records end time for experiment.
 		"""
 		self.endT = end_t
 
 	# ----- Saving (pickling) utilities ------- #
 
 	def get_unique_filepath(self,subdir,filename):
-		# get the current script path
-		here = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..'))
-		subdir = "/data/demonstrations/"+subdir+"/"
-		filepath = here + subdir + filename + "1.p"
+		# Get the current script path
+		dirpath = self.save_dir + subdir + "/"
+		filepath = dirpath + filename + "_1.p"
 		i = 2
 		while os.path.exists(filepath):
-			filepath = here+subdir+filename+str(i)+".p"
+			filepath = dirpath + filename + str(i)+".p"
 			i+=1
 
 		return filepath
 
 	def get_unique_bagpath(self,subdir,filename):
-		# get the current script path
-		here = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..'))
-		subdir = "/data/demonstrations/"+subdir+"/"
-		filepath = here + subdir + filename + "1.bag"
+		# Get the current script path.
+		dirpath = self.save_dir + subdir + "/"
+		filepath = dirpath + filename + "_1.bar"
 		i = 2
 		while os.path.exists(filepath):
-			filepath = here+subdir+filename+str(i)+".bag"
+			filepath = dirpath + filename + str(i)+".bag"
 			i+=1
 
 		return filepath

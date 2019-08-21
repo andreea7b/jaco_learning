@@ -47,6 +47,7 @@ class DemoInference(object):
             place = params["sim"]["task"]["goal"]
             self.start = np.array(pick)*(math.pi/180.0)
             self.goal = np.array(place)*(math.pi/180.0)
+            self.goal_pose = None if params["sim"]["tasak"]["goal_pose"] == "None" else params["sim"]["tasak"]["goal_pose"]
             self.T = params["sim"]["task"]["T"]
             self.timestep = params["sim"]["task"]["timestep"]
             self.weights = params["sim"]["task"]["feat_weights"]
@@ -62,7 +63,7 @@ class DemoInference(object):
             else:
                 raise Exception('Planner {} not implemented.'.format(planner_type))
             
-            self.traj = [self.planner.replan(self.start, self.goal, self.weights, self.T, self.timestep)]
+            self.traj = [self.planner.replan(self.start, self.goal, self.goal_pose, self.weights, self.T, self.timestep)]
 			plotTraj(self.environment.env, self.environment.robot, self.environment.bodies, self.traj.waypts, size=0.015,color=[0, 0, 1])
 			plotCupTraj(self.environment.env, self.environment.robot, self.environment.bodies, [self.traj[0][-1]],color=[0,1,0])
         else:

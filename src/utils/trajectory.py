@@ -1,8 +1,5 @@
 import numpy as np
 
-import openravepy
-from openravepy import *
-
 class Trajectory(object):
 	"""
 	This class represents a trajectory object, supporting operations such as
@@ -12,7 +9,8 @@ class Trajectory(object):
 		self.waypts = waypts
 		self.waypts_time = waypts_time
 		self.num_waypts = len(waypts)
-		self.timestep = (self.waypts_time[-1] - self.waypts_time[0]) / (self.num_waypts - 1)
+		if self.num_waypts > 1:
+			self.timestep = (self.waypts_time[-1] - self.waypts_time[0]) / (self.num_waypts - 1)
 
 	def upsample(self, num_waypts):
 		"""
@@ -26,6 +24,7 @@ class Trajectory(object):
 			upsampled_waypts [Trajectory] -- Downsampled trajectory.
 		"""
 		assert num_waypts >= len(self.waypts), "Upsampling requires a larger number of waypoints to upsample to. Your number is smaller."
+		assert len(self.waypts) > 1, "Cannot upsample a one-waypoint trajectory."
 
 		timestep = (self.waypts_time[-1] - self.waypts_time[0]) / (num_waypts - 1)
 		waypts = np.zeros((num_waypts,7))
@@ -57,15 +56,16 @@ class Trajectory(object):
 			downsampled_waypts [Trajectory] -- Downsampled trajectory.
 		"""
 		assert num_waypts <= len(self.waypts), "Downsampling requires a smaller number of waypoints to downsample to. Your number is larger."
-		
+		assert len(self.waypts) > 1, "Cannot downsample a one-waypoint trajectory."
+
 		timestep = (self.waypts_time[-1] - self.waypts_time[0]) / (num_waypts - 1)
 		waypts = np.zeros((num_waypts,7))
 		waypts_time = [None]*num_waypts
 
-		for index in range(1, num_waypts - 1):
+		for index in range(num_waypts):
 			t = self.waypts_time[0] + index * timestep
 			waypts_time[index] = t
-			waypts[index,:] = self.interpolate(t)
+			waypts[index,:] = self.interpolate(t).reshape((1,7))
 
 		return Trajectory(waypts, waypts_time)
 
@@ -79,6 +79,7 @@ class Trajectory(object):
 		Returns:
 			waypt [array] -- Interpolated waypoint at time t.
 		"""
+		assert len(self.waypts) > 1, "Cannot interpolate a one-waypoint trajectory."
 
 		if t >= self.waypts_time[-1]:
 			# If interpolating after end of trajectory, return last waypoint.
