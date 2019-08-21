@@ -211,7 +211,7 @@ class pHRIInference():
 		self.curr_pos = self.curr_pos*(math.pi/180.0)
 
 		# Update cmd from PID based on current position.
-		self.cmd = -self.controller.get_command(self.curr_pos)
+		self.cmd = self.controller.get_command(self.curr_pos)
 		
         # Check is start/goal has been reached.
         if self.controller.path_start_T is not None:
@@ -255,6 +255,8 @@ class pHRIInference():
 
                 self.traj = self.planner.replan(self.start, self.goal, self.weights, self.T, 
                                                 self.timestep, seed=self.traj_plan.waypts)
+                self.traj_plan = self.traj.downsample(self.planner.num_waypts)
+				self.controller.set_trajectory(self.traj)
 
                 # Update the experimental data with new weights and new betas.
                 timestamp = time.time() - self.controller.path_start_T

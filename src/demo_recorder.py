@@ -179,7 +179,7 @@ class DemoRecorder(object):
 			timestamp = time.time() - self.path_start_T
 			self.expUtil.update_tracked_traj(timestamp, curr_pos)
         else:
-		    self.cmd = -self.controller.get_command(curr_pos)
+		    self.cmd = self.controller.get_command(curr_pos)
 
 if __name__ == '__main__':
 	DemoControl()
