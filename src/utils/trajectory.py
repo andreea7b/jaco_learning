@@ -89,7 +89,7 @@ class Trajectory(object):
 			next_waypt = self.waypts[curr_waypt_idx + 1]
 			curr_t = self.waypts_time[curr_waypt_idx]
 			next_t = self.waypts_time[curr_waypt_idx + 1]
-			waypt = curr_waypt + (next_waypt - prev_waypt) * ((t - curr_t) / (next_t - curr_t))
+			waypt = curr_waypt + (next_waypt - curr_waypt) * ((t - curr_t) / (next_t - curr_t))
 		waypt = np.array(waypt).reshape((7,1))
 		return waypt
 
