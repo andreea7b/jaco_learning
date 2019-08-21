@@ -9,6 +9,7 @@ setup:
     goal_pose: None # [-0.46513, 0.29041, 0.69497]
     T: 20.0
     timestep: 0.5
+    save_dir: "/data/corrections/"
     # These constants have been tuned for the task tested.
     INTERACTION_TORQUE_THRESHOLD: [0.88414821, 17.22751856, -0.40134936,  6.23537946, -0.90013662, 1.32379884,  0.10218059]
     INTERACTION_TORQUE_EPSILON: [4.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]

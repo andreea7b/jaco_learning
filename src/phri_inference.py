@@ -44,7 +44,7 @@ class pHRIInference():
 		self.register_callbacks()
 		
         # Start admittance control mode.
-		ros_utils.start_admittance_mode()
+		ros_utils.start_admittance_mode(self.prefix)
 
 		# Publish to ROS at 100hz.
 		r = rospy.Rate(100)
@@ -99,7 +99,7 @@ class pHRIInference():
 			self.expUtil.pickle_replanned_wayptsList(replanned_waypts_filename)
 			self.expUtil.pickle_updates(updates_filename)
 
-        ros_utils.stop_admittance_mode()
+        ros_utils.stop_admittance_mode(self.prefix)
 
 	def load_parameters(self):
 		"""
@@ -114,6 +114,7 @@ class pHRIInference():
 		self.goal_pose = None if rospy.get_param("setup/goal_pose") == "None" else rospy.get_param("setup/goal_pose")
         self.T = rospy.get_param("setup/T")
         self.timestep = rospy.get_param("setup/timestep")
+        self.save_dir = rospy.get_param("setup/save_dir")
         self.feat_list = rospy.get_param("setup/feat_list")
         self.weights = rospy.get_param("setup/feat_weights")
         self.INTERACTION_TORQUE_THRESHOLD = rospy.get_param("setup/INTERACTION_TORQUE_THRESHOLD")
@@ -181,7 +182,7 @@ class pHRIInference():
         self.learner = PHRILearner(self.feat_method, self.feat_list, self.environment, constants)
 	
          # ---- Experimental Utils ---- #
-		self.expUtil = experiment_utils.ExperimentUtils()
+		self.expUtil = experiment_utils.ExperimentUtils(self.save_dir)
 		# Update the list of replanned plans with new trajectory plan.
 		self.expUtil.update_replanned_trajList(0.0, self.traj_plan.waypts)
 		# Update the list of replanned waypoints with new waypoints.

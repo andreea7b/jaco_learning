@@ -155,4 +155,4 @@ class PathFollower(object):
 		self.cmd = self.controller.get_command(self.curr_pos)
 		
 if __name__ == '__main__':
-	path_follower = PathFollower()
+	PathFollower()

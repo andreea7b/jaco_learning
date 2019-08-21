@@ -5,6 +5,7 @@ setup:
     start: [104.2, 151.6, 183.8, 101.8, 224.2, 216.9, 310.8]
     T: 20.0
     timestep: 0.5
+    save_dir: "/data/demonstrations/"
 
 controller:
     # These settings have been tuned for PID controller.
