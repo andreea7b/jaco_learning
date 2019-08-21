@@ -151,7 +151,7 @@ class PathFollower(object):
 		self.curr_pos = self.curr_pos*(math.pi/180.0)
 
 		# Update cmd from PID based on current position.
-		self.cmd = -self.controller.get_command(self.curr_pos)
+		self.cmd = self.controller.get_command(self.curr_pos)
 		
 if __name__ == '__main__':
 	path_follower = PathFollower()

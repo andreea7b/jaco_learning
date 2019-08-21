@@ -211,7 +211,7 @@ class pHRIInference():
 		self.curr_pos = self.curr_pos*(math.pi/180.0)
 
 		# Update cmd from PID based on current position.
-		self.cmd = -self.controller.get_command(self.curr_pos)
+		self.cmd = self.controller.get_command(self.curr_pos)
 		
         # Check is start/goal has been reached.
         if self.controller.path_start_T is not None:
