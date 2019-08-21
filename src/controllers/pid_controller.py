@@ -20,50 +20,50 @@ class PIDController(object):
 
 	Required parameters:
 		P, I, D    - gain terms for the PID controller
-        epsilon    - proximity threshold
-        max_cmd    - maximum allowed torque command
+		epsilon    - proximity threshold
+		max_cmd    - maximum allowed torque command
 	"""
 
 	def __init__(self, P, I, D, epsilon, max_cmd):
 		# ----- PID Parameter Setup ----- #
-		
-        # Basic PID controller initialization.
-		self.pid = pid.PID(P,I,D,0,0)
-		
-        # Stores proximity threshold.
-        self.epsilon = epsilon
 
-        # Stores maximum COMMANDED joint torques.
+		# Basic PID controller initialization.
+		self.pid = pid.PID(P,I,D,0,0)
+
+		# Stores proximity threshold.
+		self.epsilon = epsilon
+
+		# Stores maximum COMMANDED joint torques.
 		self.max_cmd = max_cmd 
 
-    def set_trajectory(self, trajectory):
-        """
-        Setter method that sets the trajectory and relevant parameters.
-        """
-        # Set the trajectory, which may be updated.
-        self.traj = trajectory
-		
-        # Save the intermediate target configuration. 
+	def set_trajectory(self, trajectory):
+		"""
+		Setter method that sets the trajectory and relevant parameters.
+		"""
+		# Set the trajectory, which may be updated.
+		self.traj = trajectory
+
+		# Save the intermediate target configuration. 
 		self.target_pos = self.traj.waypts[0]
-		
+
 		# Tracks running time since beginning and end of the path.
 		self.path_start_T = None
-        self.path_end_T = None
+		self.path_end_T = None
 
 	def get_command(self, current_pos):
 		"""
 		Reads the latest position of the robot and returns an
 		appropriate torque command to move the robot to the target.
 
-        Parameters:
-            current_pos - A waypoint determining the robot's position.
+		Parameters:
+			current_pos - A waypoint determining the robot's position.
 
-        Returns:
-            cmd - The next control command to get to the updated target.
+		Returns:
+		    cmd - The next control command to get to the updated target.
 		"""
-		
-        # First update the target position if needed.
-        # Check if the arm is at the start of the path to execute.
+
+		# First update the target position if needed.
+		# Check if the arm is at the start of the path to execute.
 		if self.path_start_T is None:
 			dist_from_start = -((current_pos - self.traj.waypts[0] + math.pi)%(2*math.pi) - math.pi)
 			dist_from_start = np.fabs(dist_from_start)
@@ -99,4 +99,4 @@ class PIDController(object):
 			if self.cmd[i][i] < -self.max_cmd[i][i]:
 				self.cmd[i][i] = -self.max_cmd[i][i]
 
-        return cmd
+		return cmd

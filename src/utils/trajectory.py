@@ -1,30 +1,30 @@
 import numpy as np
 
 class Trajectory(object):
-    """
-    This class represents a trajectory object, supporting operations such as
-    interpolating, downsampling waypoints, upsampling waypoints, etc.
-    """
-    def __init__(self, waypts, waypts_time):
-        self.waypts = waypts
-        self.waypts_time = waypts_time
-        self.num_waypts = len(waypts)
-        self.timestep = (self.waypts_time[-1] - self.waypts_time[0]) / (self.num_waypts - 1)
-	
-    def upsample(self, num_waypts):
+	"""
+	This class represents a trajectory object, supporting operations such as
+	interpolating, downsampling waypoints, upsampling waypoints, etc.
+	"""
+	def __init__(self, waypts, waypts_time):
+		self.waypts = waypts
+		self.waypts_time = waypts_time
+		self.num_waypts = len(waypts)
+		self.timestep = (self.waypts_time[-1] - self.waypts_time[0]) / (self.num_waypts - 1)
+
+	def upsample(self, num_waypts):
 		"""
 		Upsample the trajectory waypoints to num_waypts length.
-        Error if num_waypts is smaller than current waypts length.
+		Error if num_waypts is smaller than current waypts length.
 
-        Params:
-            num_waypts [int] -- Number of waypoints to downsample to.
-        
-        Returns:
-            upsampled_waypts [Trajectory] -- Downsampled trajectory.
-        """
-        assert num_waypts <= len(self.waypts), "Upsampling requires a larger number of waypoints to upsample to. Your number is smaller."
-        
-        timestep = (self.waypts_time[-1] - self.waypts_time[0]) / (num_waypts - 1)
+		Params:
+			num_waypts [int] -- Number of waypoints to downsample to.
+
+		Returns:
+			upsampled_waypts [Trajectory] -- Downsampled trajectory.
+		"""
+		assert num_waypts <= len(self.waypts), "Upsampling requires a larger number of waypoints to upsample to. Your number is smaller."
+
+		timestep = (self.waypts_time[-1] - self.waypts_time[0]) / (num_waypts - 1)
 		waypts = np.zeros((num_waypts,7))
 		waypts_time = [None]*num_waypts
 
@@ -34,51 +34,51 @@ class Trajectory(object):
 				waypts_time[i] = self.waypts_time[-1]
 				waypts[i,:] = self.waypts[-1]
 			else:
-			    curr_waypt_idx = int((t - self.waypts_time[0]) / self.timestep)
-			    curr_waypt = self.waypts[curr_waypt_idx]
-			    next_waypt = self.waypts[curr_waypt_idx + 1]
+				curr_waypt_idx = int((t - self.waypts_time[0]) / self.timestep)
+				curr_waypt = self.waypts[curr_waypt_idx]
+				next_waypt = self.waypts[curr_waypt_idx + 1]
 				waypts_time[i] = t
 				waypts[i,:] = curr_waypt + ((t - curr_waypt_idx * self.timestep) / self.timestep) * (next_waypt - curr_waypt)
 			t += timestep
-        return Trajectory(waypts, waypts_time)
+		return Trajectory(waypts, waypts_time)
 
 	def downsample(self, num_waypts):
 		"""
 		Downsample the trajectory waypoints to num_waypts length.
-        Error if num_waypts is larger than current waypts length.
+		Error if num_waypts is larger than current waypts length.
 
-        Params:
-            num_waypts [int] -- Number of waypoints to downsample to.
-        
-        Returns:
-            downsampled_waypts [Trajectory] -- Downsampled trajectory.
-        """
-        assert num_waypts <= len(self.waypts), "Downsampling requires a smaller number of waypoints to downsample to. Your number is larger."
+		Params:
+			num_waypts [int] -- Number of waypoints to downsample to.
+
+		Returns:
+			downsampled_waypts [Trajectory] -- Downsampled trajectory.
+		"""
+		assert num_waypts <= len(self.waypts), "Downsampling requires a smaller number of waypoints to downsample to. Your number is larger."
 		
-        timestep = (self.waypts_time[-1] - self.waypts_time[0]) / (num_waypts - 1)
+		timestep = (self.waypts_time[-1] - self.waypts_time[0]) / (num_waypts - 1)
 		waypts = np.zeros((num_waypts,7))
 		waypts_time = [None]*num_waypts
 
-        for index in range(1, num_waypts - 1):
+		for index in range(1, num_waypts - 1):
 			t = self.waypts_time[0] + index * timestep
-            waypts_time[index] = t
+			waypts_time[index] = t
 			waypts[index,:] = self.interpolate(t)
 
-        return Trajectory(waypts, waypts_time)
+		return Trajectory(waypts, waypts_time)
 
 	def interpolate(self, t):
 		"""
 		Gets the desired position along trajectory at time t by interpolating between waypoints.
 
-        Params:
-            t [float] -- The time of desired interpolation along path.
+		Params:
+			t [float] -- The time of desired interpolation along path.
 
-        Returns:
-            waypt [array] -- Interpolated waypoint at time t.
+		Returns:
+			waypt [array] -- Interpolated waypoint at time t.
 		"""
 
 		if t >= self.waypts_time[-1]:
-            # If interpolating after end of trajectory, return last waypoint.
+			# If interpolating after end of trajectory, return last waypoint.
 			waypt = self.waypts[-1]
 		else:
 			curr_waypt_idx = int((t - self.waypts_time[0]) / self.timestep)
@@ -94,16 +94,16 @@ class Trajectory(object):
 		"""
 		Deforms the next n waypoints of the trajectory.
 		
-        Params:
-            u_h -- Human torque for correction.
-            alpha -- Alpha deformation parameter.
-            n -- Width of deformation parameter.
+		Params:
+			u_h -- Human torque for correction.
+			alpha -- Alpha deformation parameter.
+			n -- Width of deformation parameter.
 
-        Returns:
-            trajectory -- Deformed trajectory.
+		Returns:
+			trajectory -- Deformed trajectory.
 		"""
-		
-        # ---- DEFORMATION Initialization ---- #
+
+		# ---- DEFORMATION Initialization ---- #
 		A = np.zeros((n+2, n))
 		np.fill_diagonal(A, 1)
 		for i in range(n):
@@ -115,10 +115,10 @@ class Trajectory(object):
 		Uh[0] = 1
 		H = np.dot(Rinv,Uh)*(np.sqrt(n)/np.linalg.norm(np.dot(Rinv,Uh)))
 
-        # ---- Deformation process ---- #
+		# ---- Deformation process ---- #
 		waypts_deform = copy.deepcopy(self.waypts)
 		gamma = np.zeros((n,7))
-        deform_waypt_idx = int((t - self.waypts_time[0]) / self.timestep) + 1
+		deform_waypt_idx = int((t - self.waypts_time[0]) / self.timestep) + 1
 
 		if (deform_waypt_idx + n) > self.num_waypts:
 			print "Deforming too close to end. Returning same trajectory"

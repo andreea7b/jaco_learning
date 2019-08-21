@@ -4,14 +4,13 @@ import json
 import copy
 
 import trajoptpy
-from trajectory import Trajectory
-
+from utils.trajectory import Trajectory
 from utils.openrave_utils import *
 
 class TrajoptPlanner(object):
 	"""
 	This class plans a trajectory from start to goal with TrajOpt, given
-    features and feature weights (optionally).
+	features and feature weights (optionally).
 	"""
 	def __init__(self, feat_list, max_iter, num_waypts, environment):
 
@@ -22,14 +21,14 @@ class TrajoptPlanner(object):
 
 		# These variables are trajopt parameters.
 		self.MAX_ITER = max_iter
-        self.num_waypts = num_waypts
+		self.num_waypts = num_waypts
 
-        # Set OpenRAVE environment.
-        self.environment = environment
+		# Set OpenRAVE environment.
+		self.environment = environment
 
-    # ---- Costs ---- #
+	# ---- Costs ---- #
 	
-    def efficiency_cost(self, waypt):
+	def efficiency_cost(self, waypt):
 		"""
 		Computes the total efficiency cost
 		---
@@ -102,26 +101,26 @@ class TrajoptPlanner(object):
 		Computes a plan from start to goal using trajectory optimizer.
 		Reference: http://joschu.net/docs/trajopt-paper.pdf
 		---
-        Paramters:
-		    start -- The start position.
-            goal -- The goal position OR pose.
-            traj_seed [optiona] -- An optional initial trajectory seed.
+		Paramters:
+			start -- The start position.
+			goal -- The goal position OR pose.
+			traj_seed [optiona] -- An optional initial trajectory seed.
 
-        Returns:
-            waypts_plan -- A downsampled trajectory resulted from the TrajOpt
-            optimization problem solution.
+		Returns:
+			waypts_plan -- A downsampled trajectory resulted from the TrajOpt
+			optimization problem solution.
 		"""
 
-        # --- Initialization --- #
+		# --- Initialization --- #
 		print("I'm in TrajOpt!")
 		if len(start) < 10:
 			aug_start = np.append(start.reshape(7), np.array([0,0,0]))
 		self.environment.robot.SetDOFValues(aug_start)
-        if len(goal) < 7:
-            goal_pose = goal
-            goal = poseToRobot(robot, goal_pose)
-        else:
-            goal_pose = None
+		if len(goal) < 7:
+			goal_pose = goal
+			goal = poseToRobot(robot, goal_pose)
+		else:
+			goal_pose = None
 
 		# --- Linear interpolation seed --- #
 		if traj_seed is None:
@@ -133,35 +132,35 @@ class TrajoptPlanner(object):
 			print("Using trajectory seed initialization!")
 			init_waypts = traj_seed
 
-        # --- Request construction --- #
-        # If pose is given, must include pose constraint.
-        if goal_pose is not None:
-            xyz_target = goal_pose
-            quat_target = [1,0,0,0] # wxyz
-            constraint = [
-                {
-                    "type": "pose",
-                    "params" : {"xyz" : xyz_target,
-                                "wxyz" : quat_target,
-                                "link": "j2s7s300_link_7",
-                                "rot_coeffs" : [0,0,0],
-                                "pos_coeffs" : [35,35,35],
-                               }
-                }
-            ]
-        else:
-            constraint = [
-                {
-                    "type": "joint",
-                    "params": {"vals": goal.tolist()}
-                }
-            ]
+		# --- Request construction --- #
+		# If pose is given, must include pose constraint.
+		if goal_pose is not None:
+			xyz_target = goal_pose
+			quat_target = [1,0,0,0] # wxyz
+			constraint = [
+				{
+					"type": "pose",
+					"params" : {"xyz" : xyz_target,
+								"wxyz" : quat_target,
+								"link": "j2s7s300_link_7",
+								"rot_coeffs" : [0,0,0],
+								"pos_coeffs" : [35,35,35],
+								}
+				}
+			]
+		else:
+			constraint = [
+				{
+					"type": "joint",
+					"params": {"vals": goal.tolist()}
+				}
+			]
 
-        request = {
+		request = {
 			"basic_info": {
 				"n_steps": self.num_waypts,
 				"manip" : "j2s7s300",
-                "start_fixed" : True,
+				"start_fixed" : True,
 				"max_iter" : self.MAX_ITER
 			},
 			"costs": [
@@ -172,8 +171,8 @@ class TrajoptPlanner(object):
 			],
 			"constraints": constraint,
 			"init_info": {
-                "type": "given_traj",
-                "data": init_waypts.tolist()
+				"type": "given_traj",
+				"data": init_waypts.tolist()
 			}
 		}
 
@@ -205,20 +204,20 @@ class TrajoptPlanner(object):
 		"""
 		Replan the trajectory from start to goal given weights.
 		---
-        Parameters:
-            start -- Start position
-            goal -- Goal position OR pose.
-            weights -- Weights used for the planning objective.
-            T [float] -- Time horizon for the desired trajectory.
-            timestep [float] -- Frequency of waypoints in desired trajectory.
-        Returns:
-            traj [Trajectory] -- The optimal trajectory satisfying the arguments.
+		Parameters:
+			start -- Start position
+			goal -- Goal position OR pose.
+			weights -- Weights used for the planning objective.
+			T [float] -- Time horizon for the desired trajectory.
+			timestep [float] -- Frequency of waypoints in desired trajectory.
+		Returns:
+			traj [Trajectory] -- The optimal trajectory satisfying the arguments.
 		"""
-        assert weights is not None, "The weights vector is empty. Cannot plan without a cost preference."
+		assert weights is not None, "The weights vector is empty. Cannot plan without a cost preference."
 		self.weights = weights
 
 		waypts = self.trajOpt(start, goal, traj_seed=seed)
-        waypts_time = np.linspace(0.0, T, self.num_waypts)
-        traj = Trajectory(waypts, waypts_time)
+		waypts_time = np.linspace(0.0, T, self.num_waypts)
+		traj = Trajectory(waypts, waypts_time)
 		return traj.upsample(T/timestep + 1)
 

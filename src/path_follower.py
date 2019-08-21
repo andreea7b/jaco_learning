@@ -19,6 +19,7 @@ import sys, select, os
 import time
 
 from utils import ros_utils
+from utils.environment import Environment
 from controllers.pid_controller import PIDController
 from planners.trajopt_planner import TrajoptPlanner
 
@@ -40,9 +41,9 @@ class PathFollower(object):
 
 	def __init__(self):
 		# Create ROS node.
-        rospy.init_node("path_follower")
+		rospy.init_node("path_follower")
 
-        # Load parameters and set up subscribers/publishers.
+		# Load parameters and set up subscribers/publishers.
 		self.load_parameters()
 		self.register_callbacks()
 
@@ -69,64 +70,63 @@ class PathFollower(object):
 		"""
 
 		# ----- General Setup ----- #
-        self.prefix = rospy.get_param("setup/prefix")
-        pick = rospy.get_param("setup/start")
-        place = rospy.get_param("setup/goal")
+		self.prefix = rospy.get_param("setup/prefix")
+		pick = rospy.get_param("setup/start")
+		place = rospy.get_param("setup/goal")
 		self.start = np.array(pick)*(math.pi/180.0)
 		self.goal = np.array(place)*(math.pi/180.0)
-        self.T = rospy.get_param("setup/T")
-        self.timestep = rospy.get_param("setup/timestep")
-        self.feat_list = rospy.get_param("setup/feat_list")
-        self.weights = rospy.get_param("setup/feat_weights")
-            
-        # Openrave parameters for the environment.
-        model_filename = rospy.get_param("setup/model_filename")
-        object_centers = rospy.get_param("setup/object_centers")
-        self.environment = Environment(model_filename, object_centers)
-        
+		self.T = rospy.get_param("setup/T")
+		self.timestep = rospy.get_param("setup/timestep")
+		self.feat_list = rospy.get_param("setup/feat_list")
+		self.weights = rospy.get_param("setup/feat_weights")
+		    
+		# Openrave parameters for the environment.
+		model_filename = rospy.get_param("setup/model_filename")
+		object_centers = rospy.get_param("setup/object_centers")
+		self.environment = Environment(model_filename, object_centers)
+
 		# ----- Planner Setup ----- #
-        # Retrieve the planner specific parameters.
-        planner_type = rospy.get_param("planner/type")
-        if planner_type == "trajopt":
-            max_iter = rospy.get_param("planner/max_iter")
-            num_waypts = rospy.get_param("planner/num_waypts")
-            
-            # Initialize planner and compute trajectory to track.
-		    self.planner = TrajoptPlanner(self.feat_list, max_iter, num_waypts, self.environment)
-        else:
-            raise Exception('Planner {} not implemented.'.format(planner_type))
+		# Retrieve the planner specific parameters.
+		planner_type = rospy.get_param("planner/type")
+		if planner_type == "trajopt":
+			max_iter = rospy.get_param("planner/max_iter")
+			num_waypts = rospy.get_param("planner/num_waypts")
+
+			# Initialize planner and compute trajectory to track.
+			self.planner = TrajoptPlanner(self.feat_list, max_iter, num_waypts, self.environment)
+		else:
+			raise Exception('Planner {} not implemented.'.format(planner_type))
 		
-        self.traj = self.planner.replan(self.start, self.goal, self.weights,
-                                        self.T, self.timestep seed=None)
-        
-        # Save the intermediate target configuration. 
+		self.traj = self.planner.replan(self.start, self.goal, self.weights, self.T, self.timestep)
+
+		# Save the intermediate target configuration. 
 		self.curr_pos = None
 
 		# ----- Controller Setup ----- #
-        # Retrieve controller specific parameters.
-        controller_type = rospy.get_param("controller/type")
-        if controller_type == "pid":
-            # P, I, D gains.
-            P = rospy.get_param("controller/p_gain") * np.eye(7)
-            I = rospy.get_param("controller/i_gain") * np.eye(7)
-            D = rospy.get_param("controller/d_gain") * np.eye(7)
+		# Retrieve controller specific parameters.
+		controller_type = rospy.get_param("controller/type")
+		if controller_type == "pid":
+			# P, I, D gains.
+			P = rospy.get_param("controller/p_gain") * np.eye(7)
+			I = rospy.get_param("controller/i_gain") * np.eye(7)
+			D = rospy.get_param("controller/d_gain") * np.eye(7)
 
-            # Stores proximity threshold.
-            epsilon = rospy.get_param("controller/epsilon")
-		    
-            # Stores maximum COMMANDED joint torques.
-            MAX_CMD = rospy.get_param("controller/max_cmd") * np.eye(7)
-            
-            self.controller = PIDController(P, I, D, epsilon, MAX_CMD)
-        else:
-            raise Exception('Controller {} not implemented.'.format(controller_type))
-            
-        # Planner tells controller what plan to follow.
-        self.controller.set_trajectory(self.traj)
+			# Stores proximity threshold.
+			epsilon = rospy.get_param("controller/epsilon")
+
+			# Stores maximum COMMANDED joint torques.
+			MAX_CMD = rospy.get_param("controller/max_cmd") * np.eye(7)
+
+			self.controller = PIDController(P, I, D, epsilon, MAX_CMD)
+		else:
+			raise Exception('Controller {} not implemented.'.format(controller_type))
+
+		# Planner tells controller what plan to follow.
+		self.controller.set_trajectory(self.traj)
 
 		# Stores current COMMANDED joint torques.
 		self.cmd = np.eye(7)
-         
+
 	def register_callbacks(self):
 		"""
 		Sets up all the publishers/subscribers needed.
@@ -143,7 +143,7 @@ class PathFollower(object):
 		Reads the latest position of the robot and publishes an
 		appropriate torque command to move the robot to the target.
 		"""
-        
+
 		# Read the current joint angles from the robot.
 		self.curr_pos = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
 
@@ -154,4 +154,4 @@ class PathFollower(object):
 		self.cmd = -self.controller.get_command(self.curr_pos)
 		
 if __name__ == '__main__':
-    path_follower = PathFollower()
+	path_follower = PathFollower()

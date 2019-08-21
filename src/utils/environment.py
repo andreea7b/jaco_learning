@@ -10,17 +10,16 @@ from utils.openrave_utils import *
 class Environment(object):
 	"""
 	This class creates an OpenRave environment and contains all the
-    functionality needed for custom features and constraints.
-    """
+	functionality needed for custom features and constraints.
+	"""
 	def __init__(self, model_filename, object_centers):
-
 		# ---- Create environment ---- #
 		self.env, self.robot = initialize(model_filename)
 
 		# Insert any objects you want into environment.
 		self.bodies = []
-        self.object_centers = object_centers
-
+		self.object_centers = object_centers
+		import pdb;pdb.set_trace()
 		# Plot the table and table mount, and other desired objects.
 		plotTable(self.env)
 		plotTableMount(self.env,self.bodies)
@@ -35,8 +34,8 @@ class Environment(object):
 		---
 		input trajectory, output list of feature values
 		"""
-        waypts = traj.waypts
-        num_features = len(feat_list)
+		waypts = traj.waypts
+		num_features = len(feat_list)
 		features = [[0.0 for _ in range(len(waypts)-1)] for _ in range(0, num_features)]
 
 		for index in range(len(waypts)-1):
@@ -237,9 +236,9 @@ class Environment(object):
 		world_dir = self.robot.GetLinks()[7].GetTransform()[:3,:3].dot([1,0,0])
 		return np.array([np.cross(self.robot.GetJoints()[i].GetAxis(), world_dir)[:2] for i in range(7)]).T.copy()
 
-    # ---- Helper functions ---- #
+	# ---- Helper functions ---- #
 
-    def update_curr_pos(self, curr_pos):
+	def update_curr_pos(self, curr_pos):
 		"""
 		Updates DOF values in OpenRAVE simulation based on curr_pos.
 		----
