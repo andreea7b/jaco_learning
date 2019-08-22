@@ -1,6 +1,6 @@
 <launch>
 	
-	<rosparam command="load" file="$(find beta_adaptive_pHRI)/config/phi_inference.yaml" />
+	<rosparam command="load" file="$(find beta_adaptive_pHRI)/config/phri_inference.yaml" />
 	
 	<!-- Trajopt PID control with learning from human corrections. -->
 	<node name="phri_inference" pkg="beta_adaptive_pHRI" type="phri_inference.py" output="screen"/>
