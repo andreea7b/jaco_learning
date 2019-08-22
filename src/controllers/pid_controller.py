@@ -36,6 +36,10 @@ class PIDController(object):
 		# Stores maximum COMMANDED joint torques.
 		self.max_cmd = max_cmd 
 
+		# Tracks running time since beginning and end of the path.
+		self.path_start_T = None
+		self.path_end_T = None
+
 	def set_trajectory(self, trajectory):
 		"""
 		Setter method that sets the trajectory and relevant parameters.
@@ -45,10 +49,6 @@ class PIDController(object):
 
 		# Save the intermediate target configuration. 
 		self.target_pos = self.traj.waypts[0].reshape((7,1))
-
-		# Tracks running time since beginning and end of the path.
-		self.path_start_T = None
-		self.path_end_T = None
 
 	def get_command(self, current_pos):
 		"""

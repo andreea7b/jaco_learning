@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 
 class Trajectory(object):
 	"""
@@ -94,12 +95,13 @@ class Trajectory(object):
 		waypt = np.array(waypt).reshape((7,1))
 		return waypt
 
-	def deform(self, u_h, alpha=-0.01, n=5):
+	def deform(self, u_h, t, alpha, n):
 		"""
 		Deforms the next n waypoints of the trajectory.
 		
 		Params:
-			u_h -- Human torque for correction.
+			u_h -- Deformation torque.
+			t [float] -- The time of deformation.
 			alpha -- Alpha deformation parameter.
 			n -- Width of deformation parameter.
 
