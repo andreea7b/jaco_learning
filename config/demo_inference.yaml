@@ -4,6 +4,7 @@ setup:
     object_centers: {'HUMAN_CENTER': [-0.6,-0.55,0.0], 'LAPTOP_CENTER': [-0.7929,-0.1,0.0]}
     feat_list: ["efficiency", "table", "laptop"]
     demo_spec: "all_0" # "simulate", "all" followed by task number, ID number followed by task number
+    demo_dir: "/data/demonstrations/demos/"
 
 sim:
     task:
@@ -20,7 +21,7 @@ sim:
         num_waypts: 5
 
 learner:
-    trajs_path: "/traj_rand/traj_rand_merged_H.p"
+    trajs_path: "/data/traj_sets/traj_rand_merged_H.p"
     betas_list: [0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0, 100.0]
     weight_vals: [0.0, 0.5, 1.0] # Per feature theta options.
     FEAT_RANGE: {'table':1.0, 'coffee':1.0, 'laptop':1.6, 'human':1.6, 'efficiency':0.01}

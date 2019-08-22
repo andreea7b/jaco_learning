@@ -28,13 +28,12 @@ class Environment(object):
 		plotSphere(self.env,self.bodies,object_centers['HUMAN_CENTER'], 0.015)
 
 	# ---- Custom environmental features ---- #
-	def featurize(self, traj, feat_list):
+	def featurize(self, waypts, feat_list):
 		"""
 		Computes the user-defined features for a given trajectory.
 		---
-		input trajectory, output list of feature values
+		input trajectory waypoints, output list of feature values
 		"""
-		waypts = traj.waypts
 		num_features = len(feat_list)
 		features = [[0.0 for _ in range(len(waypts)-1)] for _ in range(0, num_features)]
 

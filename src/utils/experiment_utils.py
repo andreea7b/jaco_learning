@@ -198,7 +198,7 @@ class ExperimentUtils(object):
 	def get_unique_bagpath(self,subdir,filename):
 		# Get the current script path.
 		dirpath = self.save_dir + subdir + "/"
-		filepath = dirpath + filename + "_1.bar"
+		filepath = dirpath + filename + "_1.bag"
 		i = 2
 		while os.path.exists(filepath):
 			filepath = dirpath + filename + str(i)+".bag"

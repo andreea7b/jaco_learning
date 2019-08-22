@@ -99,7 +99,7 @@ class DemoRecorder(object):
 			ID = raw_input()
 			print "Please type in the task number (e.g. [0/1/2/...])."
 			task = raw_input()
-			filename = "demo" + "_" + ID + "_" + task
+			filename = "demo" + "_ID" + ID + "_task" + task
 			savefile = self.expUtil.get_unique_filepath("demos",filename)
 			pickle.dump(demo, open(savefile, "wb" ))
 			print "Saved demonstration in {}.".format(savefile)

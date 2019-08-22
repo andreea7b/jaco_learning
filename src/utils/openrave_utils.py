@@ -38,7 +38,7 @@ def initialize(model_filename='jaco', envXML=None):
 
 	robot.SetActiveDOFs(np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]))
 	robot.SetDOFValues(robot_starting_dofs)
-	
+
 	viewer = env.GetViewer()
 	viewer.SetSize(700,500)
 	cam_params = np.array([[-0.99885711, -0.01248719, -0.0461361 , -0.18887213],
