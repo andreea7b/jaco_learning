@@ -67,37 +67,55 @@ class PHRILearner(object):
 			# Update only weight of maximal change.
 			curr_weight = self.max_update(update)
 		elif self.feat_method == "beta":
-            # Set up the optimization problems that are useful. A few have been
-            # tested here by doing a grid search over parameters.
+			# Set up the optimization problem.
+			def u_constrained(u):
+				cost = np.linalg.norm(u)**2
+				return cost
 
-            # a) Set up the unconstrained optimization problem:
-            def u_unconstrained(u, idx):
-                # Optimized manually; lambda_u can be changed according to designer preferences.
-                if self.feat_list[idx] == 'table':
-                    lambda_u = 20000
-                elif self.feat_list[idx] == 'human':
-                    lambda_u = 1500
-                elif self.feat_list[idx] == 'coffee':	
-                    lambda_u = 20000
-                u_p = np.reshape(u, (7,1))
-                waypts_deform_p = self.traj.deform(u_p, t, self.alpha, self.n).waypts
-                H_features = self.environment.featurize(waypts_deform_p, [self.feat_list[idx]])[0]
-                Phi_H = sum(H_features)
-                cost = (Phi_H - Phi_p[idx])**2
-                return cost
+			def u_constraint(u, idx):
+				u_p = np.reshape(u, (7,1))
+				waypts_deform_p = self.traj.deform(u_p, t, self.alpha, self.n).waypts
+				H_features = self.environment.featurize(waypts_deform_p, [self.feat_list[idx]])[0]
+				Phi_H = sum(H_features)
+				cost = (Phi_H - Phi_p[idx])**2
+				return cost
 
-            # b) Constrained variant of the optimization problem
-            def u_constrained(u):
-                cost = np.linalg.norm(u)**2
-                return cost
+			for i in range(self.num_features):
+				# Compute optimal action.
+				u_h_opt = minimize(u_constrained, np.zeros((7,1)), method='SLSQP', 
+									constraints=({'type': 'eq', 'fun': u_constraint, 'args': (i,)}), 
+									options={'maxiter': 10, 'ftol': 1e-6, 'disp': True})
+				l = math.pi
+				u_h_star = np.reshape(u_h_opt.x, (7, 1)) 
 
-            def u_constraint(u, idx):
-                u_p = np.reshape(u, (7,1))
-                waypts_deform_p = self.traj.deform(u_p, t, self.alpha, self.n).waypts
-                H_features = self.environment.featurize(waypts_deform_p, [self.feat_list[idx]])[0]
-                Phi_H = sum(H_features)
-                cost = (Phi_H - Phi_p[idx])**2
-                return cost
+				# Compute beta based on deviation from optimal action.
+				beta_norm = 1.0 / np.linalg.norm(u_h_star) ** 2
+				self.betas[i] = self.num_features / (2 * beta_norm * abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2))
+				print "Here is beta:", self.betas
+
+				### Compute update using P(r|beta) for the beta estimate we just computed ###
+				# Compute P(r|beta)
+				mus1 = self.P_beta[self.feat_list[i]+"1"]
+				mus0 = self.P_beta[self.feat_list[i]+"0"]
+				p_r0 = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) / (chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) + chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2]))
+				p_r1 = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2]) / (chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) + chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2]))
+
+				# Newton-Rapson setup; define function, derivative, and call optimization method.
+				def f_theta(weights_p):
+					num = p_r1 * np.exp(weights_p * update[i])
+					denom = p_r0 * (l/math.pi) ** (self.num_features/2.0) * np.exp(-l*update[i]**2) + num
+					return weights_p + self.update_gains[i] * num * update[i]/denom - self.weights[i]
+				def df_theta(weights_p):
+					num = p_r0 * (l/math.pi) ** (self.num_features/2.0) * np.exp(-l*update[i]**2)
+					denom = p_r1 * np.exp(weights_p*update[i])
+					return 1 + self.update_gains[i] * num / denom
+
+				weight_p = newton(f_theta,self.weights[i],df_theta,tol=1e-04,maxiter=1000)
+
+				num = p_r1 * np.exp(weight_p * update[i])
+				denom = p_r0 * (l/math.pi) ** (self.num_features/2.0) * np.exp(-l*update[i]**2) + num
+				self.betas_u[i] = num/denom
+				print "Here is weighted beta:", self.betas_u
 
 			curr_weight = self.beta_update(update)
 		else:
@@ -128,41 +146,4 @@ class PHRILearner(object):
 		return curr_weight
 
 	def beta_update(self, update):
-		for i in range(self.num_features):
-			# Compute optimal action.
-            u_h_opt = minimize(u_constrained, np.zeros((7,1)), args=(i), method='SLSQP', 
-                                constraints=({'type': 'eq', 'fun': u_constraint}), 
-                                options={'maxiter': 10, 'ftol': 1e-6, 'disp': True})
-            l = math.pi
-			u_h_star = np.reshape(u_h_opt.x, (7, 1)) 
-
-			# Compute beta based on deviation from optimal action.
-			beta_norm = 1.0 / np.linalg.norm(u_h_star) ** 2
-			self.betas[i] = self.num_features / (2 * beta_norm * abs(np.linalg.norm(u_h)**2 - np.linalg.norm(u_h_star)**2))
-			print "Here is beta:", self.betas
-
-			### Compute update using P(r|beta) for the beta estimate we just computed ###
-			# Compute P(r|beta)
-			mus1 = self.P_beta[self.feat_list[i]+"1"]
-			mus0 = self.P_beta[self.feat_list[i]+"0"]
-			p_r0 = chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) / (chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) + chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2]))
-			p_r1 = chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2]) / (chi2.pdf(self.betas[i],mus0[0],mus0[1],mus0[2]) + chi2.pdf(self.betas[i],mus1[0],mus1[1],mus1[2]))
-
-			# Newton-Rapson setup; define function, derivative, and call optimization method.
-			def f_theta(weights_p):
-				num = p_r1 * np.exp(weights_p * update[i])
-				denom = p_r0 * (l/math.pi) ** (self.num_features/2.0) * np.exp(-l*update[i]**2) + num
-				return weights_p + self.update_gains[i] * num * update[i]/denom - self.weights[i]
-			def df_theta(weights_p):
-				num = p_r0 * (l/math.pi) ** (self.num_features/2.0) * np.exp(-l*update[i]**2)
-				denom = p_r1 * np.exp(weights_p*update[i])
-				return 1 + self.update_gains[i] * num / denom
-
-			weight_p = newton(f_theta,self.weights[i],df_theta,tol=1e-04,maxiter=1000)
-			
-			num = p_r1 * np.exp(weight_p * update[i])
-			denom = p_r0 * (l/math.pi) ** (self.num_features/2.0) * np.exp(-l*update[i]**2) + num
-			self.betas_u[i] = num/denom
-			print "Here is weighted beta:", self.betas_u
-		# Compute new weights
 		return self.weights - np.array(self.betas_u) * self.update_gains * update
