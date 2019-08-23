@@ -21,7 +21,8 @@ To demonstrate simple path planning and control with the Jaco arm, run (in anoth
 ```
 roslaunch beta_adaptive_pHRI path_follower.launch
 ```
-The launch file first reads the corresponding yaml (`config/path_follower.yaml`) containing all important parameters, then runs `path_follower.py`. Given a start, a goal, and other task specifications, a planner plans an optimal path, then the controller executes it. For a selection of planners and controllers, see `src/planners` (trajopt supported currently) and `src/controllers` (pid supported currently). The yaml file should contain parameter information to instantiate these two components.
+The launch file first reads the corresponding yaml `config/path_follower.yaml` containing all important parameters, then runs `path_follower.py`. Given a start, a goal, and other task specifications, a planner plans an optimal path, then the controller executes it. For a selection of planners and controllers, see `src/planners` (TrajOpt supported currently) and `src/controllers` (PID supported currently). The yaml file should contain parameter information to instantiate these two components.
+
 Some important parameters for specifying the task in the yaml include:
 * `start`: Jaco start configuration
 * `goal`: Jaco goal configuration
@@ -36,14 +37,15 @@ To demonstrate planning and control with online learning from physical human cor
 ```
 roslaunch beta_adaptive_pHRI phri_inference.launch
 ```
-The launch file first reads the corresponding yaml (`config/phri_inference.yaml`) containing all important parameters, then runs `phri_inference.py`. Given a start, a goal, and other task specifications, a planner plans an optimal path, and the controller executes it. A human can apply a physical correction to change the way the robot is executing the task. Depending on the learning method used, the robot learns from the human torque accordingly and updates its trajectory in real-time.
+The launch file first reads the corresponding yaml `config/phri_inference.yaml` containing all important parameters, then runs `phri_inference.py`. Given a start, a goal, and other task specifications, a planner plans an optimal path, and the controller executes it. A human can apply a physical correction to change the way the robot is executing the task. Depending on the learning method used, the robot learns from the human torque accordingly and updates its trajectory in real-time.
+
 Some task-specific parameters in addition to the ones above include:
-* `learner/type`: Learning method used. 
-  * ALL = update all features at once, according to A. Bajcsy* , D.P. Losey*, M.K. O'Malley, and A.D. Dragan. [Learning Robot Objectives from Physical Human Robot Interaction](http://proceedings.mlr.press/v78/bajcsy17a/bajcsy17a.pdf) Conference on Robot Learning (CoRL), 2017.
-  * MAX = update one feature at a time, according to A. Bajcsy , D.P. Losey, M.K. O'Malley, and A.D. Dragan. [Learning from Physical Human Corrections, One Feature at a Time](https://dl.acm.org/citation.cfm?id=3171267) International Confernece on Human-Robot Interaction (HRI), 2018.
-  * BETA = relevance adaptive method according to A. Bobu, A. Bajcsy, J. Fisac, A.D. Dragan. [Learning under Misspecified Objective Spaces](http://proceedings.mlr.press/v87/bobu18a.html) Conference on Robot Learning (CoRL), 2018.
+* `learner/type`: Learning method used.
+  * all = update all features at once, according to A. Bajcsy* , D.P. Losey*, M.K. O'Malley, and A.D. Dragan. [Learning Robot Objectives from Physical Human Robot Interaction](http://proceedings.mlr.press/v78/bajcsy17a/bajcsy17a.pdf) Conference on Robot Learning (CoRL), 2017.
+  * max = update one feature at a time, according to A. Bajcsy , D.P. Losey, M.K. O'Malley, and A.D. Dragan. [Learning from Physical Human Corrections, One Feature at a Time](https://dl.acm.org/citation.cfm?id=3171267) International Confernece on Human-Robot Interaction (HRI), 2018.
+  * beta = relevance adaptive method according to A. Bobu, A. Bajcsy, J. Fisac, A.D. Dragan. [Learning under Misspecified Objective Spaces](http://proceedings.mlr.press/v87/bobu18a.html) Conference on Robot Learning (CoRL), 2018.
 * `save_dir`: Location for saving human data (optional). After the run, you will be prompted to save the collected data.
- 
+
 ### Learning from physical human demonstrations
 
 ### References
