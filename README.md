@@ -1,4 +1,4 @@
-# beta_adaptive_pHRI: Adaptive Physical HRI
+# jaco_learning: Jaco HRI
 
 Control, planning, and learning system for physical human-robot interaction (pHRI) with a JACO2 7DOF robotic arm. Learning is adaptive based on how relevant the human's interaction is. Supports learning from physical corrections and demonstrations.
 
