@@ -43,10 +43,21 @@ Some task-specific parameters in addition to the ones above include:
 * `learner/type`: Learning method used.
   * all = update all features at once, according to A. Bajcsy* , D.P. Losey*, M.K. O'Malley, and A.D. Dragan. [Learning Robot Objectives from Physical Human Robot Interaction](http://proceedings.mlr.press/v78/bajcsy17a/bajcsy17a.pdf) Conference on Robot Learning (CoRL), 2017.
   * max = update one feature at a time, according to A. Bajcsy , D.P. Losey, M.K. O'Malley, and A.D. Dragan. [Learning from Physical Human Corrections, One Feature at a Time](https://dl.acm.org/citation.cfm?id=3171267) International Confernece on Human-Robot Interaction (HRI), 2018.
-  * beta = relevance adaptive method according to A. Bobu, A. Bajcsy, J. Fisac, A.D. Dragan. [Learning under Misspecified Objective Spaces](http://proceedings.mlr.press/v87/bobu18a.html) Conference on Robot Learning (CoRL), 2018.
+  * beta = relevance adaptive method according to our method: A. Bobu, A. Bajcsy, J. Fisac, A.D. Dragan. [Learning under Misspecified Objective Spaces](http://proceedings.mlr.press/v87/bobu18a.html) Conference on Robot Learning (CoRL), 2018.
 * `save_dir`: Location for saving human data (optional). After the run, you will be prompted to save the collected data.
 
 ### Learning from physical human demonstrations
+To demonstrate learning from human demonstrations, first record some demonstrations:
+```
+roslaunch beta_adaptive_pHRI demo_recorder.launch
+```
+The launch file first reads the corresponding yaml `config/demo_recorder.yaml` containing all important parameters, then runs `demo_recorder.py`. Given a start, the Jaco is controlled to the initial location, after which it aways for human input. Once the start is reached, the person can physically direct the arm to demonstrate how it should perform the task. The user is then shown the collected the demonstration and prompted to save it.
+
+To perform inference from human demonstrations, run:
+```
+python demo_inference.py config/demo_inference.yaml
+```
+The script loads the yaml file given as argument, then performs inference. There is an option to perform inference from either recorded demonstrations or a simulated one, created using the planner. Inference is performed according to our method: A. Bobu, A. Bajcsy, J. Fisac, S. Deglurkar, and A.D. Dragan. Quantifying Hypothesis Space Misspecification in Learning from Human-Robot Demonstrations and Physical Corrections.
 
 ### References
 * https://github.com/abajcsy/iact_control
