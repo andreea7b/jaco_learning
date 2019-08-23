@@ -51,7 +51,7 @@ To demonstrate learning from human demonstrations, first record some demonstrati
 ```
 roslaunch beta_adaptive_pHRI demo_recorder.launch
 ```
-The launch file first reads the corresponding yaml `config/demo_recorder.yaml` containing all important parameters, then runs `demo_recorder.py`. Given a start, the Jaco is controlled to the initial location, after which it aways for human input. Once the start is reached, the person can physically direct the arm to demonstrate how it should perform the task. The user is then shown the collected the demonstration and prompted to save it.
+The launch file first reads the corresponding yaml `config/demo_recorder.yaml` containing all important parameters, then runs `demo_recorder.py`. Given a start, the Jaco is controlled to the initial location, after which it waits for human input. Once the start is reached, the person can physically direct the arm to demonstrate how it should perform the task. The user is then shown the collected the demonstration and prompted to save it.
 
 To perform inference from human demonstrations, run:
 ```
