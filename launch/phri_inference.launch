@@ -1,9 +1,9 @@
 <launch>
 	
-	<rosparam command="load" file="$(find beta_adaptive_pHRI)/config/phri_inference.yaml" />
+	<rosparam command="load" file="$(find jaco_learning)/config/phri_inference.yaml" />
 	
 	<!-- Trajopt PID control with learning from human corrections. -->
-	<node name="phri_inference" pkg="beta_adaptive_pHRI" type="phri_inference.py" output="screen"/>
+	<node name="phri_inference" pkg="jaco_learning" type="phri_inference.py" output="screen"/>
 
 </launch>
 

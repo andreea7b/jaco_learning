@@ -19,7 +19,7 @@ roslaunch kinova_bringup kinova_robot.launch kinova_robotType:=j2s7s300 use_urdf
 ### Starting the controller and planner
 To demonstrate simple path planning and control with the Jaco arm, run (in another terminal window):
 ```
-roslaunch beta_adaptive_pHRI path_follower.launch
+roslaunch jaco_learning path_follower.launch
 ```
 The launch file first reads the corresponding yaml `config/path_follower.yaml` containing all important parameters, then runs `path_follower.py`. Given a start, a goal, and other task specifications, a planner plans an optimal path, then the controller executes it. For a selection of planners and controllers, see `src/planners` (TrajOpt supported currently) and `src/controllers` (PID supported currently). The yaml file should contain parameter information to instantiate these two components.
 
@@ -35,7 +35,7 @@ Some important parameters for specifying the task in the yaml include:
 ### Learning from physical human corrections
 To demonstrate planning and control with online learning from physical human corrections, run:
 ```
-roslaunch beta_adaptive_pHRI phri_inference.launch
+roslaunch jaco_learning phri_inference.launch
 ```
 The launch file first reads the corresponding yaml `config/phri_inference.yaml` containing all important parameters, then runs `phri_inference.py`. Given a start, a goal, and other task specifications, a planner plans an optimal path, and the controller executes it. A human can apply a physical correction to change the way the robot is executing the task. Depending on the learning method used, the robot learns from the human torque accordingly and updates its trajectory in real-time.
 
@@ -49,7 +49,7 @@ Some task-specific parameters in addition to the ones above include:
 ### Learning from physical human demonstrations
 To demonstrate learning from human demonstrations, first record some demonstrations:
 ```
-roslaunch beta_adaptive_pHRI demo_recorder.launch
+roslaunch jaco_learning demo_recorder.launch
 ```
 The launch file first reads the corresponding yaml `config/demo_recorder.yaml` containing all important parameters, then runs `demo_recorder.py`. Given a start, the Jaco is controlled to the initial location, after which it waits for human input. Once the start is reached, the person can physically direct the arm to demonstrate how it should perform the task. The user is then shown the collected the demonstration and prompted to save it.
 

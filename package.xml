@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package>
-  <name>beta_adaptive_pHRI</name>
+  <name>jaco_learning</name>
   <version>0.0.0</version>
-  <description>The beta_adaptive_pHRI package</description>
+  <description>The jaco_learning package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag --> 
   <!-- Example:  -->
@@ -19,7 +19,7 @@
   <!-- Url tags are optional, but mutiple are allowed, one per tag -->
   <!-- Optional attribute type can be: website, bugtracker, or repository -->
   <!-- Example: -->
-  <!-- <url type="website">http://wiki.ros.org/beta_adaptive_pHRI</url> -->
+  <!-- <url type="website">http://wiki.ros.org/jaco_learning</url> -->
 
 
   <!-- Author tags are optional, mutiple are allowed, one per tag -->
