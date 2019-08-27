@@ -1,6 +1,6 @@
 # jaco_learning: Jaco HRI
 
-Control, planning, and learning system for physical human-robot interaction (pHRI) with a JACO2 7DOF robotic arm. Learning is adaptive based on how relevant the human's interaction is. Supports learning from physical corrections and demonstrations.
+Control, planning, and learning system for human-robot interaction with a JACO2 7DOF robotic arm. Supports learning from physical corrections and demonstrations.
 
 ## Dependencies
 * Ubuntu 14.04, ROS Indigo, OpenRAVE, Python 2.7
@@ -55,7 +55,7 @@ The launch file first reads the corresponding yaml `config/demo_recorder.yaml` c
 
 To perform inference from human demonstrations, run:
 ```
-python demo_inference.py config/demo_inference.yaml
+python src/demo_inference.py config/demo_inference.yaml
 ```
 The script loads the yaml file given as argument, then performs inference. There is an option to perform inference from either recorded demonstrations or a simulated one, created using the planner. Inference is performed according to our method: A. Bobu, A. Bajcsy, J. Fisac, S. Deglurkar, and A.D. Dragan. Quantifying Hypothesis Space Misspecification in Learning from Human-Robot Demonstrations and Physical Corrections.
 
