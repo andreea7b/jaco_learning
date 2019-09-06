@@ -35,11 +35,11 @@ class DemoLearner(object):
 
 		# Construct uninformed prior
 		self.P_bt = np.ones((self.num_betas, self.num_weights)) / (self.num_betas * self.num_weights)
-	
+
 		# Trajectory paths.
 		here = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../../'))
 		self.traj_rand = pickle.load(open(here + constants["trajs_path"], "rb" ))
-		
+
 		# Compute features for the normalizing trajectories.
 		self.Phi_rands = []
 		for rand_i, traj_str in enumerate(self.traj_rand.keys()):
@@ -47,7 +47,7 @@ class DemoLearner(object):
 			rand_features = self.environment.featurize(curr_traj, self.feat_list)
 			Phi_rand = np.array([sum(x)/self.feat_range[i] for i,x in enumerate(rand_features)])
 			self.Phi_rands.append(Phi_rand)
-		
+
 	def learn_weights(self, trajs):
 		# Project all trajectories into feature space.
 		new_features = [np.sum(self.environment.featurize(traj.waypts, self.feat_list), axis=1) for traj in trajs]
@@ -80,7 +80,7 @@ class DemoLearner(object):
 				denom = A_max + np.log(sum(np.exp(expdif)))
 
 				# Get P(xi_H | beta, weight) by dividing them
-				P_xi[beta_i][weight_i] = np.exp(numerator - denom)
+				P_xi[beta_i][weight_i] = np.exp(numerator - denom * len(trajs))
 
 		P_obs = P_xi / sum(sum(P_xi))
 
