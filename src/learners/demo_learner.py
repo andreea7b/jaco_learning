@@ -112,8 +112,7 @@ class DemoLearner(object):
 		matplotlib.rcParams.update({'font.size': 15})
 
 		plt.imshow(post, cmap='Blues', interpolation='nearest')
-		#plt.colorbar(ticks=[0, 0.15, 0.3])
-		#plt.clim(0, 0.3)
+		plt.colorbar()
 
 		weights_rounded = [[round(i,2) for i in j] for j in self.weights_list]
 		plt.xticks(range(len(self.weights_list)), weights_rounded, rotation = 'vertical')
