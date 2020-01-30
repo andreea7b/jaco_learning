@@ -1,0 +1,8 @@
+<launch>
+
+	<rosparam command="load" file="$(find jaco_learning)/config/teleop_inference.yaml" />
+
+	<!-- Trajopt PID control with... -->
+	<node name="teleop_inference" pkg="jaco_learning" type="teleop_inference.py" output="screen"/>
+
+</launch>
