@@ -183,7 +183,7 @@ class TeleopInference():
 		constants["alpha"] = rospy.get_param("learner/alpha")
 		constants["n"] = rospy.get_param("learner/n")
 		self.feat_method = rospy.get_param("learner/type")
-		self.learner = PHRILearner(self.feat_method, self.feat_list, self.environment, constants)
+		self.learner = TeleopLearner(self.feat_method, self.feat_list, self.environment, constants)
 
 		 # ---- Experimental Utils ---- #
 		self.expUtil = experiment_utils.ExperimentUtils(self.save_dir)
@@ -242,13 +242,22 @@ class TeleopInference():
 		interaction = False
 		for i in range(7):
 			# Center torques around zero.
-			torque_curr[i][0] -= self.INTERACTION_TORQUE_THRESHOLD[i]
+			#torque_curr[i][0] -= self.INTERACTION_TORQUE_THRESHOLD[i]
+			torque_curr[i][0] -= self.cmd[i][i]
 			# Check if interaction was not noise.
 			if np.fabs(torque_curr[i][0]) > self.INTERACTION_TORQUE_EPSILON[i] and self.reached_start:
 				interaction = True
 
 		# If we experienced large enough interaction force, then learn.
 		if interaction:
+			# for testing the thresholds/epsilons
+			print "interaction detected"
+			print torque_curr.reshape((1,7))
+			print np.fabs(torque_curr[:, 0]) > self.INTERACTION_TORQUE_EPSILON
+			print self.cmd.shape
+			print self.cmd
+			return
+			# 
 			if self.reached_start and not self.reached_goal:
 				timestamp = time.time() - self.controller.path_start_T
 				self.expUtil.update_tauH(timestamp, torque_curr)
