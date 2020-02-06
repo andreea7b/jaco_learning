@@ -109,10 +109,8 @@ class TeleopInference():
 		"""
 		# ----- General Setup ----- #
 		self.prefix = rospy.get_param("setup/prefix")
-		pick = rospy.get_param("setup/start")
-		place = rospy.get_param("setup/goal")
-		self.start = np.array(pick)*(math.pi/180.0)
-		self.goal = np.array(place)*(math.pi/180.0)
+		self.start = np.array(rospy.get_param("setup/start"))*(math.pi/180.0)
+		self.goals = np.array(rospy.get_param("setup/goal"))*(math.pi/180.0)
 		self.goal_pose = None if rospy.get_param("setup/goal_pose") == "None" else rospy.get_param("setup/goal_pose")
 		self.T = rospy.get_param("setup/T")
 		self.timestep = rospy.get_param("setup/timestep")
@@ -125,11 +123,15 @@ class TeleopInference():
 		# Openrave parameters for the environment.
 		model_filename = rospy.get_param("setup/model_filename")
 		object_centers = rospy.get_param("setup/object_centers")
+		for goal_num in range(len(self.goals)):
+			object_centers["GOAL"+str(goal_num)+" ANGLES"] = self.goals[goal_num]
+		# object centers holds xyz coords of objects and radian joint coords of goals 
 		self.environment = Environment(model_filename, object_centers)
 
 		# ----- Planner Setup ----- #
 		# Retrieve the planner specific parameters.
 		planner_type = rospy.get_param("planner/type")
+		belief = rospy.get_param("planner/belief")
 		if planner_type == "trajopt":
 			max_iter = rospy.get_param("planner/max_iter")
 			num_waypts = rospy.get_param("planner/num_waypts")
@@ -139,7 +141,7 @@ class TeleopInference():
 		else:
 			raise Exception('Planner {} not implemented.'.format(planner_type))
 
-		self.traj = self.planner.replan(self.start, self.goal, self.goal_pose, self.weights, self.T, self.timestep)
+		self.traj = self.planner.replan(self.start, self.goals, self.goal_pose, self.weights, self.T, self.timestep, belief=belief)
 		self.traj_plan = self.traj.downsample(self.planner.num_waypts)
 
 		# Track if you have reached the start/goal of the path.
@@ -185,13 +187,6 @@ class TeleopInference():
 		self.feat_method = rospy.get_param("learner/type")
 		self.learner = TeleopLearner(self.feat_method, self.feat_list, self.environment, constants)
 
-		 # ---- Experimental Utils ---- #
-		self.expUtil = experiment_utils.ExperimentUtils(self.save_dir)
-		# Update the list of replanned plans with new trajectory plan.
-		self.expUtil.update_replanned_trajList(0.0, self.traj_plan.waypts)
-		# Update the list of replanned waypoints with new waypoints.
-		self.expUtil.update_replanned_wayptsList(0.0, self.traj.waypts)
-
 	def register_callbacks(self):
 		"""
 		Sets up all the publishers/subscribers needed.
@@ -222,10 +217,8 @@ class TeleopInference():
 		# Check is start/goal has been reached.
 		if self.controller.path_start_T is not None:
 			self.reached_start = True
-			self.expUtil.set_startT(self.controller.path_start_T)
 		if self.controller.path_end_T is not None:
 			self.reached_goal = True
-			self.expUtil.set_endT(self.controller.path_end_T)
 
 		# Update the experiment utils executed trajectory tracker.
 		if self.reached_start and not self.reached_goal:
@@ -264,12 +257,13 @@ class TeleopInference():
 				self.expUtil.update_interaction_point(timestamp, self.curr_pos)
 
 				self.weights = self.learner.learn_weights(self.traj, torque_curr, timestamp)
+				# learn weights here
 				betas = self.learner.betas
 				betas_u = self.learner.betas_u
 				updates = self.learner.updates
 
-				self.traj = self.planner.replan(self.start, self.goal, self.goal_pose, self.weights,
-												self.T, self.timestep, seed=self.traj_plan.waypts)
+				self.traj = self.planner.replan(self.start, self.goals, self.goal_pose, self.weights,
+												self.T, self.timestep, seed=self.traj_plan.waypts, belief=belief)
 				self.traj_plan = self.traj.downsample(self.planner.num_waypts)
 				self.controller.set_trajectory(self.traj)
 
