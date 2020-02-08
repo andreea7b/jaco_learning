@@ -18,7 +18,7 @@ class Environment(object):
 
 		# Insert any objects you want into environment.
 		self.bodies = []
-		self.object_centers = object_centers
+		self.object_centers = object_centers_angles
 
 		# Plot the table and table mount, and other desired objects.
 		plotTable(self.env)
