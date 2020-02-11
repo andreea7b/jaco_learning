@@ -128,7 +128,7 @@ class Trajectory(object):
 
 		if (deform_waypt_idx + n) > self.num_waypts:
 			print "Deforming too close to end. Returning same trajectory"
-			return waypts_deform
+			return Trajectory(waypts_deform, self.waypts_time)
 
 		for joint in range(7):
 			gamma[:,joint] = alpha*np.dot(H, u_h[joint])

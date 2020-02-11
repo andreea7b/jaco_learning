@@ -204,20 +204,23 @@ class TrajoptPlanner(object):
 		---
 		Parameters:
 			start -- Start position
-			goal -- Goal position.
+			goals -- If belief is None, this is assumed to be one vector of goal angles, otherwise goals
+				is a list of goal vectors
 			goal_pose -- Goal pose (optional: can be None).
 			weights -- Weights used for the planning objective.
 			T [float] -- Time horizon for the desired trajectory.
 			timestep [float] -- Frequency of waypoints in desired trajectory.
+			belief -- Beliefs for each goal in goals
 		Returns:
 			traj [Trajectory] -- The optimal trajectory satisfying the arguments.
 		"""
 		assert weights is not None, "The weights vector is empty. Cannot plan without a cost preference."
 		self.weights = weights
-		if belief is not None:
-			goal = expected_goal(belief, goals)
+		if belief is None:
+			goal = goals
 		else:
-			goal = goals[0]
+			goal = expected_goal(belief, goals)
+
 		waypts = self.trajOpt(start, goal, goal_pose, traj_seed=seed)
 		waypts_time = np.linspace(0.0, T, self.num_waypts)
 		traj = Trajectory(waypts, waypts_time)

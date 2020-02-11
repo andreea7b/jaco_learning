@@ -110,7 +110,7 @@ class TeleopInference():
 		# ----- General Setup ----- #
 		self.prefix = rospy.get_param("setup/prefix")
 		self.start = np.array(rospy.get_param("setup/start"))*(math.pi/180.0)
-		self.goals = np.array(rospy.get_param("setup/goal"))*(math.pi/180.0)
+		self.goals = np.array(rospy.get_param("setup/goals"))*(math.pi/180.0)
 		self.goal_pose = None if rospy.get_param("setup/goal_pose") == "None" else rospy.get_param("setup/goal_pose")
 		self.T = rospy.get_param("setup/T")
 		self.timestep = rospy.get_param("setup/timestep")
@@ -124,7 +124,11 @@ class TeleopInference():
 		model_filename = rospy.get_param("setup/model_filename")
 		object_centers = rospy.get_param("setup/object_centers")
 		for goal_num in range(len(self.goals)):
-			object_centers["GOAL"+str(goal_num)+" ANGLES"] = self.goals[goal_num]
+			# assumes the goal either contains the finger angles (10DOF) or does not (7DOF)
+			if len(self.goals[goal_num]) == 7:
+				object_centers["GOAL"+str(goal_num)+" ANGLES"] = np.pad(self.goals[goal_num], (0,3), mode='constant') 
+			else:
+				object_centers["GOAL"+str(goal_num)+" ANGLES"] = self.goals[goal_num]
 		# object centers holds xyz coords of objects and radian joint coords of goals 
 		self.environment = Environment(model_filename, object_centers)
 

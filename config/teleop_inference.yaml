@@ -22,7 +22,7 @@ planner:
     type: "trajopt"
     max_iter: 50
     num_waypts: 5
-    belief: [0.5, 0.5]
+    belief: [1, 0]
 
 controller:
     # These settings have been tuned for PID controller.
