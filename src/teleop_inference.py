@@ -187,6 +187,9 @@ class TeleopInference():
 			self.reached_start = True
 		if self.controller.path_end_T is not None:
 			self.reached_goal = True
+			print "reached goal!"
+			#elf.environment.robot.SeDOFValues(list(self.curr_pos.reshape(7)))
+			 
 
 	def joint_torques_callback(self, msg):
 		"""
@@ -208,10 +211,9 @@ class TeleopInference():
 		if interaction:
 			# for testing the thresholds/epsilons
 			print "interaction detected"
-			print torque_curr.reshape((1,7))
+			#print torque_curr.reshape((1,7))
 			print np.fabs(torque_curr[:, 0]) > self.INTERACTION_TORQUE_EPSILON
-			print self.cmd.shape
-			print self.cmd
+			#print self.cmd
 			return
 			#
 			if self.reached_start and not self.reached_goal:

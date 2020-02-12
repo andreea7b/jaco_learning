@@ -33,7 +33,9 @@ class Environment(object):
 				self.robot.SetDOFValues(object_centers_angles[key])
 				cartesian_coords = robotToCartesian(self.robot)
 				EEcoords = cartesian_coords[6]
-				plotSphere(self.env, self.bodies, EEcoords, 0.015) # may need to change colors
+				print key
+				print EEcoords
+				#plotSphere(self.env, self.bodies, EEcoords, 0.015) # may need to change colors
 
 	# ---- Custom environmental features ---- #
 	def featurize(self, waypts, feat_list):
