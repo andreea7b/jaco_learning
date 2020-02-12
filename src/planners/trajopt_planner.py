@@ -28,7 +28,7 @@ class TrajoptPlanner(object):
 		self.environment = environment
 
 	# ---- Costs ---- #
-	
+
 	def efficiency_cost(self, waypt):
 		"""
 		Computes the total efficiency cost
@@ -226,5 +226,5 @@ class TrajoptPlanner(object):
 		traj = Trajectory(waypts, waypts_time)
 		return traj.upsample(int(T/timestep) + 1)
 
-	def expected_goal(self, belief, goals):
-		return np.sum([goal*prob for goal, prob in zip(goals, belief)], axis=0)
+def expected_goal(belief, goals):
+	return np.sum([goal*prob for goal, prob in zip(goals, belief)], axis=0)
