@@ -126,10 +126,10 @@ class TeleopInference():
 		for goal_num in range(len(self.goals)):
 			# assumes the goal either contains the finger angles (10DOF) or does not (7DOF)
 			if len(self.goals[goal_num]) == 7:
-				object_centers["GOAL"+str(goal_num)+" ANGLES"] = np.pad(self.goals[goal_num], (0,3), mode='constant') 
+				object_centers["GOAL"+str(goal_num)+" ANGLES"] = np.pad(self.goals[goal_num], (0,3), mode='constant')
 			else:
 				object_centers["GOAL"+str(goal_num)+" ANGLES"] = self.goals[goal_num]
-		# object centers holds xyz coords of objects and radian joint coords of goals 
+		# object centers holds xyz coords of objects and radian joint coords of goals
 		self.environment = Environment(model_filename, object_centers)
 
 		# ----- Planner Setup ----- #
@@ -239,8 +239,8 @@ class TeleopInference():
 		interaction = False
 		for i in range(7):
 			# Center torques around zero.
-			#torque_curr[i][0] -= self.INTERACTION_TORQUE_THRESHOLD[i]
-			torque_curr[i][0] -= self.cmd[i][i]
+			torque_curr[i][0] -= self.INTERACTION_TORQUE_THRESHOLD[i]
+			#torque_curr[i][0] -= self.cmd[i][i]
 			# Check if interaction was not noise.
 			if np.fabs(torque_curr[i][0]) > self.INTERACTION_TORQUE_EPSILON[i] and self.reached_start:
 				interaction = True
@@ -254,7 +254,7 @@ class TeleopInference():
 			print self.cmd.shape
 			print self.cmd
 			return
-			# 
+			#
 			if self.reached_start and not self.reached_goal:
 				timestamp = time.time() - self.controller.path_start_T
 				self.expUtil.update_tauH(timestamp, torque_curr)

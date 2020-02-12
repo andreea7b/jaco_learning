@@ -32,7 +32,7 @@ class Environment(object):
 			if "ANGLES" in key:
 				self.robot.SetDOFValues(object_centers_angles[key])
 				cartesian_coords = robotToCartesian(self.robot)
-				EEcoords = coords[6]
+				EEcoords = cartesian_coords[6]
 				plotSphere(self.env, self.bodies, EEcoords, 0.015) # may need to change colors
 
 	# ---- Custom environmental features ---- #
@@ -75,7 +75,7 @@ class Environment(object):
 
 	def origin_features(self, waypt):
 		"""
-		Computes the total feature value over waypoints based on 
+		Computes the total feature value over waypoints based on
 		y-axis distance to table.
 		---
 		input waypoint, output scalar feature
@@ -93,7 +93,7 @@ class Environment(object):
 
 	def table_features(self, waypt):
 		"""
-		Computes the total feature value over waypoints based on 
+		Computes the total feature value over waypoints based on
 		z-axis distance to table.
 		---
 		input waypoint, output scalar feature
@@ -152,7 +152,7 @@ class Environment(object):
 	def laptop_dist(self, waypt):
 		"""
 		Computes distance from end-effector to laptop in xy coords
-		input trajectory, output scalar distance where 
+		input trajectory, output scalar distance where
 			0: EE is at more than 0.4 meters away from laptop
 			+: EE is closer than 0.4 meters to laptop
 		"""
@@ -187,7 +187,7 @@ class Environment(object):
 	def human_dist(self, waypt):
 		"""
 		Computes distance from end-effector to human in xy coords
-		input trajectory, output scalar distance where 
+		input trajectory, output scalar distance where
 			0: EE is at more than 0.4 meters away from human
 			+: EE is closer than 0.4 meters to human
 		"""
@@ -207,7 +207,7 @@ class Environment(object):
 
 	def table_constraint(self, waypt):
 		"""
-		Constrains z-axis of robot's end-effector to always be 
+		Constrains z-axis of robot's end-effector to always be
 		above the table.
 		"""
 		if len(waypt) < 10:
@@ -222,7 +222,7 @@ class Environment(object):
 
 	def coffee_constraint(self, waypt):
 		"""
-		Constrains orientation of robot's end-effector to be 
+		Constrains orientation of robot's end-effector to be
 		holding coffee mug upright.
 		"""
 		if len(waypt) < 10:
@@ -261,6 +261,3 @@ class Environment(object):
 		"""
 		self.env.Destroy()
 		RaveDestroy() # destroy the runtime
-
-
-
