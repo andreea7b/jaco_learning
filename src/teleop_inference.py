@@ -19,7 +19,7 @@ from kinova_msgs.srv import *
 from controllers.pid_controller import PIDController
 from planners.trajopt_planner import TrajoptPlanner
 from learners.teleop_learner import TeleopLearner
-from utils import ros_utils, experiment_utils
+from utils import ros_utils
 from utils.environment import Environment
 
 import numpy as np
@@ -64,42 +64,6 @@ class TeleopInference():
 			r.sleep()
 
 		print "----------------------------------"
-
-		# Ask whether to save experimental data for pHRI corrections.
-		print "Type [yes/y/Y] if you'd like to save experimental data."
-		line = raw_input()
-		if (line is not "yes") and (line is not "Y") and (line is not "y"):
-			print "Not happy with recording. Terminating experiment."
-		else:
-			print "Please type in the ID number (e.g. [0/1/2/...])."
-			ID = raw_input()
-			print "Please type in the task number."
-			task = raw_input()
-			print "Saving experimental data to file..."
-			settings_string = "ID" + ID + "_" + self.feat_method + "_" + "_".join(self.feat_list) + "_task" + task
-			weights_filename = "weights_" + settings_string
-			betas_filename = "betas_" + settings_string
-			betas_u_filename = "betas_u_" + settings_string
-			force_filename = "force_" + settings_string
-			interaction_pts_filename = "interaction_pts_" + settings_string
-			tracked_filename = "tracked_" + settings_string
-			deformed_filename = "deformed_" + settings_string
-			deformed_waypts_filename = "deformed_waypts_" + settings_string
-			replanned_filename = "replanned_" + settings_string
-			replanned_waypts_filename = "replanned_waypts_" + settings_string
-			updates_filename = "updates_" + settings_string
-
-			self.expUtil.pickle_weights(weights_filename)
-			self.expUtil.pickle_betas(betas_filename)
-			self.expUtil.pickle_betas_u(betas_u_filename)
-			self.expUtil.pickle_force(force_filename)
-			self.expUtil.pickle_interaction_pts(interaction_pts_filename)
-			self.expUtil.pickle_tracked_traj(tracked_filename)
-			self.expUtil.pickle_deformed_trajList(deformed_filename)
-			self.expUtil.pickle_deformed_wayptsList(deformed_waypts_filename)
-			self.expUtil.pickle_replanned_trajList(replanned_filename)
-			self.expUtil.pickle_replanned_wayptsList(replanned_waypts_filename)
-			self.expUtil.pickle_updates(updates_filename)
 
 		ros_utils.stop_admittance_mode(self.prefix)
 
@@ -224,11 +188,6 @@ class TeleopInference():
 		if self.controller.path_end_T is not None:
 			self.reached_goal = True
 
-		# Update the experiment utils executed trajectory tracker.
-		if self.reached_start and not self.reached_goal:
-			timestamp = time.time() - self.controller.path_start_T
-			self.expUtil.update_tracked_traj(timestamp, self.curr_pos)
-
 	def joint_torques_callback(self, msg):
 		"""
 		Reads the latest torque sensed by the robot and records it for
@@ -257,8 +216,6 @@ class TeleopInference():
 			#
 			if self.reached_start and not self.reached_goal:
 				timestamp = time.time() - self.controller.path_start_T
-				self.expUtil.update_tauH(timestamp, torque_curr)
-				self.expUtil.update_interaction_point(timestamp, self.curr_pos)
 
 				self.weights = self.learner.learn_weights(self.traj, torque_curr, timestamp)
 				# learn weights here
@@ -270,26 +227,6 @@ class TeleopInference():
 												self.T, self.timestep, seed=self.traj_plan.waypts, belief=belief)
 				self.traj_plan = self.traj.downsample(self.planner.num_waypts)
 				self.controller.set_trajectory(self.traj)
-
-				# Update the experimental data with new weights and new betas.
-				timestamp = time.time() - self.controller.path_start_T
-				self.expUtil.update_weights(timestamp, self.weights)
-				self.expUtil.update_betas(timestamp, betas)
-				self.expUtil.update_betas_u(timestamp, betas_u)
-				self.expUtil.update_updates(timestamp, updates)
-
-				# Update the list of replanned plans with new trajectory plan.
-				self.expUtil.update_replanned_trajList(timestamp, self.traj_plan.waypts)
-
-				# Update the list of replanned trajectory waypts with new trajectory.
-				self.expUtil.update_replanned_wayptsList(timestamp, self.traj.waypts)
-
-				# Store deformed trajectory plan.
-				deformed_traj = self.learner.traj_deform.downsample(self.planner.num_waypts)
-				self.expUtil.update_deformed_trajList(timestamp, deformed_traj.waypts)
-
-				# Store deformed trajectory waypoints.
-				self.expUtil.update_deformed_wayptsList(timestamp, self.learner.traj_deform.waypts)
 
 if __name__ == '__main__':
 	TeleopInference()
