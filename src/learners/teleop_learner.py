@@ -50,3 +50,6 @@ class TeleopLearner(object):
 		"""
 
 		return self.weights
+
+	def update_beliefs(self, beliefs):
+		pass

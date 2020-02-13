@@ -59,8 +59,8 @@ class TeleopInference():
 			if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
 				line = raw_input()
 				break
-
-			self.vel_pub.publish(ros_utils.cmd_to_JointVelocityMsg(self.cmd))
+			#self.vel_pub.publish(ros_utils.cmd_to_JointVelocityMsg(self.cmd))
+			self.vel_pub.publish(ros_utils.cmd_to_JointVelocityMsg((180/np.pi)*self.cmd))
 			r.sleep()
 
 		print "----------------------------------"
@@ -81,8 +81,7 @@ class TeleopInference():
 		self.save_dir = rospy.get_param("setup/save_dir")
 		self.feat_list = rospy.get_param("setup/feat_list")
 		self.weights = rospy.get_param("setup/feat_weights")
-		self.INTERACTION_TORQUE_THRESHOLD = rospy.get_param("setup/INTERACTION_TORQUE_THRESHOLD")
-		self.INTERACTION_TORQUE_EPSILON = rospy.get_param("setup/INTERACTION_TORQUE_EPSILON")
+		self.INTERACTION_VELOCITY_EPSILON = np.array(rospy.get_param("setup/INTERACTION_VELOCITY_EPSILON"))
 
 		# Openrave parameters for the environment.
 		model_filename = rospy.get_param("setup/model_filename")
@@ -99,7 +98,7 @@ class TeleopInference():
 		# ----- Planner Setup ----- #
 		# Retrieve the planner specific parameters.
 		planner_type = rospy.get_param("planner/type")
-		belief = rospy.get_param("planner/belief")
+		prior_belief = rospy.get_param("planner/belief")
 		if planner_type == "trajopt":
 			max_iter = rospy.get_param("planner/max_iter")
 			num_waypts = rospy.get_param("planner/num_waypts")
@@ -109,7 +108,7 @@ class TeleopInference():
 		else:
 			raise Exception('Planner {} not implemented.'.format(planner_type))
 
-		self.traj = self.planner.replan(self.start, self.goals, self.goal_pose, self.weights, self.T, self.timestep, belief=belief)
+		self.traj = self.planner.replan(self.start, self.goals, self.goal_pose, self.weights, self.T, self.timestep, belief=prior_belief)
 		self.traj_plan = self.traj.downsample(self.planner.num_waypts)
 
 		# Track if you have reached the start/goal of the path.
@@ -118,6 +117,10 @@ class TeleopInference():
 
 		# Save the intermediate target configuration.
 		self.curr_pos = None
+		#!!! added for interaction detection
+		self.prev_pos = None
+		self.curr_time = None
+		self.prev_time = None
 
 		# ----- Controller Setup ----- #
 		# Retrieve controller specific parameters.
@@ -173,11 +176,22 @@ class TeleopInference():
 		Reads the latest position of the robot and publishes an
 		appropriate torque command to move the robot to the target.
 		"""
+		self.prev_pos = self.curr_pos
+		self.prev_time = self.curr_time
+		self.curr_time = time.time()
+
 		# Read the current joint angles from the robot.
 		self.curr_pos = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
 
 		# Convert to radians.
 		self.curr_pos = self.curr_pos*(math.pi/180.0)
+
+		if self.prev_pos is not None:
+			dt = self.curr_time - self.prev_time
+			obs_vel = ((self.curr_pos - self.prev_pos) / dt).reshape(7)
+			if any(obs_vel - self.cmd.diagonal() > self.INTERACTION_VELOCITY_EPSILON) and self.reached_start:
+				print "interaction detected"
+				print np.max(obs_vel - self.cmd.diagonal())
 
 		# Update cmd from PID based on current position.
 		self.cmd = self.controller.get_command(self.curr_pos)
@@ -187,8 +201,6 @@ class TeleopInference():
 			self.reached_start = True
 		if self.controller.path_end_T is not None:
 			self.reached_goal = True
-			print "reached goal!"
-			#elf.environment.robot.SeDOFValues(list(self.curr_pos.reshape(7)))
 			 
 
 	def joint_torques_callback(self, msg):
@@ -199,6 +211,7 @@ class TeleopInference():
 		# Read the current joint torques from the robot.
 		torque_curr = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
 		interaction = False
+		return
 		for i in range(7):
 			# Center torques around zero.
 			torque_curr[i][0] -= self.INTERACTION_TORQUE_THRESHOLD[i]
@@ -210,9 +223,9 @@ class TeleopInference():
 		# If we experienced large enough interaction force, then learn.
 		if interaction:
 			# for testing the thresholds/epsilons
-			print "interaction detected"
+			#print "interaction detected"
 			#print torque_curr.reshape((1,7))
-			print np.fabs(torque_curr[:, 0]) > self.INTERACTION_TORQUE_EPSILON
+			#print np.fabs(torque_curr[:, 0]) > self.INTERACTION_TORQUE_EPSILON
 			#print self.cmd
 			return
 			#

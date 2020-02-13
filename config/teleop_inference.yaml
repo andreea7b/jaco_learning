@@ -4,7 +4,7 @@ setup:
     object_centers: {'HUMAN_CENTER': [-0.6,-0.55,0.0], 'LAPTOP_CENTER': [-0.7929,-0.1,0.0]}
     feat_list: ["table", "coffee"]
     feat_weights: [0.0,0.0]
-    start: [104.2, 151.6, 183.8, 101.8, 224.2, 216.9, 225.0]
+    start: [180.0, 160.0, 175.0, 40.0, 275.0, 180.0, 280.0]
     goals: [
         [160.0, 90.0, 180.0, 160.0, 270.0, 180.0, 280.0],
         [200.0, 90.0, 180.0, 160.0, 270.0, 180.0, 280.0]
@@ -13,9 +13,7 @@ setup:
     T: 20.0
     timestep: 0.5
     save_dir: "/data/corrections/"
-    # These constants have been tuned for the task tested.
-    INTERACTION_TORQUE_THRESHOLD: [0.88414821, 17.22751856, -0.40134936,  6.23537946, -0.90013662, 1.32379884,  0.10218059]
-    INTERACTION_TORQUE_EPSILON: [4.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]
+    INTERACTION_VELOCITY_EPSILON: [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
 
 planner:
     # These settings have been tuned for trajopt planner.
@@ -27,9 +25,11 @@ planner:
 controller:
     # These settings have been tuned for PID controller.
     type: "pid"
-    p_gain: 50.0
+    #p_gain: 50.0
+    p_gain: 5.0
     i_gain: 0.0
-    d_gain: 20.0
+    #d_gain: 20.0
+    d_gain: 1.0
     epsilon: 0.10
     max_cmd: 40.0
 
