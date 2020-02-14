@@ -10,7 +10,7 @@ class TeleopLearner(object):
 	torque applied onto the trajectory.
 	"""
 
-	def __init__(self, feat_method, feat_list, environment, constants):
+	def __init__(self, feat_method, feat_list, environment, constants, goals, beliefs):
 
 		# ---- Important internal variables ---- #
 		self.feat_method = feat_method
@@ -33,6 +33,12 @@ class TeleopLearner(object):
 		self.feat_range = [FEAT_RANGE[self.feat_list[feat]] for feat in range(self.num_features)]
 		self.P_beta = constants["P_beta"]
 
+		self.goals = goals
+		self.goals_xyz = [self.environment.get_cartesian_coords(goal) for goal in goals]
+		self.num_goals = len(goals)
+
+		self.beliefs = beliefs
+
 	def learn_weights(self, traj, u_h, t):
 		"""
 		Deforms the trajectory given human force, u_h, and
@@ -51,5 +57,15 @@ class TeleopLearner(object):
 
 		return self.weights
 
-	def update_beliefs(self, beliefs):
-		pass
+	def update_beliefs(self, pos, delta_v):
+		"""
+		Updates the beliefs given an interaction delta_v.
+		"""
+		print(delta_v)
+		print(pos.shape)
+		print(goal.shape)
+		goal_directions = [goal - pos for goal in self.goals]
+		#pos_xyz = self.environment.get_cartesian_coords(pos)
+		#goal_directions = [goal_xyz - pos_xyz for goal_xyz in self.goals_xyz]
+		print(goal_directions)
+

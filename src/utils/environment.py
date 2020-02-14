@@ -257,6 +257,13 @@ class Environment(object):
 
 		self.robot.SetDOFValues(pos)
 
+	def get_cartesian_coords(self, joint_angles):
+		"""
+		Note that joint_angles are assumed to be in degrees
+		"""
+		self.robot.SetDOFValues(np.append(joint_angles, np.array([0,0,0])))
+		return robotToCartesian(self.robot)[6]
+
 	def kill_environment(self):
 		"""
 		Destroys openrave thread and environment for clean shutdown.

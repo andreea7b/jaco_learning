@@ -98,7 +98,7 @@ class TeleopInference():
 		# ----- Planner Setup ----- #
 		# Retrieve the planner specific parameters.
 		planner_type = rospy.get_param("planner/type")
-		prior_belief = rospy.get_param("planner/belief")
+		prior_belief = rospy.get_param("planner/belief") # this is also used to initialize the learner
 		if planner_type == "trajopt":
 			max_iter = rospy.get_param("planner/max_iter")
 			num_waypts = rospy.get_param("planner/num_waypts")
@@ -117,7 +117,6 @@ class TeleopInference():
 
 		# Save the intermediate target configuration.
 		self.curr_pos = None
-		#!!! added for interaction detection
 		self.prev_pos = None
 		self.curr_time = None
 		self.prev_time = None
@@ -156,7 +155,7 @@ class TeleopInference():
 		constants["alpha"] = rospy.get_param("learner/alpha")
 		constants["n"] = rospy.get_param("learner/n")
 		self.feat_method = rospy.get_param("learner/type")
-		self.learner = TeleopLearner(self.feat_method, self.feat_list, self.environment, constants)
+		self.learner = TeleopLearner(self.feat_method, self.feat_list, self.environment, constants, self.goals, prior_belief)
 
 	def register_callbacks(self):
 		"""
@@ -186,12 +185,14 @@ class TeleopInference():
 		# Convert to radians.
 		self.curr_pos = self.curr_pos*(math.pi/180.0)
 
+		interaction = False
 		if self.prev_pos is not None:
 			dt = self.curr_time - self.prev_time
 			obs_vel = ((self.curr_pos - self.prev_pos) / dt).reshape(7)
 			if any(obs_vel - self.cmd.diagonal() > self.INTERACTION_VELOCITY_EPSILON) and self.reached_start:
 				print "interaction detected"
 				print np.max(obs_vel - self.cmd.diagonal())
+				interaction = True
 
 		# Update cmd from PID based on current position.
 		self.cmd = self.controller.get_command(self.curr_pos)
@@ -201,7 +202,10 @@ class TeleopInference():
 			self.reached_start = True
 		if self.controller.path_end_T is not None:
 			self.reached_goal = True
-			 
+		
+		if interaction:
+			pass
+			#self.learner.update_beliefs(self.curr_pos, obs_vel - self.cmd.diagonal())
 
 	def joint_torques_callback(self, msg):
 		"""
@@ -228,7 +232,6 @@ class TeleopInference():
 			#print np.fabs(torque_curr[:, 0]) > self.INTERACTION_TORQUE_EPSILON
 			#print self.cmd
 			return
-			#
 			if self.reached_start and not self.reached_goal:
 				timestamp = time.time() - self.controller.path_start_T
 
@@ -238,8 +241,7 @@ class TeleopInference():
 				betas_u = self.learner.betas_u
 				updates = self.learner.updates
 
-				self.traj = self.planner.replan(self.start, self.goals, self.goal_pose, self.weights,
-												self.T, self.timestep, seed=self.traj_plan.waypts, belief=belief)
+				self.traj = self.planner.replan(self.start, self.goals, self.goal_pose, self.weights, self.T, self.timestep, seed=self.traj_plan.waypts, belief=belief)
 				self.traj_plan = self.traj.downsample(self.planner.num_waypts)
 				self.controller.set_trajectory(self.traj)
 
