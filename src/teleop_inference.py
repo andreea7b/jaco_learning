@@ -59,7 +59,6 @@ class TeleopInference():
 			if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
 				line = raw_input()
 				break
-			#self.vel_pub.publish(ros_utils.cmd_to_JointVelocityMsg(self.cmd))
 			self.vel_pub.publish(ros_utils.cmd_to_JointVelocityMsg((180/np.pi)*self.cmd))
 			r.sleep()
 
@@ -189,9 +188,9 @@ class TeleopInference():
 		if self.prev_pos is not None:
 			dt = self.curr_time - self.prev_time
 			obs_vel = ((self.curr_pos - self.prev_pos) / dt).reshape(7)
-			if any(obs_vel - self.cmd.diagonal() > self.INTERACTION_VELOCITY_EPSILON) and self.reached_start:
+			if any(np.fabs(obs_vel - self.cmd.diagonal()) > self.INTERACTION_VELOCITY_EPSILON) and self.reached_start:
 				print "interaction detected"
-				print np.max(obs_vel - self.cmd.diagonal())
+				print np.max(np.fabs(obs_vel - self.cmd.diagonal()))
 				interaction = True
 
 		# Update cmd from PID based on current position.
@@ -204,8 +203,10 @@ class TeleopInference():
 			self.reached_goal = True
 		
 		if interaction:
-			pass
-			#self.learner.update_beliefs(self.curr_pos, obs_vel - self.cmd.diagonal())
+			self.learner.update_beliefs(self.prev_pos.reshape(7), obs_vel - self.cmd.diagonal())
+			self.traj = self.planner.replan(self.start, self.goals, self.goal_pose, self.weights, self.T, self.timestep, seed=self.traj_plan.waypts, belief=self.learner.beliefs)
+			self.traj_plan = self.traj.downsample(self.planner.num_waypts)
+			self.controller.set_trajectory(self.traj)
 
 	def joint_torques_callback(self, msg):
 		"""
