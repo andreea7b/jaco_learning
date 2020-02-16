@@ -57,47 +57,28 @@ class TeleopLearner(object):
 
 		return self.weights
 
-	def update_beliefs(self, angles, delta_v):
+	def update_beliefs(self, old_angles, new_angles):
 		"""
-		Updates the beliefs given an interaction delta_v that ocurred when the robot
-		was at angles (both in radians).
-
-		Params:
-			angles -- Shape (7,) array of radian joint angles
-			delta_v -- Shape (7,) array of radian joint velocities induced from the interaction
+		Updates the beliefs given an interaction that moved the robot from old_angles to new_angles
 		"""
-		to_xyz = self.environment.get_cartesian_coords
-		pos_xyz = to_xyz(angles)
-		cartesian_displacement = to_xyz(angles + delta_v) - to_xyz(angles)
-		goal_displacements = self.goals_xyz - pos_xyz
-		goal_costs = angle_costs(cartesian_displacement, goal_displacements)
-		print goal_costs
-
+		#to_xyz = self.environment.get_cartesian_coords
+		#pos_xyz = to_xyz(old_angles)
+		#cartesian_displacement = to_xyz(new_angles) - pos_xyz
+		#goal_displacements = self.goals_xyz - pos_xyz
+		#goal_costs = angle_costs(cartesian_displacement, goal_displacements)
+		goal_costs = angle_costs(new_angles - old_angles, self.goals - old_angles)
 		beta = 1
 		prob_fn = lambda costs: np.exp(-beta * costs)
 		# likelihood of the action given each goal
 		prob_u_given_g = prob_fn(goal_costs)
-		print "prob_u_given_g:"
-		print prob_u_given_g
-
 		updated_beliefs = prob_u_given_g * self.beliefs
 		updated_beliefs = updated_beliefs / np.sum(updated_beliefs)
-		print "new beliefs:"
-		print updated_beliefs
 		self.beliefs = updated_beliefs
 
 
 def angle_costs(obs_dir, goal_dirs):
 	u_obs_dir = obs_dir/np.linalg.norm(obs_dir)
 	u_goal_dirs = np.apply_along_axis(lambda x: x/np.linalg.norm(x), 1, goal_dirs)
-	print(u_obs_dir)
-	print(u_goal_dirs)
-	print "dot products"
-	print(np.dot(u_obs_dir, u_goal_dirs[0]))
-	print(np.dot(u_obs_dir, u_goal_dirs[1]))
-	print "angles"
-	print np.arccos(np.clip(np.dot(u_obs_dir, u_goal_dirs[0]), -1.0, 1))
-	print np.arccos(np.clip(np.dot(u_obs_dir, u_goal_dirs[1]), -1.0, 1))
 	def angle_from_obs(u_goal_dir):
 		return np.arccos(np.clip(np.dot(u_goal_dir, u_obs_dir), -1.0, 1.0))
 	return np.fabs(np.apply_along_axis(angle_from_obs, 1, u_goal_dirs))

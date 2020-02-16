@@ -190,7 +190,6 @@ class TeleopInference():
 			obs_vel = ((self.curr_pos - self.prev_pos) / dt).reshape(7)
 			if any(np.fabs(obs_vel - self.cmd.diagonal()) > self.INTERACTION_VELOCITY_EPSILON) and self.reached_start:
 				print "interaction detected"
-				print np.max(np.fabs(obs_vel - self.cmd.diagonal()))
 				interaction = True
 
 		# Update cmd from PID based on current position.
@@ -202,8 +201,9 @@ class TeleopInference():
 		if self.controller.path_end_T is not None:
 			self.reached_goal = True
 		
+
 		if interaction:
-			self.learner.update_beliefs(self.prev_pos.reshape(7), obs_vel - self.cmd.diagonal())
+			self.learner.update_beliefs(self.prev_pos.reshape(7), self.curr_pos.reshape(7))
 			self.traj = self.planner.replan(self.start, self.goals, self.goal_pose, self.weights, self.T, self.timestep, seed=self.traj_plan.waypts, belief=self.learner.beliefs)
 			self.traj_plan = self.traj.downsample(self.planner.num_waypts)
 			self.controller.set_trajectory(self.traj)
