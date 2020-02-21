@@ -261,7 +261,10 @@ class Environment(object):
 		"""
 		Note that joint_angles are assumed to be in degrees
 		"""
-		self.robot.SetDOFValues(np.append(joint_angles, np.array([0,0,0])))
+		if len(joint_angles) < 10:
+			joint_angles = np.append(joint_angles.reshape(7), np.array([0,0,0]))
+			joint_angles[2] += math.pi
+		self.robot.SetDOFValues(joint_angles)
 		return robotToCartesian(self.robot)[6]
 
 	def kill_environment(self):

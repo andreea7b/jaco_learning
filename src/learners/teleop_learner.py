@@ -10,34 +10,20 @@ class TeleopLearner(object):
 	torque applied onto the trajectory.
 	"""
 
-	def __init__(self, feat_method, feat_list, environment, constants, goals, beliefs):
+	def __init__(self, environment, goals, beliefs, betas):
 
 		# ---- Important internal variables ---- #
-		self.feat_method = feat_method
-		self.feat_list = feat_list
-		self.num_features = len(self.feat_list)
-		self.weights = [0.0] * self.num_features
-		self.betas = [1.0] * self.num_features
-		self.betas_u = [1.0] * self.num_features
-		self.updates = [0.0] * self.num_features
 		self.environment = environment
-
-		self.alpha = constants["alpha"]
-		self.n = constants["n"]
-		UPDATE_GAINS = constants["UPDATE_GAINS"]
-		MAX_WEIGHTS = constants["MAX_WEIGHTS"]
-		FEAT_RANGE = constants["FEAT_RANGE"]
-
-		self.update_gains = [UPDATE_GAINS[self.feat_list[feat]] for feat in range(self.num_features)]
-		self.max_weights = [MAX_WEIGHTS[self.feat_list[feat]] for feat in range(self.num_features)]
-		self.feat_range = [FEAT_RANGE[self.feat_list[feat]] for feat in range(self.num_features)]
-		self.P_beta = constants["P_beta"]
 
 		self.goals = goals
 		self.goals_xyz = np.array([self.environment.get_cartesian_coords(goal) for goal in goals])
 		self.num_goals = len(goals)
 
-		self.beliefs = beliefs
+		self.goals_beliefs = beliefs
+		assert(len(goals) == len(beliefs))
+		self.betas = betas
+		self.beliefs = np.outer(beliefs, np.ones(len(betas),)/len(betas))
+		# beliefs is a len(goals) x len(betas)
 
 	def learn_weights(self, traj, u_h, t):
 		"""
@@ -61,19 +47,27 @@ class TeleopLearner(object):
 		"""
 		Updates the beliefs given an interaction that moved the robot from old_angles to new_angles
 		"""
-		#to_xyz = self.environment.get_cartesian_coords
-		#pos_xyz = to_xyz(old_angles)
-		#cartesian_displacement = to_xyz(new_angles) - pos_xyz
-		#goal_displacements = self.goals_xyz - pos_xyz
-		#goal_costs = angle_costs(cartesian_displacement, goal_displacements)
-		goal_costs = angle_costs(new_angles - old_angles, self.goals - old_angles)
-		beta = 1
-		prob_fn = lambda costs: np.exp(-beta * costs)
+		to_xyz = self.environment.get_cartesian_coords
+		pos_xyz = to_xyz(old_angles)
+		cartesian_displacement = to_xyz(new_angles) - pos_xyz
+		goal_displacements = self.goals_xyz - pos_xyz
+		goal_costs = angle_costs(cartesian_displacement, goal_displacements)
+		#goal_costs = angle_costs(new_angles - old_angles, self.goals - old_angles)
+		
+
+		#beta = 100
+		#prob_fn = lambda beta, costs: np.exp(-beta * costs)
 		# likelihood of the action given each goal
-		prob_u_given_g = prob_fn(goal_costs)
+		#prob_u_given_g = prob_fn(goal_costs)
+		prob_u_given_g = np.exp(np.outer(goal_costs, -self.betas))
 		updated_beliefs = prob_u_given_g * self.beliefs
 		updated_beliefs = updated_beliefs / np.sum(updated_beliefs)
+		print updated_beliefs
 		self.beliefs = updated_beliefs
+
+		self.goal_beliefs = self.beliefs.sum(axis=1)
+		print self.goal_beliefs
+
 
 
 def angle_costs(obs_dir, goal_dirs):

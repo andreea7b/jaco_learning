@@ -146,15 +146,9 @@ class TeleopInference():
 		self.cmd = np.eye(7)
 
 		# ----- Learner Setup ----- #
-		constants = {}
-		constants["UPDATE_GAINS"] = rospy.get_param("learner/UPDATE_GAINS")
-		constants["MAX_WEIGHTS"] = rospy.get_param("learner/MAX_WEIGHTS")
-		constants["FEAT_RANGE"] = rospy.get_param("learner/FEAT_RANGE")
-		constants["P_beta"] = rospy.get_param("learner/P_beta")
-		constants["alpha"] = rospy.get_param("learner/alpha")
-		constants["n"] = rospy.get_param("learner/n")
-		self.feat_method = rospy.get_param("learner/type")
-		self.learner = TeleopLearner(self.feat_method, self.feat_list, self.environment, constants, self.goals, prior_belief)
+
+		betas = np.array(rospy.get_param("learner/betas"))
+		self.learner = TeleopLearner(self.environment, self.goals, prior_belief, betas)
 
 	def register_callbacks(self):
 		"""
@@ -204,7 +198,7 @@ class TeleopInference():
 
 		if interaction:
 			self.learner.update_beliefs(self.prev_pos.reshape(7), self.curr_pos.reshape(7))
-			self.traj = self.planner.replan(self.start, self.goals, self.goal_pose, self.weights, self.T, self.timestep, seed=self.traj_plan.waypts, belief=self.learner.beliefs)
+			self.traj = self.planner.replan(self.start, self.goals, self.goal_pose, self.weights, self.T, self.timestep, seed=self.traj_plan.waypts, belief=self.learner.goal_beliefs)
 			self.traj_plan = self.traj.downsample(self.planner.num_waypts)
 			self.controller.set_trajectory(self.traj)
 
