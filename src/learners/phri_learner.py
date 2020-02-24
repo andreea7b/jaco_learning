@@ -50,7 +50,6 @@ class PHRILearner(object):
 		"""
 		self.traj = traj
 		self.traj_deform = traj.deform(u_h, t, self.alpha, self.n)
-		import pdb;pdb.set_trace()
 		new_features = self.environment.featurize(self.traj_deform.waypts, self.feat_list)
 		old_features = self.environment.featurize(traj.waypts, self.feat_list)
 

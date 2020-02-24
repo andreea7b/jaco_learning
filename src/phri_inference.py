@@ -12,6 +12,7 @@ import rospy
 import math
 import sys, select, os
 import time
+from multiprocessing.dummy import Process as Thread
 
 import kinova_msgs.msg
 from kinova_msgs.srv import *
@@ -149,7 +150,7 @@ class PHRIInference():
 		self.prev_pos = None
 		self.curr_time = None
 		self.prev_time = None
-		self.interaction=False
+		self.started_update = False
 
 		# ----- Controller Setup ----- #
 		# Retrieve controller specific parameters.
@@ -204,8 +205,6 @@ class PHRIInference():
 
 		# Create subscriber to joint_angles.
 		rospy.Subscriber(self.prefix + '/out/joint_angles', kinova_msgs.msg.JointAngles, self.joint_angles_callback, queue_size=1)
-		# Create subscriber to joint torques
-		rospy.Subscriber(self.prefix + '/out/joint_torques', kinova_msgs.msg.JointTorque, self.joint_torques_callback, queue_size=1)
 	
 	def joint_angles_callback(self, msg):
 		"""
@@ -230,6 +229,11 @@ class PHRIInference():
 			if any(np.fabs(obs_vel - self.cmd.diagonal()) > self.INTERACTION_VELOCITY_EPSILON):
 				interaction = True
 
+		if interaction and not self.started_update:
+			self.started_update = True
+			t = Thread(target=self.handle_interaction, args=((dq,)))
+			t.start()
+
 		# Update cmd from PID based on current position.
 		self.cmd = self.controller.get_command(self.curr_pos)
 
@@ -246,59 +250,44 @@ class PHRIInference():
 			timestamp = time.time() - self.controller.path_start_T
 			self.expUtil.update_tracked_traj(timestamp, self.curr_pos)
 
-		if interaction:
-			if self.reached_start and not self.reached_goal:
-				self.interaction=True
-				print "Interaction detected!"
-				print "dq", dq, np.linalg.norm(dq)
-				timestamp = time.time() - self.controller.path_start_T
-				self.expUtil.update_tauH(timestamp, dq)
-				self.expUtil.update_interaction_point(timestamp, self.curr_pos)
 
-				self.weights = self.learner.learn_weights(self.traj, dq, timestamp)
-				betas = self.learner.betas
-				betas_u = self.learner.betas_u
-				updates = self.learner.updates
+	def handle_interaction(self, dq):
+		if self.reached_start and not self.reached_goal:
+			print "Interaction detected!"
+			timestamp = time.time() - self.controller.path_start_T
+			self.expUtil.update_tauH(timestamp, dq)
+			self.expUtil.update_interaction_point(timestamp, self.curr_pos)
 
-				self.traj = self.planner.replan(self.start, self.goal, self.goal_pose, self.weights, 
-												self.T, self.timestep, seed=self.traj_plan.waypts)
-				self.traj_plan = self.traj.downsample(self.planner.num_waypts)
-				self.controller.set_trajectory(self.traj)
+			self.weights = self.learner.learn_weights(self.traj, dq, timestamp)
+			betas = self.learner.betas
+			betas_u = self.learner.betas_u
+			updates = self.learner.updates
 
-				# Update the experimental data with new weights and new betas.
-				timestamp = time.time() - self.controller.path_start_T
-				self.expUtil.update_weights(timestamp, self.weights)
-				self.expUtil.update_betas(timestamp, betas)
-				self.expUtil.update_betas_u(timestamp, betas_u)
-				self.expUtil.update_updates(timestamp, updates)
+			self.traj = self.planner.replan(self.start, self.goal, self.goal_pose, self.weights, 
+											self.T, self.timestep, seed=self.traj_plan.waypts)
+			self.traj_plan = self.traj.downsample(self.planner.num_waypts)
+			self.controller.set_trajectory(self.traj)
 
-				# Update the list of replanned plans with new trajectory plan.
-				self.expUtil.update_replanned_trajList(timestamp, self.traj_plan.waypts)
+			# Update the experimental data with new weights and new betas.
+			timestamp = time.time() - self.controller.path_start_T
+			self.expUtil.update_weights(timestamp, self.weights)
+			self.expUtil.update_betas(timestamp, betas)
+			self.expUtil.update_betas_u(timestamp, betas_u)
+			self.expUtil.update_updates(timestamp, updates)
 
-				# Update the list of replanned trajectory waypts with new trajectory.
-				self.expUtil.update_replanned_wayptsList(timestamp, self.traj.waypts)
+			# Update the list of replanned plans with new trajectory plan.
+			self.expUtil.update_replanned_trajList(timestamp, self.traj_plan.waypts)
 
-				# Store deformed trajectory plan.
-				deformed_traj = self.learner.traj_deform.downsample(self.planner.num_waypts)
-				self.expUtil.update_deformed_trajList(timestamp, deformed_traj.waypts)
+			# Update the list of replanned trajectory waypts with new trajectory.
+			self.expUtil.update_replanned_wayptsList(timestamp, self.traj.waypts)
 
-				# Store deformed trajectory waypoints.
-				self.expUtil.update_deformed_wayptsList(timestamp, self.learner.traj_deform.waypts)
+			# Store deformed trajectory plan.
+			deformed_traj = self.learner.traj_deform.downsample(self.planner.num_waypts)
+			self.expUtil.update_deformed_trajList(timestamp, deformed_traj.waypts)
 
-	def joint_torques_callback(self, msg):
-		"""
-		Reads the latest torque sensed by the robot and records it for
-		plotting & analysis
-		"""
-		# Read the current joint torques from the robot.
-		torque_curr = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
-		INTERACTION_TORQUE_THRESHOLD = [0.88414821, 17.22751856, -0.40134936,  6.23537946, -0.90013662, 1.32379884,  0.10218059]
-		if self.interaction:
-			for i in range(7):
-				# Center torques around zero.
-				torque_curr[i][0] -= INTERACTION_TORQUE_THRESHOLD[i]
-			print "torque", torque_curr, np.linalg.norm(torque_curr)
-			self.interaction=False
+			# Store deformed trajectory waypoints.
+			self.expUtil.update_deformed_wayptsList(timestamp, self.learner.traj_deform.waypts)
+		self.started_update = False
 
 if __name__ == '__main__':
 	PHRIInference()
