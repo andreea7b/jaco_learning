@@ -11,8 +11,7 @@ setup:
     timestep: 0.5
     save_dir: "/data/corrections/"
     # These constants have been tuned for the task tested.
-    INTERACTION_TORQUE_THRESHOLD: [0.88414821, 17.22751856, -0.40134936,  6.23537946, -0.90013662, 1.32379884,  0.10218059]
-    INTERACTION_TORQUE_EPSILON: [4.0, 5.0, 3.0, 4.0, 1.5, 1.5, 1.5]
+    INTERACTION_VELOCITY_EPSILON: 0.2
 
 planner:
     # These settings have been tuned for trajopt planner.
@@ -23,19 +22,19 @@ planner:
 controller:
     # These settings have been tuned for PID controller.
     type: "pid"
-    p_gain: 50.0
+    p_gain: 0.5
     i_gain: 0.0
-    d_gain: 20.0
+    d_gain: 0.1
     epsilon: 0.10
     max_cmd: 40.0
 
 learner:
     # These settings have been tuned for beta learner.
-    type: "beta"
+    type: "all"
     UPDATE_GAINS: {'table':2.0, 'coffee':2.0, 'laptop':100.0, 'human':20.0, 'efficiency':1.0}
     MAX_WEIGHTS: {'table':1.0, 'coffee':1.0, 'laptop':8.0, 'human':10.0, 'efficiency':1.0}
     FEAT_RANGE: {'table':0.6918574, 'coffee':1.87608702, 'laptop':1.00476554, 'human':3.2, 'efficiency':1.0}
-    alpha: -0.01
+    alpha: 1.0
     n: 5
     P_beta: {"table0": [1.83701582842, 0.0, 0.150583961407], "table1": [2.8, 0.0, 0.4212940611], "coffee0": [1.67451171875, 0.0, 0.05], "coffee1": [2.8169921875, 0.0, 0.3], "human0": [2.14693459432, 0.0, 0.227738059531], "human1": [5.0458984375, 0.0, 0.25]}
 

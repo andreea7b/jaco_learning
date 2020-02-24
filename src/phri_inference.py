@@ -31,7 +31,6 @@ class PHRIInference():
 
 	Subscribes to:
 		/$prefix$/out/joint_angles	- Jaco sensed joint angles
-		/$prefix$/out/joint_torques - Jaco sensed joint torques
 
 	Publishes to:
 		/$prefix$/in/joint_velocity	- Jaco commanded joint velocities
@@ -60,7 +59,7 @@ class PHRIInference():
 				line = raw_input()
 				break
 
-			self.vel_pub.publish(ros_utils.cmd_to_JointVelocityMsg(self.cmd))
+			self.vel_pub.publish(ros_utils.cmd_to_JointVelocityMsg((180/np.pi)*self.cmd))
 			r.sleep()
 
 		print "----------------------------------"
@@ -119,8 +118,7 @@ class PHRIInference():
 		self.save_dir = rospy.get_param("setup/save_dir")
 		self.feat_list = rospy.get_param("setup/feat_list")
 		self.weights = rospy.get_param("setup/feat_weights")
-		self.INTERACTION_TORQUE_THRESHOLD = rospy.get_param("setup/INTERACTION_TORQUE_THRESHOLD")
-		self.INTERACTION_TORQUE_EPSILON = rospy.get_param("setup/INTERACTION_TORQUE_EPSILON")
+		self.INTERACTION_VELOCITY_EPSILON = rospy.get_param("setup/INTERACTION_VELOCITY_EPSILON")
 
 		# Openrave parameters for the environment.
 		model_filename = rospy.get_param("setup/model_filename")
@@ -148,6 +146,10 @@ class PHRIInference():
 		
 		# Save the intermediate target configuration. 
 		self.curr_pos = None
+		self.prev_pos = None
+		self.curr_time = None
+		self.prev_time = None
+		self.interaction=False
 
 		# ----- Controller Setup ----- #
 		# Retrieve controller specific parameters.
@@ -161,7 +163,7 @@ class PHRIInference():
 			# Stores proximity threshold.
 			epsilon = rospy.get_param("controller/epsilon")
 			
-			# Stores maximum COMMANDED joint torques.
+			# Stores maximum COMMANDED joint velocities.
 			MAX_CMD = rospy.get_param("controller/max_cmd") * np.eye(7)
 			
 			self.controller = PIDController(P, I, D, epsilon, MAX_CMD)
@@ -171,7 +173,7 @@ class PHRIInference():
 		# Planner tells controller what plan to follow.
 		self.controller.set_trajectory(self.traj)
 
-		# Stores current COMMANDED joint torques.
+		# Stores current COMMANDED joint velocities.
 		self.cmd = np.eye(7)
 
 		# ----- Learner Setup ----- #
@@ -208,17 +210,29 @@ class PHRIInference():
 	def joint_angles_callback(self, msg):
 		"""
 		Reads the latest position of the robot and publishes an
-		appropriate torque command to move the robot to the target.
+		appropriate velocity command to move the robot to the target.
 		"""
+		self.prev_pos = self.curr_pos
+		self.prev_time = self.curr_time
+		self.curr_time = time.time()
+
 		# Read the current joint angles from the robot.
 		self.curr_pos = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
 
 		# Convert to radians.
 		self.curr_pos = self.curr_pos*(math.pi/180.0)
 
+		interaction = False
+		if self.prev_pos is not None:
+			dt = self.curr_time - self.prev_time
+			dq = self.curr_pos - self.prev_pos
+			obs_vel = (dq / dt).reshape(7)
+			if any(np.fabs(obs_vel - self.cmd.diagonal()) > self.INTERACTION_VELOCITY_EPSILON):
+				interaction = True
+
 		# Update cmd from PID based on current position.
 		self.cmd = self.controller.get_command(self.curr_pos)
-		
+
 		# Check is start/goal has been reached.
 		if self.controller.path_start_T is not None:
 			self.reached_start = True
@@ -232,29 +246,16 @@ class PHRIInference():
 			timestamp = time.time() - self.controller.path_start_T
 			self.expUtil.update_tracked_traj(timestamp, self.curr_pos)
 
-	def joint_torques_callback(self, msg):
-		"""
-		Reads the latest torque sensed by the robot and records it for
-		plotting & analysis
-		"""
-		# Read the current joint torques from the robot.
-		torque_curr = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
-		interaction = False
-		for i in range(7):
-			# Center torques around zero.
-			torque_curr[i][0] -= self.INTERACTION_TORQUE_THRESHOLD[i]
-			# Check if interaction was not noise.
-			if np.fabs(torque_curr[i][0]) > self.INTERACTION_TORQUE_EPSILON[i] and self.reached_start:
-				interaction = True
-		
-		# If we experienced large enough interaction force, then learn.
 		if interaction:
 			if self.reached_start and not self.reached_goal:
+				self.interaction=True
+				print "Interaction detected!"
+				print "dq", dq, np.linalg.norm(dq)
 				timestamp = time.time() - self.controller.path_start_T
-				self.expUtil.update_tauH(timestamp, torque_curr)
+				self.expUtil.update_tauH(timestamp, dq)
 				self.expUtil.update_interaction_point(timestamp, self.curr_pos)
 
-				self.weights = self.learner.learn_weights(self.traj, torque_curr, timestamp)
+				self.weights = self.learner.learn_weights(self.traj, dq, timestamp)
 				betas = self.learner.betas
 				betas_u = self.learner.betas_u
 				updates = self.learner.updates
@@ -283,6 +284,21 @@ class PHRIInference():
 
 				# Store deformed trajectory waypoints.
 				self.expUtil.update_deformed_wayptsList(timestamp, self.learner.traj_deform.waypts)
+
+	def joint_torques_callback(self, msg):
+		"""
+		Reads the latest torque sensed by the robot and records it for
+		plotting & analysis
+		"""
+		# Read the current joint torques from the robot.
+		torque_curr = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
+		INTERACTION_TORQUE_THRESHOLD = [0.88414821, 17.22751856, -0.40134936,  6.23537946, -0.90013662, 1.32379884,  0.10218059]
+		if self.interaction:
+			for i in range(7):
+				# Center torques around zero.
+				torque_curr[i][0] -= INTERACTION_TORQUE_THRESHOLD[i]
+			print "torque", torque_curr, np.linalg.norm(torque_curr)
+			self.interaction=False
 
 if __name__ == '__main__':
 	PHRIInference()
