@@ -25,6 +25,8 @@ from utils.environment import Environment
 import numpy as np
 import pickle
 
+import Tkinter as tk
+
 class TeleopInference():
 	"""
 	This class represents a node that moves the Jaco with PID control AND supports receiving human corrections online.
@@ -51,10 +53,19 @@ class TeleopInference():
 		# Publish to ROS at 100hz.
 		r = rospy.Rate(100)
 
+		# Setup keypress listener
+		# need to put in another thread
+		main = tk.Tk()
+		def test(event):
+			print 'keypress detected'
+		main.bind('<Up>', test)
+		main.mainloop()
+
 		print "----------------------------------"
 		print "Moving robot, press ENTER to quit:"
 
 		while not rospy.is_shutdown():
+
 
 			if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
 				line = raw_input()
