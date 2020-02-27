@@ -21,11 +21,11 @@ from planners.trajopt_planner import TrajoptPlanner
 from learners.teleop_learner import TeleopLearner
 from utils import ros_utils
 from utils.environment import Environment
+from utils.input_utils import KeyboardListener
 
 import numpy as np
 import pickle
 
-import Tkinter as tk
 
 class TeleopInference():
 	"""
@@ -53,13 +53,7 @@ class TeleopInference():
 		# Publish to ROS at 100hz.
 		r = rospy.Rate(100)
 
-		# Setup keypress listener
-		# need to put in another thread
-		main = tk.Tk()
-		def test(event):
-			print 'keypress detected'
-		main.bind('<Up>', test)
-		main.mainloop()
+
 
 		print "----------------------------------"
 		print "Moving robot, press ENTER to quit:"
@@ -125,11 +119,8 @@ class TeleopInference():
 		self.reached_start = False
 		self.reached_goal = False
 
-		# Save the intermediate target configuration.
+		# Save the current configuration.
 		self.curr_pos = None
-		self.prev_pos = None
-		self.curr_time = None
-		self.prev_time = None
 
 		# ----- Controller Setup ----- #
 		# Retrieve controller specific parameters.
@@ -153,13 +144,17 @@ class TeleopInference():
 		# Planner tells controller what plan to follow.
 		self.controller.set_trajectory(self.traj)
 
-		# Stores current COMMANDED joint torques.
+		# Stores current COMMANDED joint velocities.
 		self.cmd = np.eye(7)
 
 		# ----- Learner Setup ----- #
-
 		betas = np.array(rospy.get_param("learner/betas"))
 		self.learner = TeleopLearner(self.environment, self.goals, prior_belief, betas)
+
+		# ----- Input Device Setup ----- #
+		bindings = [('<Up>', )]
+		self.input_device = KeyboardListener(bindings)
+		self.input_device.start()
 
 	def register_callbacks(self):
 		"""
@@ -179,23 +174,11 @@ class TeleopInference():
 		Reads the latest position of the robot and publishes an
 		appropriate torque command to move the robot to the target.
 		"""
-		self.prev_pos = self.curr_pos
-		self.prev_time = self.curr_time
-		self.curr_time = time.time()
-
 		# Read the current joint angles from the robot.
 		self.curr_pos = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
 
 		# Convert to radians.
 		self.curr_pos = self.curr_pos*(math.pi/180.0)
-
-		interaction = False
-		if self.prev_pos is not None:
-			dt = self.curr_time - self.prev_time
-			obs_vel = ((self.curr_pos - self.prev_pos) / dt).reshape(7)
-			if any(np.fabs(obs_vel - self.cmd.diagonal()) > self.INTERACTION_VELOCITY_EPSILON) and self.reached_start:
-				print "interaction detected"
-				interaction = True
 
 		# Update cmd from PID based on current position.
 		self.cmd = self.controller.get_command(self.curr_pos)
@@ -205,51 +188,6 @@ class TeleopInference():
 			self.reached_start = True
 		if self.controller.path_end_T is not None:
 			self.reached_goal = True
-		
-
-		if interaction:
-			self.learner.update_beliefs(self.prev_pos.reshape(7), self.curr_pos.reshape(7))
-			self.traj = self.planner.replan(self.start, self.goals, self.goal_pose, self.weights, self.T, self.timestep, seed=self.traj_plan.waypts, belief=self.learner.goal_beliefs)
-			self.traj_plan = self.traj.downsample(self.planner.num_waypts)
-			self.controller.set_trajectory(self.traj)
-
-	def joint_torques_callback(self, msg):
-		"""
-		Reads the latest torque sensed by the robot and records it for
-		plotting & analysis
-		"""
-		# Read the current joint torques from the robot.
-		torque_curr = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
-		interaction = False
-		return
-		for i in range(7):
-			# Center torques around zero.
-			torque_curr[i][0] -= self.INTERACTION_TORQUE_THRESHOLD[i]
-			#torque_curr[i][0] -= self.cmd[i][i]
-			# Check if interaction was not noise.
-			if np.fabs(torque_curr[i][0]) > self.INTERACTION_TORQUE_EPSILON[i] and self.reached_start:
-				interaction = True
-
-		# If we experienced large enough interaction force, then learn.
-		if interaction:
-			# for testing the thresholds/epsilons
-			#print "interaction detected"
-			#print torque_curr.reshape((1,7))
-			#print np.fabs(torque_curr[:, 0]) > self.INTERACTION_TORQUE_EPSILON
-			#print self.cmd
-			return
-			if self.reached_start and not self.reached_goal:
-				timestamp = time.time() - self.controller.path_start_T
-
-				self.weights = self.learner.learn_weights(self.traj, torque_curr, timestamp)
-				# learn weights here
-				betas = self.learner.betas
-				betas_u = self.learner.betas_u
-				updates = self.learner.updates
-
-				self.traj = self.planner.replan(self.start, self.goals, self.goal_pose, self.weights, self.T, self.timestep, seed=self.traj_plan.waypts, belief=belief)
-				self.traj_plan = self.traj.downsample(self.planner.num_waypts)
-				self.controller.set_trajectory(self.traj)
 
 if __name__ == '__main__':
 	TeleopInference()
