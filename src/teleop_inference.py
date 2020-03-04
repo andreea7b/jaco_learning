@@ -15,13 +15,13 @@ import time
 
 import kinova_msgs.msg
 from kinova_msgs.srv import *
+from sensor_msgs.msg import Joy
 
 from controllers.pid_controller import PIDController
 from planners.trajopt_planner import TrajoptPlanner
 from learners.teleop_learner import TeleopLearner
 from utils import ros_utils
 from utils.environment import Environment
-from utils.input_utils import KeyboardListener
 
 import numpy as np
 import pickle
@@ -53,8 +53,6 @@ class TeleopInference():
 		# Publish to ROS at 100hz.
 		r = rospy.Rate(100)
 
-
-
 		print "----------------------------------"
 		print "Moving robot, press ENTER to quit:"
 
@@ -78,31 +76,24 @@ class TeleopInference():
 		# ----- General Setup ----- #
 		self.prefix = rospy.get_param("setup/prefix")
 		self.start = np.array(rospy.get_param("setup/start"))*(math.pi/180.0)
-		self.goals = np.array(rospy.get_param("setup/goals"))*(math.pi/180.0)
-		self.goal_pose = None if rospy.get_param("setup/goal_pose") == "None" else rospy.get_param("setup/goal_pose")
+		self.goal_poses = np.array(rospy.get_param("setup/goals"))*(math.pi/180.0)
 		self.T = rospy.get_param("setup/T")
 		self.timestep = rospy.get_param("setup/timestep")
 		self.save_dir = rospy.get_param("setup/save_dir")
 		self.feat_list = rospy.get_param("setup/feat_list")
 		self.weights = rospy.get_param("setup/feat_weights")
-		self.INTERACTION_VELOCITY_EPSILON = np.array(rospy.get_param("setup/INTERACTION_VELOCITY_EPSILON"))
 
 		# Openrave parameters for the environment.
 		model_filename = rospy.get_param("setup/model_filename")
 		object_centers = rospy.get_param("setup/object_centers")
-		for goal_num in range(len(self.goals)):
-			# assumes the goal either contains the finger angles (10DOF) or does not (7DOF)
-			if len(self.goals[goal_num]) == 7:
-				object_centers["GOAL"+str(goal_num)+" ANGLES"] = np.pad(self.goals[goal_num], (0,3), mode='constant')
-			else:
-				object_centers["GOAL"+str(goal_num)+" ANGLES"] = self.goals[goal_num]
-		# object centers holds xyz coords of objects and radian joint coords of goals
+		for goal_num in range(len(self.goal_poses)):
+			object_centers["GOAL"+str(goal_num)] = self.goal_poses[goal_num]
+		# object centers holds xyz coords of objects
 		self.environment = Environment(model_filename, object_centers)
 
 		# ----- Planner Setup ----- #
 		# Retrieve the planner specific parameters.
 		planner_type = rospy.get_param("planner/type")
-		prior_belief = rospy.get_param("planner/belief") # this is also used to initialize the learner
 		if planner_type == "trajopt":
 			max_iter = rospy.get_param("planner/max_iter")
 			num_waypts = rospy.get_param("planner/num_waypts")
@@ -111,8 +102,8 @@ class TeleopInference():
 			self.planner = TrajoptPlanner(self.feat_list, max_iter, num_waypts, self.environment)
 		else:
 			raise Exception('Planner {} not implemented.'.format(planner_type))
-
-		self.traj = self.planner.replan(self.start, self.goals, self.goal_pose, self.weights, self.T, self.timestep, belief=prior_belief)
+		# TODO: do something better than goal_poses[0]?
+		self.traj = self.planner.replan(self.start, None, self.goal_poses[0], self.weights, self.T, self.timestep)
 		self.traj_plan = self.traj.downsample(self.planner.num_waypts)
 
 		# Track if you have reached the start/goal of the path.
@@ -149,12 +140,13 @@ class TeleopInference():
 
 		# ----- Learner Setup ----- #
 		betas = np.array(rospy.get_param("learner/betas"))
-		self.learner = TeleopLearner(self.environment, self.goals, prior_belief, betas)
+		prior_belief = rospy.get_param("learner/belief")
+		planner_vars = (self.T, self.timestep, self.start)
+		self.learner = TeleopLearner(self.planner, planner_vars, self.environment,
+			self.goal_poses, self.feat_list, self.weights, prior_belief, betas)
 
 		# ----- Input Device Setup ----- #
-		bindings = [('<Up>', )]
-		self.input_device = KeyboardListener(bindings)
-		self.input_device.start()
+
 
 	def register_callbacks(self):
 		"""
@@ -166,8 +158,8 @@ class TeleopInference():
 
 		# Create subscriber to joint_angles.
 		rospy.Subscriber(self.prefix + '/out/joint_angles', kinova_msgs.msg.JointAngles, self.joint_angles_callback, queue_size=1)
-		# Create subscriber to joint torques
-		rospy.Subscriber(self.prefix + '/out/joint_torques', kinova_msgs.msg.JointTorque, self.joint_torques_callback, queue_size=1)
+		# Create subscriber to input joystick.
+		rospy.Subscriber('joy', Joy, self.joystick_input_callback, queue_size=1)
 
 	def joint_angles_callback(self, msg):
 		"""
@@ -175,10 +167,10 @@ class TeleopInference():
 		appropriate torque command to move the robot to the target.
 		"""
 		# Read the current joint angles from the robot.
-		self.curr_pos = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
+		curr_pos = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
 
 		# Convert to radians.
-		self.curr_pos = self.curr_pos*(math.pi/180.0)
+		self.curr_pos = curr_pos*(math.pi/180.0)
 
 		# Update cmd from PID based on current position.
 		self.cmd = self.controller.get_command(self.curr_pos)
@@ -188,6 +180,17 @@ class TeleopInference():
 			self.reached_start = True
 		if self.controller.path_end_T is not None:
 			self.reached_goal = True
+
+	def joystick_input_callback(self, msg):
+		"""
+		Reads joystick commands
+		"""
+		print msg
+		break # TODO: remove after testing
+		cartesian_input = PROCESS_INPUT_TO_CARTESIAN(msg)
+		joint_vel_input = CONVERT_TO_ANGULAR(cartesian_input)
+
+
 
 if __name__ == '__main__':
 	TeleopInference()

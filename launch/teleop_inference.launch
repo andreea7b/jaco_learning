@@ -2,6 +2,10 @@
 
 	<rosparam command="load" file="$(find jaco_learning)/config/teleop_inference.yaml" />
 
+	<!-- joy node -->
+	  <node respawn="true" pkg="joy" type="joy_node" name="turtle_joy" />
+	  <param name="dev" type="string" value="/dev/input/js0" />
+
 	<!-- Trajopt PID control with... -->
 	<node name="teleop_inference" pkg="jaco_learning" type="teleop_inference.py" output="screen"/>
 

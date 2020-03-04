@@ -198,14 +198,13 @@ class TrajoptPlanner(object):
 		result = trajoptpy.OptimizeProblem(prob)
 		return result.GetTraj()
 
-	def replan(self, start, goals, goal_pose, weights, T, timestep, seed=None, belief=None):
+	def replan(self, start, goal, goal_pose, weights, T, timestep, seed=None):
 		"""
 		Replan the trajectory from start to goal given weights.
 		---
 		Parameters:
 			start -- Start position
-			goals -- If belief is None, this is assumed to be one vector of goal angles, otherwise goals
-				is a list of goal vectors
+			goal -- List of goal angles
 			goal_pose -- Goal pose (optional: can be None).
 			weights -- Weights used for the planning objective.
 			T [float] -- Time horizon for the desired trajectory.
@@ -216,11 +215,6 @@ class TrajoptPlanner(object):
 		"""
 		assert weights is not None, "The weights vector is empty. Cannot plan without a cost preference."
 		self.weights = weights
-		if belief is None:
-			goal = goals
-		else:
-			goal = expected_goal(belief, goals)
-
 		waypts = self.trajOpt(start, goal, goal_pose, traj_seed=seed)
 		waypts_time = np.linspace(0.0, T, self.num_waypts)
 		traj = Trajectory(waypts, waypts_time)

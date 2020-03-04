@@ -12,30 +12,30 @@ class Environment(object):
 	This class creates an OpenRave environment and contains all the
 	functionality needed for custom features and constraints.
 	"""
-	def __init__(self, model_filename, object_centers_angles):
+	def __init__(self, model_filename, object_centers):
 		# ---- Create environment ---- #
 		self.env, self.robot = initialize(model_filename)
 
 		# Insert any objects you want into environment.
 		self.bodies = []
-		self.object_centers = object_centers_angles
+		self.object_centers = object_centers
 
 		# Plot the table and table mount, and other desired objects.
 		plotTable(self.env)
 		plotTableMount(self.env,self.bodies)
-		plotLaptop(self.env,self.bodies,object_centers_angles['LAPTOP_CENTER'])
+		plotLaptop(self.env,self.bodies,object_centers['LAPTOP_CENTER'])
 		plotCabinet(self.env)
-		plotSphere(self.env,self.bodies,object_centers_angles['HUMAN_CENTER'], 0.015)
+		plotSphere(self.env,self.bodies,object_centers['HUMAN_CENTER'], 0.015)
 
 		# Plot the goals
-		for key in object_centers_angles.keys():
-			if "ANGLES" in key:
-				self.robot.SetDOFValues(object_centers_angles[key])
-				cartesian_coords = robotToCartesian(self.robot)
-				EEcoords = cartesian_coords[6]
-				print key
-				print EEcoords
-				#plotSphere(self.env, self.bodies, EEcoords, 0.015) # may need to change colors
+		for key in object_centers.keys():
+			if "GOAL" in key:
+				#self.robot.SetDOFValues(object_centers[key])
+				#cartesian_coords = robotToCartesian(self.robot)
+				#EEcoords = cartesian_coords[6]
+				#print key
+				#print EEcoords
+				plotSphere(self.env, self.bodies, object_centers[key], 0.015) # may need to change colors
 
 	# ---- Custom environmental features ---- #
 	def featurize(self, waypts, feat_list):
