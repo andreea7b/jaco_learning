@@ -76,7 +76,9 @@ class TeleopInference():
 		# ----- General Setup ----- #
 		self.prefix = rospy.get_param("setup/prefix")
 		self.start = np.array(rospy.get_param("setup/start"))*(math.pi/180.0)
-		self.goal_poses = np.array(rospy.get_param("setup/goals"))*(math.pi/180.0)
+		# TODO: remove one of these
+		self.goal_poses = np.array(rospy.get_param("setup/goal_poses"))
+		self.goals = np.array(rospy.get_param("setup/goals"))*(math.pi/180.0)
 		self.T = rospy.get_param("setup/T")
 		self.timestep = rospy.get_param("setup/timestep")
 		self.save_dir = rospy.get_param("setup/save_dir")
@@ -102,9 +104,9 @@ class TeleopInference():
 			self.planner = TrajoptPlanner(self.feat_list, max_iter, num_waypts, self.environment)
 		else:
 			raise Exception('Planner {} not implemented.'.format(planner_type))
-		# TODO: do something better than goal_poses[0]?
-		self.traj = self.planner.replan(self.start, None, self.goal_poses[0], self.weights, self.T, self.timestep)
-		self.traj_plan = self.traj.downsample(self.planner.num_waypts)
+		# TODO: do something better than goals[0]?
+		#self.traj = self.planner.replan(self.start, self.goals[0], None, self.weights, self.T, self.timestep)
+		#self.traj_plan = self.traj.downsample(self.planner.num_waypts)
 
 		# Track if you have reached the start/goal of the path.
 		self.reached_start = False
@@ -133,17 +135,16 @@ class TeleopInference():
 			raise Exception('Controller {} not implemented.'.format(controller_type))
 
 		# Planner tells controller what plan to follow.
-		self.controller.set_trajectory(self.traj)
+		#self.controller.set_trajectory(self.traj)
 
 		# Stores current COMMANDED joint velocities.
-		self.cmd = np.eye(7)
+		self.cmd = np.zeros((7,7))
 
 		# ----- Learner Setup ----- #
 		betas = np.array(rospy.get_param("learner/betas"))
 		prior_belief = rospy.get_param("learner/belief")
 		planner_vars = (self.T, self.timestep, self.start)
-		self.learner = TeleopLearner(self.planner, planner_vars, self.environment,
-			self.goal_poses, self.feat_list, self.weights, prior_belief, betas)
+		#self.learner = TeleopLearner(self.planner, planner_vars, self.environment, self.goal_poses, self.feat_list, self.weights, prior_belief, betas)
 
 		# ----- Input Device Setup ----- #
 
@@ -173,7 +174,7 @@ class TeleopInference():
 		self.curr_pos = curr_pos*(math.pi/180.0)
 
 		# Update cmd from PID based on current position.
-		self.cmd = self.controller.get_command(self.curr_pos)
+		#self.cmd = self.controller.get_command(self.curr_pos)
 
 		# Check is start/goal has been reached.
 		if self.controller.path_start_T is not None:
@@ -185,12 +186,17 @@ class TeleopInference():
 		"""
 		Reads joystick commands
 		"""
-		print msg
-		break # TODO: remove after testing
+		print msg.axes
+		self.environment.robot.SetDOFValues(np.append(self.curr_pos.reshape(7), np.array([0,0,0])))
+		# definitely not the right Jacobian
+		J_inv = np.linalg.pinv(self.environment.robot.ComputeJacobianTranslation(7, [0,0,0]))
+		print J_inv
+		print J_inv.shape
+		print np.dot(J_inv, msg.axes)
+		self.cmd = np.diag(np.dot(J_inv, msg.axes))
+		return # TODO: remove after testing
 		cartesian_input = PROCESS_INPUT_TO_CARTESIAN(msg)
 		joint_vel_input = CONVERT_TO_ANGULAR(cartesian_input)
-
-
 
 if __name__ == '__main__':
 	TeleopInference()
