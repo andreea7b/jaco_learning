@@ -187,7 +187,8 @@ class TeleopInference():
 		Reads joystick commands
 		"""
 		print msg.axes
-		self.environment.robot.SetDOFValues(np.append(self.curr_pos.reshape(7), np.array([0,0,0])))
+		pos = self.curr_pos.reshape(7) + np.array([0,0,np.pi,0,0,0,0])
+		self.environment.robot.SetDOFValues(np.append(pos, np.array([0,0,0])))
 		# definitely not the right Jacobian
 		J_inv = np.linalg.pinv(self.environment.robot.ComputeJacobianTranslation(7, [0,0,0]))
 		print J_inv
