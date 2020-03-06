@@ -22,6 +22,7 @@ from planners.trajopt_planner import TrajoptPlanner
 from learners.teleop_learner import TeleopLearner
 from utils import ros_utils
 from utils.environment import Environment
+from utils.openrave_utils import robotToCartesian
 
 import numpy as np
 import pickle
@@ -186,15 +187,20 @@ class TeleopInference():
 		"""
 		Reads joystick commands
 		"""
-		print msg.axes
+		print "joystick", msg.axes
+		#import pdb; pdb.set_trace()
 		pos = self.curr_pos.reshape(7) + np.array([0,0,np.pi,0,0,0,0])
 		self.environment.robot.SetDOFValues(np.append(pos, np.array([0,0,0])))
 		# definitely not the right Jacobian
-		J_inv = np.linalg.pinv(self.environment.robot.ComputeJacobianTranslation(7, [0,0,0]))
+		xyz = robotToCartesian(self.environment.robot)[6]
+		print "pos", xyz
+		Jt = self.environment.robot.ComputeJacobianTranslation(7, xyz)
+		Jo = self.environment.robot.ComputeJacobianAxisAngle(7)
+		J_inv = np.linalg.pinv(Jt)
 		print J_inv
-		print J_inv.shape
-		print np.dot(J_inv, msg.axes)
-		self.cmd = np.diag(np.dot(J_inv, msg.axes))
+		import pdb;pdb.set_trace()
+		self.cmd = np.diag(np.dot(J_inv, np.array(msg.axes)))
+		print 'cmd', self.cmd
 		return # TODO: remove after testing
 		cartesian_input = PROCESS_INPUT_TO_CARTESIAN(msg)
 		joint_vel_input = CONVERT_TO_ANGULAR(cartesian_input)
