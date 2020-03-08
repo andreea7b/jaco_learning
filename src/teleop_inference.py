@@ -187,23 +187,20 @@ class TeleopInference():
 		"""
 		Reads joystick commands
 		"""
-		print "joystick", msg.axes
-		#import pdb; pdb.set_trace()
+		joy_cmd = (msg.axes[1], msg.axes[0], msg.axes[2])
 		pos = self.curr_pos.reshape(7) + np.array([0,0,np.pi,0,0,0,0])
-		self.environment.robot.SetDOFValues(np.append(pos, np.array([0,0,0])))
-		# definitely not the right Jacobian
-		xyz = robotToCartesian(self.environment.robot)[6]
-		print "pos", xyz
-		Jt = self.environment.robot.ComputeJacobianTranslation(7, xyz)
-		Jo = self.environment.robot.ComputeJacobianAxisAngle(7)
+		with self.environment.robot:
+			self.environment.robot.SetDOFValues(np.append(pos, np.array([0,0,0])))
+			xyz = robotToCartesian(self.environment.robot)[6]
+			Jt = self.environment.robot.ComputeJacobianTranslation(7, xyz)
+			Jo = self.environment.robot.ComputeJacobianAxisAngle(7)
+		# not using EE orientation
 		J_inv = np.linalg.pinv(Jt)
-		print J_inv
-		import pdb;pdb.set_trace()
-		self.cmd = np.diag(np.dot(J_inv, np.array(msg.axes)))
-		print 'cmd', self.cmd
-		return # TODO: remove after testing
-		cartesian_input = PROCESS_INPUT_TO_CARTESIAN(msg)
-		joint_vel_input = CONVERT_TO_ANGULAR(cartesian_input)
+		self.cmd = np.diag(np.dot(J_inv, 0.1 * np.array(joy_cmd)))
+		# preserving EE orientation
+		#J_inv = np.linalg.pinv(np.vstack((Jt, Jo)))
+		#self.cmd = np.diag(np.dot(J_inv, 0.1 * np.array(joy_cmd + (0,0,0))))
+
 
 if __name__ == '__main__':
 	TeleopInference()
