@@ -161,6 +161,7 @@ class TrajoptPlanner(object):
 				"start_fixed" : True,
 				"max_iter" : self.MAX_ITER
 			},
+			# TODO: should this be removed and handled like the other features, so it can be measured?
 			"costs": [
 			{
 				"type": "joint_vel",

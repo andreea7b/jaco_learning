@@ -30,12 +30,15 @@ class Environment(object):
 		# Plot the goals
 		for key in object_centers.keys():
 			if "GOAL" in key:
-				#self.robot.SetDOFValues(object_centers[key])
-				#cartesian_coords = robotToCartesian(self.robot)
-				#EEcoords = cartesian_coords[6]
-				#print key
-				#print EEcoords
-				plotSphere(self.env, self.bodies, object_centers[key], 0.015) # may need to change colors
+				if "ANGLES" in key:
+					with self.robot:
+						angles = object_centers[key] if len(object_centers[key]) == 10 else object_centers[key]+[0,0,0]
+						self.robot.SetDOFValues(object_centers[key])
+						cartesian_coords = robotToCartesian(self.robot)
+						obj_center = cartesian_coords[6]
+				else:
+					obj_center = object_centers[key]
+				plotSphere(self.env, self.bodies, obj, 0.015) # may need to change colors
 
 	# ---- Custom environmental features ---- #
 	def featurize(self, waypts, feat_list):
@@ -85,8 +88,9 @@ class Environment(object):
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
-		self.robot.SetDOFValues(waypt)
-		coords = robotToCartesian(self.robot)
+		with self.robot:
+			self.robot.SetDOFValues(waypt)
+			coords = robotToCartesian(self.robot)
 		EEcoord_y = coords[6][1]
 		EEcoord_y = np.linalg.norm(coords[6])
 		return EEcoord_y
@@ -103,8 +107,9 @@ class Environment(object):
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
-		self.robot.SetDOFValues(waypt)
-		coords = robotToCartesian(self.robot)
+		with self.robot:
+			self.robot.SetDOFValues(waypt)
+			coords = robotToCartesian(self.robot)
 		EEcoord_z = coords[6][2]
 		return EEcoord_z
 
@@ -128,9 +133,10 @@ class Environment(object):
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
-		self.robot.SetDOFValues(waypt)
-		EE_link = self.robot.GetLinks()[7]
-		R = EE_link.GetTransform()[:3,:3]
+		with self.robot:
+			self.robot.SetDOFValues(waypt)
+			EE_link = self.robot.GetLinks()[7]
+			R = EE_link.GetTransform()[:3,:3]
 		[yaw, pitch, roll] = mat2euler(R)
 		#return sum(abs(EE_link.GetTransform()[:2,:3].dot([1,0,0])))
 		return (pitch + 1.5)
@@ -161,8 +167,9 @@ class Environment(object):
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
-		self.robot.SetDOFValues(waypt)
-		coords = robotToCartesian(self.robot)
+		with self.robot:
+			self.robot.SetDOFValues(waypt)
+			coords = robotToCartesian(self.robot)
 		EE_coord_xy = coords[6][0:2]
 		laptop_xy = np.array(self.object_centers['LAPTOP_CENTER'][0:2])
 		dist = np.linalg.norm(EE_coord_xy - laptop_xy) - 0.4
@@ -196,8 +203,9 @@ class Environment(object):
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
-		self.robot.SetDOFValues(waypt)
-		coords = robotToCartesian(self.robot)
+		with self.robot:
+			self.robot.SetDOFValues(waypt)
+			coords = robotToCartesian(self.robot)
 		EE_coord_xy = coords[6][0:2]
 		human_xy = np.array(self.object_centers['HUMAN_CENTER'][0:2])
 		dist = np.linalg.norm(EE_coord_xy - human_xy) - 0.4
@@ -215,9 +223,10 @@ class Environment(object):
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
-		self.robot.SetDOFValues(waypt)
-		EE_link = self.robot.GetLinks()[10]
-		EE_coord_z = EE_link.GetTransform()[2][3]
+		with self.robot:
+			self.robot.SetDOFValues(waypt)
+			EE_link = self.robot.GetLinks()[10]
+			EE_coord_z = EE_link.GetTransform()[2][3]
 		if EE_coord_z > 0:
 			EE_coord_z = 0
 		return -EE_coord_z
@@ -230,9 +239,10 @@ class Environment(object):
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
-		self.robot.SetDOFValues(waypt)
-		EE_link = self.robot.GetLinks()[7]
-		return EE_link.GetTransform()[:2,:3].dot([1,0,0])
+		with self.robot:
+			self.robot.SetDOFValues(waypt)
+			EE_link = self.robot.GetLinks()[7]
+			return EE_link.GetTransform()[:2,:3].dot([1,0,0])
 
 	def coffee_constraint_derivative(self, waypt):
 		"""
@@ -241,9 +251,10 @@ class Environment(object):
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
 			waypt[2] += math.pi
-		self.robot.SetDOFValues(waypt)
-		world_dir = self.robot.GetLinks()[7].GetTransform()[:3,:3].dot([1,0,0])
-		return np.array([np.cross(self.robot.GetJoints()[i].GetAxis(), world_dir)[:2] for i in range(7)]).T.copy()
+		with self.robot:
+			self.robot.SetDOFValues(waypt)
+			world_dir = self.robot.GetLinks()[7].GetTransform()[:3,:3].dot([1,0,0])
+			return np.array([np.cross(self.robot.GetJoints()[i].GetAxis(), world_dir)[:2] for i in range(7)]).T.copy()
 
 	# ---- Helper functions ---- #
 
@@ -254,7 +265,6 @@ class Environment(object):
 		curr_pos - 7x1 vector of current joint angles (degrees)
 		"""
 		pos = np.array([curr_pos[0][0],curr_pos[1][0],curr_pos[2][0]+math.pi,curr_pos[3][0],curr_pos[4][0],curr_pos[5][0],curr_pos[6][0],0,0,0])
-
 		self.robot.SetDOFValues(pos)
 
 	def get_cartesian_coords(self, joint_angles):
@@ -264,8 +274,9 @@ class Environment(object):
 		if len(joint_angles) < 10:
 			joint_angles = np.append(joint_angles.reshape(7), np.array([0,0,0]))
 			joint_angles[2] += math.pi
-		self.robot.SetDOFValues(joint_angles)
-		return robotToCartesian(self.robot)[6]
+		with self.robot:
+			self.robot.SetDOFValues(joint_angles)
+			return robotToCartesian(self.robot)[6]
 
 	def kill_environment(self):
 		"""

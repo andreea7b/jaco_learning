@@ -78,7 +78,7 @@ class TeleopInference():
 		self.prefix = rospy.get_param("setup/prefix")
 		self.start = np.array(rospy.get_param("setup/start"))*(math.pi/180.0)
 		# TODO: remove one of these
-		self.goal_poses = np.array(rospy.get_param("setup/goal_poses"))
+		#self.goal_poses = np.array(rospy.get_param("setup/goal_poses"))
 		self.goals = np.array(rospy.get_param("setup/goals"))*(math.pi/180.0)
 		self.T = rospy.get_param("setup/T")
 		self.timestep = rospy.get_param("setup/timestep")
@@ -89,9 +89,11 @@ class TeleopInference():
 		# Openrave parameters for the environment.
 		model_filename = rospy.get_param("setup/model_filename")
 		object_centers = rospy.get_param("setup/object_centers")
+		for goal_num in range(len(self.goals)):
+			object_centers["GOAL ANGLES "+str(goal_num)] = self.goals[goal_num]
 		for goal_num in range(len(self.goal_poses)):
-			object_centers["GOAL"+str(goal_num)] = self.goal_poses[goal_num]
-		# object centers holds xyz coords of objects
+			object_centers["GOAL "+str(goal_num)] = self.goal_poses[goal_num]
+		# object centers holds xyz coords of objects, unless the object name has 'ANGLES'
 		self.environment = Environment(model_filename, object_centers)
 
 		# ----- Planner Setup ----- #
@@ -195,11 +197,28 @@ class TeleopInference():
 			Jt = self.environment.robot.ComputeJacobianTranslation(7, xyz)
 			Jo = self.environment.robot.ComputeJacobianAxisAngle(7)
 		# not using EE orientation
-		J_inv = np.linalg.pinv(Jt)
-		self.cmd = np.diag(np.dot(J_inv, 0.1 * np.array(joy_cmd)))
+		J, dis = Jt, np.array(joy_cmd)
 		# preserving EE orientation
-		#J_inv = np.linalg.pinv(np.vstack((Jt, Jo)))
-		#self.cmd = np.diag(np.dot(J_inv, 0.1 * np.array(joy_cmd + (0,0,0))))
+		# J, dis = np.vstack((Jt, Jo)), np.array(joy_cmd + (0,0,0))
+
+		# clamp/scale dis
+		dis = 0.1 * dis
+		# dis = np.clip(dis, -limit, limit)
+
+		# using pseudoinverse
+		#J_inv = np.linalg.pinv(J)
+		#cmd = np.diag(np.dot(J_inv, dis))
+
+		# using transpose
+		#cmd = np.diag(np.dot(J.T, dis))
+
+		# using damped least squares
+		lamb = 0.5
+		A = np.dot(J, J.T) + lamb * np.eye(J.shape[0])
+		cmd = np.diag(np.dot(J.T, np.linalg.solve(A, dis)))
+
+		# clamp large joints if you want here
+		self.cmd = cmd
 
 
 if __name__ == '__main__':
