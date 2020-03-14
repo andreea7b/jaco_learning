@@ -161,11 +161,11 @@ class TrajoptPlanner(object):
 				"start_fixed" : True,
 				"max_iter" : self.MAX_ITER
 			},
-			# TODO: should this be removed and handled like the other features, so it can be measured?
+			# this is implemented instead through the use of the efficiency feature
 			"costs": [
 			{
 				"type": "joint_vel",
-				"params": {"coeffs": [1.0]}
+				"params": {"coeffs": [0.0]}
 			}
 			],
 			"constraints": constraint,
