@@ -4,7 +4,8 @@
 
 	<!-- joy node -->
 	  <node respawn="true" pkg="joy" type="joy_node" name="turtle_joy" />
-	  <param name="dev" type="string" value="/dev/input/js0" />
+	  <!-- <param name="dev" type="string" value="/dev/input/js0" /> --> <!--for lab setup-->
+		<param name="dev" type="string" value="/dev/input/js1" /> <!--for sim setup-->
 
 	<!-- Trajopt PID control with... -->
 	<node name="teleop_inference" pkg="jaco_learning" type="teleop_inference.py" output="screen"/>

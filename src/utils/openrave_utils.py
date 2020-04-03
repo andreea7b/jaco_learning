@@ -12,20 +12,21 @@ logging.getLogger('prpy.planning.base').addHandler(logging.NullHandler())
 
 robot_starting_dofs = np.array([-1, 2, 0, 2, 0, 4, 0, 1.11022302e-16,  -1.11022302e-16, 3.33066907e-16])
 
-def initialize(model_filename='jaco', envXML=None):
+def initialize(model_filename='jaco', envXML=None, use_viewer=True):
 	'''
 	Load and configure the JACO robot. If envXML is not None, loads environment.
 	Returns robot and environment.
 	-----
-	NOTE: 
+	NOTE:
 	IF YOU JUST WANT TO DO COMPUTATIONS THROUGH OPENRAVE
 	AND WANT MULTPILE INSTANCES TO OPEN, THEN HAVE TO TURN OFF
-	QTCOIN AND ALL VIEWER FUNCTIONALITY OR IT WILL CRASH. 
+	QTCOIN AND ALL VIEWER FUNCTIONALITY OR IT WILL CRASH.
 	'''
 	env = openravepy.Environment()
 	if envXML is not None:
 		env.LoadURI(envXML)
-	env.SetViewer('qtcoin')
+	if use_viewer:
+		env.SetViewer('qtcoin')
 
 	# Assumes the robot files are located in the data folder of the
 	# kinova_description package in the catkin workspace.
@@ -39,13 +40,14 @@ def initialize(model_filename='jaco', envXML=None):
 	robot.SetActiveDOFs(np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]))
 	robot.SetDOFValues(robot_starting_dofs)
 
-	viewer = env.GetViewer()
-	viewer.SetSize(700,500)
-	cam_params = np.array([[-0.99885711, -0.01248719, -0.0461361 , -0.18887213],
-		   [ 0.02495645,  0.68697757, -0.72624996,  2.04733515],
-		   [ 0.04076329, -0.72657133, -0.68588079,  1.67818344],
-		   [ 0.        ,  0.        ,  0.        ,  1.        ]])
-	viewer.SetCamera(cam_params)
+	if use_viewer:
+		viewer = env.GetViewer()
+		viewer.SetSize(700,500)
+		cam_params = np.array([[-0.99885711, -0.01248719, -0.0461361 , -0.18887213],
+			   [ 0.02495645,  0.68697757, -0.72624996,  2.04733515],
+			   [ 0.04076329, -0.72657133, -0.68588079,  1.67818344],
+			   [ 0.        ,  0.        ,  0.        ,  1.        ]])
+		viewer.SetCamera(cam_params)
 
 	return env, robot
 
@@ -53,7 +55,7 @@ def initialize(model_filename='jaco', envXML=None):
 
 def robotToCartesian(robot):
 	"""
-	Converts robot configuration into a list of cartesian 
+	Converts robot configuration into a list of cartesian
 	(x,y,z) coordinates for each of the robot's links.
 	------
 	Returns: 7-dimensional list of 3 xyz values
@@ -62,7 +64,7 @@ def robotToCartesian(robot):
 	cartesian = [None]*7
 	i = 0
 	for i in range(1,8):
-		link = links[i] 
+		link = links[i]
 		tf = link.GetTransform()
 		cartesian[i-1] = tf[0:3,3]
 
@@ -77,7 +79,7 @@ def manipToCartesian(robot, offset_z):
 	Returns: xyz of center of robot manipulator
 	"""
 	links = robot.GetLinks()
-	manipTf = links[7].GetTransform() 
+	manipTf = links[7].GetTransform()
 	rot = manipTf[0:3,0:3]
 	xyz = manipTf[0:3,3]
 	offset = np.array([0,0,offset_z]).T
@@ -118,7 +120,7 @@ def plotCupTraj(env,robot,bodies,waypts,color=[0,1,0], increment=1):
 		robot.SetDOFValues(dof)
 
 		links = robot.GetLinks()
-		manipTf = links[9].GetTransform() 
+		manipTf = links[9].GetTransform()
 
 		# load mug into environment
 		objects_path = find_in_workspaces(
@@ -130,13 +132,13 @@ def plotCupTraj(env,robot,bodies,waypts,color=[0,1,0], increment=1):
 		mug.GetLinks()[0].GetGeometries()[0].SetDiffuseColor(np.array(color))
 		angle = -np.pi/2
 
-		rot_x = np.array([[1,0,0,0],[0,np.cos(angle),-np.sin(angle),0],[0,np.sin(angle),np.cos(angle),0],[0,0,0,1]]) 
+		rot_x = np.array([[1,0,0,0],[0,np.cos(angle),-np.sin(angle),0],[0,np.sin(angle),np.cos(angle),0],[0,0,0,1]])
 
-		rot_y = np.array([[np.cos(angle),0,np.sin(angle),0],[0,1,0,0],[-np.sin(angle),0,np.cos(angle),0],[0,0,0,1]]) 
+		rot_y = np.array([[np.cos(angle),0,np.sin(angle),0],[0,1,0,0],[-np.sin(angle),0,np.cos(angle),0],[0,0,0,1]])
 
-		rot_z = np.array([[np.cos(angle),-np.sin(angle),0,0],[np.sin(angle),0,np.cos(angle),0],[0,0,1,0],[0,0,0,1]]) 
+		rot_z = np.array([[np.cos(angle),-np.sin(angle),0,0],[np.sin(angle),0,np.cos(angle),0],[0,0,1,0],[0,0,0,1]])
 
-		trans = np.array([[0,0,0,-0.02],[0,0,0,0.02],[0,0,0,-0.02],[0,0,0,1]]) 
+		trans = np.array([[0,0,0,-0.02],[0,0,0,0.02],[0,0,0,-0.02],[0,0,0,1]])
 
 		rotated = np.dot(manipTf+trans,rot_x)
 		mug.SetTransform(rotated)
@@ -214,7 +216,7 @@ def plotCabinet(env):
 	cabinet = env.GetKinBody('cabinet')
 	cabinet.SetTransform(np.array([[0.0, -1.0,  0.0, 0.6],
   								 [1.0, 0.0,  0.0, 0],
-			                     [0.0, 0.0,  1.0, 0], 
+			                     [0.0, 0.0,  1.0, 0],
 			                     [0.0, 0.0,  0.0, 1.0]]))
 	color = np.array([0.05,0.6,0.3])
 	cabinet.GetLinks()[0].GetGeometries()[0].SetDiffuseColor(color)
@@ -275,5 +277,3 @@ def plotLaptop(env,bodies,pos):
 	color = np.array([0, 0, 0])
 	body.GetLinks()[0].GetGeometries()[0].SetDiffuseColor(color)
 	bodies.append(body)
-
-

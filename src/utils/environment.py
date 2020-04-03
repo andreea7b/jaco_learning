@@ -12,9 +12,9 @@ class Environment(object):
 	This class creates an OpenRave environment and contains all the
 	functionality needed for custom features and constraints.
 	"""
-	def __init__(self, model_filename, object_centers):
+	def __init__(self, model_filename, object_centers, use_viewer=True):
 		# ---- Create environment ---- #
-		self.env, self.robot = initialize(model_filename)
+		self.env, self.robot = initialize(model_filename, use_viewer=use_viewer)
 
 		# Insert any objects you want into environment.
 		self.bodies = []
@@ -93,6 +93,7 @@ class Environment(object):
 			coords = robotToCartesian(self.robot)
 		EEcoord_y = coords[6][1]
 		EEcoord_y = np.linalg.norm(coords[6])
+		## QUESTION: why is the above line here (either it or the one above it is unnecessary)
 		return EEcoord_y
 
 	# -- Distance to Table -- #
@@ -139,6 +140,7 @@ class Environment(object):
 			R = EE_link.GetTransform()[:3,:3]
 		[yaw, pitch, roll] = mat2euler(R)
 		#return sum(abs(EE_link.GetTransform()[:2,:3].dot([1,0,0])))
+		## QUESTION: why 1.5? should this be pi/2?
 		return (pitch + 1.5)
 
 	# -- Distance to Laptop -- #
@@ -258,18 +260,27 @@ class Environment(object):
 
 	# ---- Helper functions ---- #
 
-	def update_curr_pos(self, curr_pos):
+	def update_pos(self, curr_pos):
 		"""
 		Updates DOF values in OpenRAVE simulation based on curr_pos.
 		----
-		curr_pos - 7x1 vector of current joint angles (degrees)
+		curr_pos - 7x1 vector of current joint angles (radians)
 		"""
 		pos = np.array([curr_pos[0][0],curr_pos[1][0],curr_pos[2][0]+math.pi,curr_pos[3][0],curr_pos[4][0],curr_pos[5][0],curr_pos[6][0],0,0,0])
 		self.robot.SetDOFValues(pos)
 
+	def update_vel(self, curr_vel):
+		"""
+		Updates DOF velocities in OpenRAVE simulation based on curr_vel.
+		----
+		curr_vel - 7x1 vector of current joint velocities (radians)
+		"""
+		vel = np.array([curr_vel[0][0],curr_vel[1][0],curr_vel[2][0],curr_pos[3][0],curr_pos[4][0],curr_pos[5][0],curr_pos[6][0],0,0,0])
+		self.robot.SetDOFVelocities(vel)
+
 	def get_cartesian_coords(self, joint_angles):
 		"""
-		Note that joint_angles are assumed to be in degrees
+		Note that joint_angles are assumed to be in radians
 		"""
 		if len(joint_angles) < 10:
 			joint_angles = np.append(joint_angles.reshape(7), np.array([0,0,0]))

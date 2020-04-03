@@ -15,7 +15,22 @@ def cmd_to_JointTorqueMsg(cmd):
 	jointCmd.joint5 = cmd[4][4];
 	jointCmd.joint6 = cmd[5][5];
 	jointCmd.joint7 = cmd[6][6];
-	
+
+	return jointCmd
+
+def cmd_to_JointAnglesMsg(cmd):
+	"""
+	Returns a JointVelocity Kinova msg from an array of velocities
+	"""
+	jointCmd = kinova_msgs.msg.JointAngles()
+	jointCmd.joint1 = cmd[0][0];
+	jointCmd.joint2 = cmd[1][1];
+	jointCmd.joint3 = cmd[2][2];
+	jointCmd.joint4 = cmd[3][3];
+	jointCmd.joint5 = cmd[4][4];
+	jointCmd.joint6 = cmd[5][5];
+	jointCmd.joint7 = cmd[6][6];
+
 	return jointCmd
 
 def cmd_to_JointVelocityMsg(cmd):
@@ -80,4 +95,3 @@ def stop_admittance_mode(prefix):
     except rospy.ServiceException, e:
         print "Service call failed: %s"%e
         return None
-

@@ -40,37 +40,53 @@ class TeleopInference():
 		/$prefix$/in/joint_velocity	- Jaco commanded joint velocities
 	"""
 
-	def __init__(self):
+	def __init__(self, mode="real"):
 		# Create ROS node.
 		rospy.init_node("teleop_inference")
 
 		# Load parameters and set up subscribers/publishers.
-		self.load_parameters()
-		self.register_callbacks()
+		self.load_parameters(mode)
+		self.register_callbacks(mode)
 
 		# Start admittance control mode.
-		ros_utils.start_admittance_mode(self.prefix)
+		if mode == "real":
+			ros_utils.start_admittance_mode(self.prefix)
 
 		# Publish to ROS at 100hz.
 		r = rospy.Rate(100)
 
 		print "----------------------------------"
-		print "Moving robot, press ENTER to quit:"
+		if mode == "real":
+			print "Moving robot, press ENTER to quit:"
 
-		while not rospy.is_shutdown():
+			while not rospy.is_shutdown():
+				if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+					line = raw_input()
+					break
+				self.vel_pub.publish(ros_utils.cmd_to_JointVelocityMsg((180/np.pi)*self.cmd))
+				r.sleep()
 
+		elif mode == "sim":
+			print "Simulating robot, press ENTER to quit:"
 
-			if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
-				line = raw_input()
-				break
-			self.vel_pub.publish(ros_utils.cmd_to_JointVelocityMsg((180/np.pi)*self.cmd))
-			r.sleep()
+			while not rospy.is_shutdown():
+				if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+					line = raw_input()
+					break
+				## TODO: this should be done in another thread like a normal subscriber
+				joint_angles = self.sim_environment.robot.GetDOFValues() * (180/np.pi)
+				print joint_angles ## TODO: check to make sure that joint_angles are in degrees as they should be
+				self.joint_angles_callback(ros_utils.cmd_to_JointAnglesMsg(np.diag(joint_angles)))
+				
+				self.sim_environment.update_vel(self.cmd) ## TODO: make sure that update_vel is supposed to take radians
+				r.sleep()
 
 		print "----------------------------------"
 
-		ros_utils.stop_admittance_mode(self.prefix)
+		if mode == "real":
+			ros_utils.stop_admittance_mode(self.prefix)
 
-	def load_parameters(self):
+	def load_parameters(self, mode):
 		"""
 		Loading parameters and setting up variables from the ROS environment.
 		"""
@@ -94,7 +110,9 @@ class TeleopInference():
 		for goal_num in range(len(self.goal_poses)):
 			object_centers["GOAL "+str(goal_num)] = self.goal_poses[goal_num]
 		# object centers holds xyz coords of objects, unless the object name has 'ANGLES'
-		self.environment = Environment(model_filename, object_centers)
+		self.environment = Environment(model_filename, object_centers,
+		                               use_viewer=(mode == "real"))
+		# turns off the viewer for the calculations environment when in sim mode
 
 		# ----- Planner Setup ----- #
 		# Retrieve the planner specific parameters.
@@ -151,17 +169,22 @@ class TeleopInference():
 
 		# ----- Input Device Setup ----- #
 
+		# ----- Simulation Setup ----- #
+		if mode == "sim":
+			self.sim_environment = Environment(model_filename, object_centers,
+			                                   use_viewer=True)
 
-	def register_callbacks(self):
+	def register_callbacks(self, mode):
 		"""
 		Sets up all the publishers/subscribers needed.
 		"""
-
-		# Create joint-velocity publisher.
-		self.vel_pub = rospy.Publisher(self.prefix + '/in/joint_velocity', kinova_msgs.msg.JointVelocity, queue_size=1)
-
-		# Create subscriber to joint_angles.
-		rospy.Subscriber(self.prefix + '/out/joint_angles', kinova_msgs.msg.JointAngles, self.joint_angles_callback, queue_size=1)
+		if mode == "real":
+			# Create joint-velocity publisher.
+			self.vel_pub = rospy.Publisher(self.prefix + '/in/joint_velocity', kinova_msgs.msg.JointVelocity, queue_size=1)
+			# Create subscriber to joint_angles.
+			rospy.Subscriber(self.prefix + '/out/joint_angles', kinova_msgs.msg.JointAngles, self.joint_angles_callback, queue_size=1)
+		elif mode == "sim":
+			pass
 		# Create subscriber to input joystick.
 		rospy.Subscriber('joy', Joy, self.joystick_input_callback, queue_size=1)
 
