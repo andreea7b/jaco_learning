@@ -35,9 +35,10 @@ class TeleopLearner(object):
 			traj_cost = np.sum(self.weights * np.sum(self.environment.featurize(traj), axis=1))
 			self.optimal_costs[i] = traj_cost
 
-	def update_beliefs(self, traj):
+	def update_beliefs(self, traj, inputs):
 		"""
-		Updates the beliefs given a trajectory traj
+		Updates the beliefs given a trajectory and inputs (length of trajectory should be one more than
+		the inputs)
 		"""
 		curr_waypt = TODO
 		curr_waypt_idx = TODO
@@ -47,7 +48,7 @@ class TeleopLearner(object):
 		for i in range(self.num_goals):
 			goal_traj = self.planner.replan(curr_waypt, None, self.goals[i], self.weights,
 											self.T - curr_time, self.timestep)
-			goal_traj_costs[i] = np.sum(self.weights * np.sum(self.environment.featurize(goal_traj), axis=1))\
+			goal_traj_costs[i] = np.sum(self.weights * np.sum(self.environment.featurize(goal_traj), axis=1))
 		#prob_u_given_g = np.exp(np.outer(-(traj_cost + goal_traj_costs), self.betas)) \
 		#               / np.exp(np.outer(-self.optimal_costs, self.betas))
 

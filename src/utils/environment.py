@@ -32,13 +32,13 @@ class Environment(object):
 			if "GOAL" in key:
 				if "ANGLES" in key:
 					with self.robot:
-						angles = object_centers[key] if len(object_centers[key]) == 10 else object_centers[key]+[0,0,0]
-						self.robot.SetDOFValues(object_centers[key])
+						angles = object_centers[key] if len(object_centers[key]) == 10 else np.append(object_centers[key], np.array([0,0,0]))
+						self.robot.SetDOFValues(angles)
 						cartesian_coords = robotToCartesian(self.robot)
 						obj_center = cartesian_coords[6]
 				else:
 					obj_center = object_centers[key]
-				plotSphere(self.env, self.bodies, obj, 0.015) # may need to change colors
+				plotSphere(self.env, self.bodies, obj_center, 0.015) # may need to change colors
 
 	# ---- Custom environmental features ---- #
 	def featurize(self, waypts, feat_list):

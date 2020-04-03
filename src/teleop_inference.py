@@ -107,8 +107,8 @@ class TeleopInference():
 		object_centers = rospy.get_param("setup/object_centers")
 		for goal_num in range(len(self.goals)):
 			object_centers["GOAL ANGLES "+str(goal_num)] = self.goals[goal_num]
-		for goal_num in range(len(self.goal_poses)):
-			object_centers["GOAL "+str(goal_num)] = self.goal_poses[goal_num]
+		#for goal_num in range(len(self.goal_poses)):
+		#	object_centers["GOAL "+str(goal_num)] = self.goal_poses[goal_num]
 		# object centers holds xyz coords of objects, unless the object name has 'ANGLES'
 		self.environment = Environment(model_filename, object_centers,
 		                               use_viewer=(mode == "real"))
@@ -126,8 +126,11 @@ class TeleopInference():
 		else:
 			raise Exception('Planner {} not implemented.'.format(planner_type))
 		# TODO: do something better than goals[0]?
-		#self.traj = self.planner.replan(self.start, self.goals[0], None, self.weights, self.T, self.timestep)
-		#self.traj_plan = self.traj.downsample(self.planner.num_waypts)
+		self.traj = self.planner.replan(self.start, self.goals[0], None, self.weights, self.T, self.timestep)
+		self.traj_plan = self.traj.downsample(self.planner.num_waypts)
+		print self.traj.waypts
+		print self.traj.waypts_time
+		print self.traj_plan
 
 		# Track if you have reached the start/goal of the path.
 		self.reached_start = False
@@ -212,36 +215,39 @@ class TeleopInference():
 		"""
 		Reads joystick commands
 		"""
-		joy_cmd = (msg.axes[1], msg.axes[0], msg.axes[2])
+		joy_cmd = (msg.axes[1], msg.axes[0], msg.axes[2]) # corrects orientation
 		pos = self.curr_pos.reshape(7) + np.array([0,0,np.pi,0,0,0,0])
 		with self.environment.robot:
 			self.environment.robot.SetDOFValues(np.append(pos, np.array([0,0,0])))
 			xyz = robotToCartesian(self.environment.robot)[6]
 			Jt = self.environment.robot.ComputeJacobianTranslation(7, xyz)
 			Jo = self.environment.robot.ComputeJacobianAxisAngle(7)
+
 		# not using EE orientation
-		J, dis = Jt, np.array(joy_cmd)
+		#J, dis = Jt, np.array(joy_cmd)
 		# preserving EE orientation
-		# J, dis = np.vstack((Jt, Jo)), np.array(joy_cmd + (0,0,0))
+		J, dis = np.vstack((Jt, Jo)), np.array(joy_cmd + (0,0,0))
 
 		# clamp/scale dis
-		dis = 0.1 * dis
+		#dis = 0.1 * dis
 		# dis = np.clip(dis, -limit, limit)
+		print dis
 
 		# using pseudoinverse
 		#J_inv = np.linalg.pinv(J)
-		#cmd = np.diag(np.dot(J_inv, dis))
+		#cmd = np.dot(J_inv, dis)
 
 		# using transpose
-		#cmd = np.diag(np.dot(J.T, dis))
+		#cmd = np.dot(J.T, dis)
 
 		# using damped least squares
 		lamb = 0.5
 		A = np.dot(J, J.T) + lamb * np.eye(J.shape[0])
-		cmd = np.diag(np.dot(J.T, np.linalg.solve(A, dis)))
+		cmd = np.dot(J.T, np.linalg.solve(A, dis))
 
 		# clamp large joints if you want here
-		self.cmd = cmd
+		print cmd
+		self.cmd = np.diag(cmd)
 
 
 if __name__ == '__main__':
