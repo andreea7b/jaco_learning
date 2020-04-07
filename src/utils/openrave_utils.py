@@ -49,6 +49,7 @@ def initialize(model_filename='jaco', envXML=None, use_viewer=True):
 			   [ 0.        ,  0.        ,  0.        ,  1.        ]])
 		viewer.SetCamera(cam_params)
 
+	print 'made it to end of env initialization'
 	return env, robot
 
 # ------- Conversion Utils ------- #

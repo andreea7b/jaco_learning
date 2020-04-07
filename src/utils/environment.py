@@ -275,7 +275,7 @@ class Environment(object):
 		----
 		curr_vel - 7x1 vector of current joint velocities (radians)
 		"""
-		vel = np.array([curr_vel[0][0],curr_vel[1][0],curr_vel[2][0],curr_pos[3][0],curr_pos[4][0],curr_pos[5][0],curr_pos[6][0],0,0,0])
+		vel = np.array([curr_vel[0][0],curr_vel[1][0],curr_vel[2][0],curr_vel[3][0],curr_vel[4][0],curr_vel[5][0],curr_vel[6][0],0,0,0])
 		self.robot.SetDOFVelocities(vel)
 
 	def get_cartesian_coords(self, joint_angles):

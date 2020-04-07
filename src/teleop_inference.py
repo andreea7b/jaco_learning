@@ -27,6 +27,8 @@ from utils.openrave_utils import robotToCartesian
 import numpy as np
 import pickle
 
+from openravepy import RaveCreatePhysicsEngine
+
 
 class TeleopInference():
 	"""
@@ -40,7 +42,7 @@ class TeleopInference():
 		/$prefix$/in/joint_velocity	- Jaco commanded joint velocities
 	"""
 
-	def __init__(self, mode="real"):
+	def __init__(self, mode="sim"):
 		# Create ROS node.
 		rospy.init_node("teleop_inference")
 
@@ -68,6 +70,9 @@ class TeleopInference():
 
 		elif mode == "sim":
 			print "Simulating robot, press ENTER to quit:"
+			physics_engine = RaveCreatePhysicsEngine(self.sim_environment.env, 'ode')
+			self.sim_environment.env.SetPhysicsEngine(physics_engine)
+			self.sim_environment.env.StartSimulation(1e-2, True)
 
 			while not rospy.is_shutdown():
 				if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
@@ -75,7 +80,6 @@ class TeleopInference():
 					break
 				## TODO: this should be done in another thread like a normal subscriber
 				joint_angles = self.sim_environment.robot.GetDOFValues() * (180/np.pi)
-				print joint_angles ## TODO: check to make sure that joint_angles are in degrees as they should be
 				self.joint_angles_callback(ros_utils.cmd_to_JointAnglesMsg(np.diag(joint_angles)))
 				
 				self.sim_environment.update_vel(self.cmd) ## TODO: make sure that update_vel is supposed to take radians
