@@ -219,8 +219,10 @@ class TeleopInference():
 		"""
 		Reads joystick commands
 		"""
-		joy_cmd = (msg.axes[1], msg.axes[0], msg.axes[2]) # corrects orientation
-		pos = self.curr_pos.reshape(7) + np.array([0,0,np.pi,0,0,0,0])
+		#joy_cmd = (msg.axes[1], msg.axes[0], msg.axes[2]) # corrects orientation
+		joy_cmd = (msg.axes[0], msg.axes[1], msg.axes[3])
+		#pos = self.curr_pos.reshape(7) + np.array([0,0,np.pi,0,0,0,0])
+		pos = self.curr_pos.reshape(7)
 		with self.environment.robot:
 			self.environment.robot.SetDOFValues(np.append(pos, np.array([0,0,0])))
 			xyz = robotToCartesian(self.environment.robot)[6]
@@ -235,7 +237,6 @@ class TeleopInference():
 		# clamp/scale dis
 		#dis = 0.1 * dis
 		# dis = np.clip(dis, -limit, limit)
-		print dis
 
 		# using pseudoinverse
 		#J_inv = np.linalg.pinv(J)
@@ -250,7 +251,6 @@ class TeleopInference():
 		cmd = np.dot(J.T, np.linalg.solve(A, dis))
 
 		# clamp large joints if you want here
-		print cmd
 		self.cmd = np.diag(cmd)
 
 

@@ -39,6 +39,7 @@ def initialize(model_filename='jaco', envXML=None, use_viewer=True):
 
 	robot.SetActiveDOFs(np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]))
 	robot.SetDOFValues(robot_starting_dofs)
+	robot.GetLinks()[0].SetStatic(True)
 
 	if use_viewer:
 		viewer = env.GetViewer()
