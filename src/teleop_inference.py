@@ -76,6 +76,7 @@ class TeleopInference():
 			physics_engine = RaveCreatePhysicsEngine(self.sim_environment.env, 'ode')
 			self.sim_environment.env.SetPhysicsEngine(physics_engine)
 			self.sim_environment.env.StartSimulation(1e-2, True)
+			self.sim_environment.robot.SetDOFValues( np.hstack((self.start, np.array([0,0,0]))) )
 
 			loop_iter = 0
 			while not rospy.is_shutdown():
@@ -149,7 +150,7 @@ class TeleopInference():
 
 		# Save a history of waypts
 		self.next_waypt_idx = 1
-		self.traj_hist = np.zeros((int(T/timestep) + 1, 7))
+		self.traj_hist = np.zeros((int(self.T/self.timestep) + 1, 7))
 		self.traj_hist[0] = self.start
 
 		# ----- Controller Setup ----- #
@@ -172,7 +173,7 @@ class TeleopInference():
 			raise Exception('Controller {} not implemented.'.format(controller_type))
 
 		# Planner tells controller what plan to follow.
-		#self.controller.set_trajectory(self.traj)
+		self.controller.set_trajectory(self.traj)
 
 		# Stores current COMMANDED joint velocities.
 		self.cmd = np.zeros((7,7))
@@ -182,6 +183,7 @@ class TeleopInference():
 		prior_belief = rospy.get_param("learner/belief")
 		inference_method = rospy.get_param("learner/inference_method")
 		self.learner = TeleopLearner(self, prior_belief, betas, inference_method)
+		self.running_inference = False
 
 		# ----- Input Device Setup ----- #
 
@@ -217,14 +219,16 @@ class TeleopInference():
 		self.curr_pos = curr_pos*(math.pi/180.0)
 
 		if self.reached_start and \
-		   (time.time() - self.controller.path_start_T >= self.T * self.next_waypt_idx) \
+		   (time.time() - self.controller.path_start_T >= self.timestep * self.next_waypt_idx) \
 		   and not self.reached_goal and not self.next_waypt_idx >= len(self.traj_hist):
-			self.traj_hist[self.next_waypt_idx] = self.curr_pos
+			self.traj_hist[self.next_waypt_idx] = self.curr_pos.reshape(7)
 			self.next_waypt_idx += 1
+			print "next timestep"
+			print self.next_waypt_idx
 			if not self.running_inference:
 				self.running_inference = True
-				t = Thread(target=self.learner.inference_step)
-				t.start()
+				inference_thread = Thread(target=self.learner.inference_step)
+				inference_thread.start()
 
 		# Update cmd from PID based on current position.
 		#self.cmd = self.controller.get_command(self.curr_pos)

@@ -29,15 +29,16 @@ class Environment(object):
 			plotSphere(self.env,self.bodies,object_centers['HUMAN_CENTER'], 0.015)
 
 		# Plot and add the goals
-		if goals:
+		if goals is not None:
 			self.goal_locs = []
+			for goal in goals:
 				with self.robot:
-					angles = object_centers[key] if len(object_centers[key]) == 10 else np.append(object_centers[key], np.array([0,0,0]))
+					angles = goal if len(goal) == 10 else np.append(goal, np.array([0,0,0]))
 					self.robot.SetDOFValues(angles)
 					cartesian_coords = robotToCartesian(self.robot)
-					goal_center = cartesian_coords[6]
-					self.goal_locs.append(goal_center)
-				plotSphere(self.env, self.bodies, goal_center, 0.015) # may need to change colors
+					goal_loc = cartesian_coords[6]
+					self.goal_locs.append(goal_loc)
+				plotSphere(self.env, self.bodies, goal_loc, 0.015) # may need to change colors
 			self.goal_locs = np.array(self.goal_locs)
 
 	# ---- Custom environmental features ---- #

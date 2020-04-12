@@ -2,7 +2,7 @@
 
 	<rosparam command="load" file="$(find jaco_learning)/config/teleop_inference.yaml" />
 
-	<param name="setup/sim_mode" value="sim">
+	<param name="setup/sim_mode" value="sim" />
 
 	<!-- joy node -->
 	<node respawn="true" pkg="joy" type="joy_node" name="turtle_joy" >
