@@ -12,7 +12,7 @@ class Environment(object):
 	This class creates an OpenRave environment and contains all the
 	functionality needed for custom features and constraints.
 	"""
-	def __init__(self, model_filename, object_centers, use_viewer=True):
+	def __init__(self, model_filename, object_centers, goals=None, use_viewer=True, plot_objects=True):
 		# ---- Create environment ---- #
 		self.env, self.robot = initialize(model_filename, use_viewer=use_viewer)
 
@@ -23,22 +23,22 @@ class Environment(object):
 		# Plot the table and table mount, and other desired objects.
 		plotTable(self.env)
 		plotTableMount(self.env,self.bodies)
-		plotLaptop(self.env,self.bodies,object_centers['LAPTOP_CENTER'])
 		plotCabinet(self.env)
-		plotSphere(self.env,self.bodies,object_centers['HUMAN_CENTER'], 0.015)
+		if plot_objects:
+			plotLaptop(self.env,self.bodies,object_centers['LAPTOP_CENTER'])
+			plotSphere(self.env,self.bodies,object_centers['HUMAN_CENTER'], 0.015)
 
-		# Plot the goals
-		for key in object_centers.keys():
-			if "GOAL" in key:
-				if "ANGLES" in key:
-					with self.robot:
-						angles = object_centers[key] if len(object_centers[key]) == 10 else np.append(object_centers[key], np.array([0,0,0]))
-						self.robot.SetDOFValues(angles)
-						cartesian_coords = robotToCartesian(self.robot)
-						obj_center = cartesian_coords[6]
-				else:
-					obj_center = object_centers[key]
-				plotSphere(self.env, self.bodies, obj_center, 0.015) # may need to change colors
+		# Plot and add the goals
+		if goals:
+			self.goal_locs = []
+				with self.robot:
+					angles = object_centers[key] if len(object_centers[key]) == 10 else np.append(object_centers[key], np.array([0,0,0]))
+					self.robot.SetDOFValues(angles)
+					cartesian_coords = robotToCartesian(self.robot)
+					goal_center = cartesian_coords[6]
+					self.goal_locs.append(goal_center)
+				plotSphere(self.env, self.bodies, goal_center, 0.015) # may need to change colors
+			self.goal_locs = np.array(self.goal_locs)
 
 	# ---- Custom environmental features ---- #
 	def featurize(self, waypts, feat_list):
@@ -183,7 +183,7 @@ class Environment(object):
 
 	def human_features(self, waypt, prev_waypt):
 		"""
-		Computes laptop feature value over waypoints, interpolating and
+		Computes human feature value over waypoints, interpolating and
 		sampling between each pair to check for intermediate collisions.
 		---
 		input neighboring waypoints, output scalar feature

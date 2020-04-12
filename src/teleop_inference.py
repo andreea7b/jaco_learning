@@ -1,10 +1,9 @@
 #! /usr/bin/env python
 """
 This node demonstrates velocity-based PID control by moving the Jaco so that it
-maintains a fixed distance to a target. Additionally, it supports human-robot
-interaction in the form of online physical corrections.
+maintains a fixed distance to a target.
 
-Authors: Andreea Bobu (abobu@eecs.berkeley.edu), Andrea Bajcsy (abajcsy@eecs.berkeley.edu)
+Authors: Andreea Bobu (abobu@eecs.berkeley.edu), Andrea Bajcsy (abajcsy@eecs.berkeley.edu), Matthew Zurek
 """
 import roslib; roslib.load_manifest('kinova_demo')
 
@@ -12,6 +11,7 @@ import rospy
 import math
 import sys, select, os
 import time
+from threading import Thread
 
 import kinova_msgs.msg
 from kinova_msgs.srv import *
@@ -42,9 +42,12 @@ class TeleopInference():
 		/$prefix$/in/joint_velocity	- Jaco commanded joint velocities
 	"""
 
-	def __init__(self, mode="sim"):
+	def __init__(self):
 		# Create ROS node.
 		rospy.init_node("teleop_inference")
+
+		# Load mode
+		mode = rospy.get_param("setup/sim_mode")
 
 		# Load parameters and set up subscribers/publishers.
 		self.load_parameters(mode)
@@ -74,15 +77,18 @@ class TeleopInference():
 			self.sim_environment.env.SetPhysicsEngine(physics_engine)
 			self.sim_environment.env.StartSimulation(1e-2, True)
 
+			loop_iter = 0
 			while not rospy.is_shutdown():
 				if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
 					line = raw_input()
 					break
 				## TODO: this should be done in another thread like a normal subscriber
-				joint_angles = self.sim_environment.robot.GetDOFValues() * (180/np.pi)
-				self.joint_angles_callback(ros_utils.cmd_to_JointAnglesMsg(np.diag(joint_angles)))
-				
+				if loop_iter % 10 == 0:
+					joint_angles = self.sim_environment.robot.GetDOFValues() * (180/np.pi)
+					self.joint_angles_callback(ros_utils.cmd_to_JointAnglesMsg(np.diag(joint_angles)))
+					loop_iter = 0
 				self.sim_environment.update_vel(self.cmd) ## TODO: make sure that update_vel is supposed to take radians
+				loop_iter += 1
 				r.sleep()
 
 		print "----------------------------------"
@@ -109,14 +115,12 @@ class TeleopInference():
 		# Openrave parameters for the environment.
 		model_filename = rospy.get_param("setup/model_filename")
 		object_centers = rospy.get_param("setup/object_centers")
-		for goal_num in range(len(self.goals)):
-			object_centers["GOAL ANGLES "+str(goal_num)] = self.goals[goal_num]
-		#for goal_num in range(len(self.goal_poses)):
-		#	object_centers["GOAL "+str(goal_num)] = self.goal_poses[goal_num]
-		# object centers holds xyz coords of objects, unless the object name has 'ANGLES'
 		self.environment = Environment(model_filename, object_centers,
-		                               use_viewer=(mode == "real"))
+									   goals=self.goals,
+		                               use_viewer=(mode == "real"),
+									   plot_objects=False)
 		# turns off the viewer for the calculations environment when in sim mode
+		self.goal_locs = self.environment.goal_locs
 
 		# ----- Planner Setup ----- #
 		# Retrieve the planner specific parameters.
@@ -142,6 +146,11 @@ class TeleopInference():
 
 		# Save the current configuration.
 		self.curr_pos = None
+
+		# Save a history of waypts
+		self.next_waypt_idx = 1
+		self.traj_hist = np.zeros((int(T/timestep) + 1, 7))
+		self.traj_hist[0] = self.start
 
 		# ----- Controller Setup ----- #
 		# Retrieve controller specific parameters.
@@ -171,15 +180,16 @@ class TeleopInference():
 		# ----- Learner Setup ----- #
 		betas = np.array(rospy.get_param("learner/betas"))
 		prior_belief = rospy.get_param("learner/belief")
-		planner_vars = (self.T, self.timestep, self.start)
-		#self.learner = TeleopLearner(self.planner, planner_vars, self.environment, self.goal_poses, self.feat_list, self.weights, prior_belief, betas)
+		inference_method = rospy.get_param("learner/inference_method")
+		self.learner = TeleopLearner(self, prior_belief, betas, inference_method)
 
 		# ----- Input Device Setup ----- #
 
 		# ----- Simulation Setup ----- #
 		if mode == "sim":
 			self.sim_environment = Environment(model_filename, object_centers,
-			                                   use_viewer=True)
+			                                   use_viewer=True,
+											   plot_objects=False)
 
 	def register_callbacks(self, mode):
 		"""
@@ -198,7 +208,7 @@ class TeleopInference():
 	def joint_angles_callback(self, msg):
 		"""
 		Reads the latest position of the robot and publishes an
-		appropriate torque command to move the robot to the target.
+		appropriate velocity command to move the robot to the target.
 		"""
 		# Read the current joint angles from the robot.
 		curr_pos = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
@@ -206,8 +216,19 @@ class TeleopInference():
 		# Convert to radians.
 		self.curr_pos = curr_pos*(math.pi/180.0)
 
+		if self.reached_start and \
+		   (time.time() - self.controller.path_start_T >= self.T * self.next_waypt_idx) \
+		   and not self.reached_goal and not self.next_waypt_idx >= len(self.traj_hist):
+			self.traj_hist[self.next_waypt_idx] = self.curr_pos
+			self.next_waypt_idx += 1
+			if not self.running_inference:
+				self.running_inference = True
+				t = Thread(target=self.learner.inference_step)
+				t.start()
+
 		# Update cmd from PID based on current position.
 		#self.cmd = self.controller.get_command(self.curr_pos)
+		self.controller.get_command(self.curr_pos)
 
 		# Check is start/goal has been reached.
 		if self.controller.path_start_T is not None:
@@ -220,7 +241,7 @@ class TeleopInference():
 		Reads joystick commands
 		"""
 		#joy_cmd = (msg.axes[1], msg.axes[0], msg.axes[2]) # corrects orientation
-		joy_cmd = (msg.axes[0], msg.axes[1], msg.axes[3])
+		joy_cmd = (msg.axes[1], msg.axes[0], msg.axes[3])
 		#pos = self.curr_pos.reshape(7) + np.array([0,0,np.pi,0,0,0,0])
 		pos = self.curr_pos.reshape(7)
 		with self.environment.robot:
