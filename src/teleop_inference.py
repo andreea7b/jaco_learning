@@ -186,10 +186,15 @@ class TeleopInference():
 		self.running_inference = False
 
 		# ----- Input Device Setup ----- #
+		self.joy_environment = Environment(model_filename, object_centers,
+										   goals=self.goals,
+										   use_viewer=False,
+										   plot_objects=False)
 
 		# ----- Simulation Setup ----- #
 		if mode == "sim":
 			self.sim_environment = Environment(model_filename, object_centers,
+											   goals=self.goals,
 			                                   use_viewer=True,
 											   plot_objects=False)
 
@@ -246,13 +251,60 @@ class TeleopInference():
 		"""
 		#joy_cmd = (msg.axes[1], msg.axes[0], msg.axes[2]) # corrects orientation
 		joy_cmd = (msg.axes[1], msg.axes[0], msg.axes[3])
+
+		#pos = self.curr_pos.reshape(7) + np.array([0,0,np.pi,0,0,0,0])
+		curr_angles = np.append(self.curr_pos.reshape(7), np.array([0,0,0]))
+
+		# not using EE orientation
+		dis = np.array(joy_cmd)
+		# preserving EE orientation
+		#dis = np.array(joy_cmd + (0,0,0))
+
+		# clamp/scale dis
+		dis = 0.01 * dis
+		#dis = np.clip(dis, -0.5, 0.5)
+
+		curr_err = np.zeros(len(dis))
+		err = curr_err + dis
+		angles = curr_angles
+		print 'current angles:', curr_angles # TODO: remove after testing
+		print 'current error:', curr_err # TODO: remove after testing
+		start = time.time() # TODO: remove after testing
+		with self.joy_environment.robot:
+			self.joy_environment.robot.SetDOFValues(angles)
+			xyz = robotToCartesian(self.joy_environment.robot)[6]
+			for k in range(10):
+				Jt = self.joy_environment.robot.ComputeJacobianTranslation(7, xyz)
+				#Jo = self.joy_environment.robot.ComputeJacobianAxisAngle(7)
+				J = Jt # J = np.vstack((Jt, Jo))
+				angle_step_dir = np.dot(J.T, err)
+				pred_xyz_step = np.dot(J, angle_step_dir)
+				step_size = np.dot(err, pred_xyz_step)/(np.linalg.norm(pred_xyz_step) ** 2)
+				angles += step_size * angle_step_dir
+				self.joy_environment.robot.SetDOFValues(angles)
+				new_xyz = robotToCartesian(self.joy_environment.robot)[6]
+				err -= (new_xyz - xyz)
+				xyz = new_xyz
+		end = time.time() # TODO: remove after testing
+		print 'time:', end - start # TODO: remove after testing
+		cmd = (angles - curr_angles) / 0.01
+
+		# clamp large joints if you want here
+		self.cmd = np.diag(cmd)
+
+	def _joystick_input_callback(self, msg):
+		"""
+		Reads joystick commands
+		"""
+		#joy_cmd = (msg.axes[1], msg.axes[0], msg.axes[2]) # corrects orientation
+		joy_cmd = (msg.axes[1], msg.axes[0], msg.axes[3])
 		#pos = self.curr_pos.reshape(7) + np.array([0,0,np.pi,0,0,0,0])
 		pos = self.curr_pos.reshape(7)
-		with self.environment.robot:
-			self.environment.robot.SetDOFValues(np.append(pos, np.array([0,0,0])))
-			xyz = robotToCartesian(self.environment.robot)[6]
-			Jt = self.environment.robot.ComputeJacobianTranslation(7, xyz)
-			Jo = self.environment.robot.ComputeJacobianAxisAngle(7)
+		with self.joy_environment.robot:
+			self.joy_environment.robot.SetDOFValues(np.append(pos, np.array([0,0,0])))
+			xyz = robotToCartesian(self.joy_environment.robot)[6]
+			Jt = self.joy_environment.robot.ComputeJacobianTranslation(7, xyz)
+			Jo = self.joy_environment.robot.ComputeJacobianAxisAngle(7)
 
 		# not using EE orientation
 		#J, dis = Jt, np.array(joy_cmd)

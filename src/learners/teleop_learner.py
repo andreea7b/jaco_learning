@@ -11,7 +11,7 @@ class TeleopLearner(object):
 		self.goal_beliefs = goal_beliefs
 		assert(len(main.goals) == len(goal_beliefs))
 		self.betas = betas
-		# joint_beliefs is len(goals) x len(betas)
+		# joint_beliefs is shape (len(goals), len(betas))
 		# assumes uniform prior over betas
 		self.joint_beliefs_prior = np.outer(goal_beliefs, np.ones(len(betas),)/len(betas))
 		self.joint_beliefs = self.joint_beliefs_prior
@@ -21,10 +21,6 @@ class TeleopLearner(object):
 			self.optimal_costs = np.zeros(len(goal_beliefs))
 			for i in range(len(goal_beliefs)):
 				traj = main.planner.replan(main.start, main.goals[i], list(main.goal_locs[i]), main.weights, main.T, main.timestep)
-				# TODO: remove these print statements once this is tested
-				print main.environment.featurize(traj.waypts, main.feat_list)
-				print np.sum(main.environment.featurize(traj.waypts, main.feat_list), axis=1)
-				print main.weights
 				traj_cost = np.sum(main.weights * np.sum(main.environment.featurize(traj.waypts, main.feat_list), axis=1))
 				self.optimal_costs[i] = traj_cost
 			self.inference_step = self._dragan_belief_update
@@ -45,6 +41,7 @@ class TeleopLearner(object):
 			goal_traj = main.planner.replan(curr_pos, main.goals[i], list(main.goal_locs[i]), main.weights,
 											main.T - curr_time, main.timestep)
 			goal_traj_costs[i] = np.sum(main.weights * np.sum(main.environment.featurize(goal_traj.waypts, main.feat_list), axis=1))
+		print "costs:", goal_traj_costs
 		cond_prob_traj = np.exp(np.outer(curr_traj_cost + goal_traj_costs - self.optimal_costs, -self.betas)) * \
 		                 (self.betas / (2*np.pi)) ** (main.next_waypt_idx / 2)
 		prob_traj_joint = cond_prob_traj * self.joint_beliefs_prior

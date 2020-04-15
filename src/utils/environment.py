@@ -23,8 +23,8 @@ class Environment(object):
 		# Plot the table and table mount, and other desired objects.
 		plotTable(self.env)
 		plotTableMount(self.env,self.bodies)
-		plotCabinet(self.env)
 		if plot_objects:
+			plotCabinet(self.env)
 			plotLaptop(self.env,self.bodies,object_centers['LAPTOP_CENTER'])
 			plotSphere(self.env,self.bodies,object_centers['HUMAN_CENTER'], 0.015)
 
