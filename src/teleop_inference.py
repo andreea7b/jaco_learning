@@ -249,6 +249,7 @@ class TeleopInference():
 		"""
 		Reads joystick commands
 		"""
+		FREQ = 10
 		#joy_cmd = (msg.axes[1], msg.axes[0], msg.axes[2]) # corrects orientation
 		joy_cmd = (msg.axes[1], msg.axes[0], msg.axes[3])
 
@@ -261,15 +262,14 @@ class TeleopInference():
 		#dis = np.array(joy_cmd + (0,0,0))
 
 		# clamp/scale dis
-		dis = 0.01 * dis
+		dis = dis / FREQ
 		#dis = np.clip(dis, -0.5, 0.5)
 
-		curr_err = np.zeros(len(dis))
-		err = curr_err + dis
-		angles = curr_angles
-		print 'current angles:', curr_angles # TODO: remove after testing
-		print 'current error:', curr_err # TODO: remove after testing
-		start = time.time() # TODO: remove after testing
+		err = dis
+		angles = np.copy(curr_angles)
+		if np.linalg.norm(err) < 0.1 / FREQ:
+			self.cmd = np.zeros((10, 10))
+			return
 		with self.joy_environment.robot:
 			self.joy_environment.robot.SetDOFValues(angles)
 			xyz = robotToCartesian(self.joy_environment.robot)[6]
@@ -285,10 +285,7 @@ class TeleopInference():
 				new_xyz = robotToCartesian(self.joy_environment.robot)[6]
 				err -= (new_xyz - xyz)
 				xyz = new_xyz
-		end = time.time() # TODO: remove after testing
-		print 'time:', end - start # TODO: remove after testing
-		cmd = (angles - curr_angles) / 0.01
-
+		cmd = (angles - curr_angles) * FREQ
 		# clamp large joints if you want here
 		self.cmd = np.diag(cmd)
 
