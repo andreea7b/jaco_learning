@@ -95,6 +95,13 @@ class TrajoptPlanner(object):
 		feature_idx = self.feat_list.index('human')
 		return feature*self.weights[feature_idx]*np.linalg.norm(curr_waypt - prev_waypt)
 
+	def gen_goal_cost(self, goal_num):
+		def goal_cost(waypt):
+			feature = self.environment.goal_dist_features(goal_num, waypt)
+			feature_idx = self.feat_list.index('goal'+str(goal_num)+'_dist')
+			return feature*self.weights[feature_idx]
+		return goal_cost
+
 	# ---- Here's TrajOpt --- #
 
 	def trajOpt(self, start, goal, goal_pose, traj_seed=None):
@@ -193,7 +200,11 @@ class TrajoptPlanner(object):
 					prob.AddCost(self.human_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "human%i"%t)
 				if 'efficiency' in self.feat_list:
 					prob.AddCost(self.efficiency_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "efficiency%i"%t)
-
+			goal_num = 0
+			while 'goal'+goal_num+'_dist' in self.feat_list:
+				for t in range(1, self.num_waypts):
+					prob.AddCost(self.gen_goal_cost(goal_num), [(t,j) for j in range(7)], "goal%i_dist%i"%(goal_num, t))
+				goal_num += 1
 			for t in range(1,self.num_waypts - 1):
 				prob.AddConstraint(self.environment.table_constraint, [(t,j) for j in range(7)], "INEQ", "up%i"%t)
 

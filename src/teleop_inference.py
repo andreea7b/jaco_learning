@@ -117,6 +117,13 @@ class TeleopInference():
 		self.save_dir = rospy.get_param("setup/save_dir")
 		self.feat_list = rospy.get_param("setup/feat_list")
 		self.weights = rospy.get_param("setup/feat_weights")
+		self.weights = ([0.] * len(self.goals)) + self.weights
+		self.goal_weights = []
+		for goal_num in range(len(self.goals)):
+			self.feat_list.append("goal"+str(goal_num)+"_dist")
+			goal_weights = list(self.weights)
+			goal_weights[goal_num] = 1.
+			self.goal_weights.append(goal_weights)
 
 		# Openrave parameters for the environment.
 		model_filename = rospy.get_param("setup/model_filename")
@@ -140,7 +147,7 @@ class TeleopInference():
 		else:
 			raise Exception('Planner {} not implemented.'.format(planner_type))
 		# TODO: do something better than goals[0]?
-		self.traj = self.planner.replan(self.start, self.goals[0], None, self.weights, self.T, self.timestep)
+		self.traj = self.planner.replan(self.start, self.goals[0], None, self.goal_weights[0], self.T, self.timestep)
 		self.traj_plan = self.traj.downsample(self.planner.num_waypts)
 		print self.traj.waypts
 		print self.traj.waypts_time
@@ -185,9 +192,10 @@ class TeleopInference():
 
 		# ----- Learner Setup ----- #
 		betas = np.array(rospy.get_param("learner/betas"))
-		prior_belief = rospy.get_param("learner/belief")
+		goal_beliefs = rospy.get_param("learner/goal_beliefs")
+		beta_beliefs = rospy.get_param("learner/beta_beliefs")
 		inference_method = rospy.get_param("learner/inference_method")
-		self.learner = TeleopLearner(self, prior_belief, betas, inference_method)
+		self.learner = TeleopLearner(self, goal_beliefs, beta_beliefs, betas, inference_method)
 		self.running_inference = False
 		self.last_inf_idx = -1
 
@@ -352,7 +360,7 @@ class TeleopInference():
 		return self.start_T + idx * self.timestep
 
 def beta_arbitration(beta):
-	return np.clip(10. / beta, 0, 1)
+	return np.clip(5. / beta, 0, 1)
 	#return np.clip(np.exp(-beta + 0.1), 0, 1)
 
 if __name__ == '__main__':

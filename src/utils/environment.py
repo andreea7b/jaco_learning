@@ -26,7 +26,7 @@ class Environment(object):
 		if plot_objects:
 			plotCabinet(self.env)
 			plotLaptop(self.env,self.bodies,object_centers['LAPTOP_CENTER'])
-			plotSphere(self.env,self.bodies,object_centers['HUMAN_CENTER'], 0.05)
+			plotSphere(self.env,self.bodies,object_centers['HUMAN_CENTER'], 0.015)
 
 		# Plot and add the goals
 		if goals is not None:
@@ -38,7 +38,7 @@ class Environment(object):
 					cartesian_coords = robotToCartesian(self.robot)
 					goal_loc = cartesian_coords[6]
 					self.goal_locs.append(goal_loc)
-				plotSphere(self.env, self.bodies, goal_loc, 0.015) # may need to change colors
+				plotSphere(self.env, self.bodies, goal_loc, 0.05) # may need to change colors
 			self.goal_locs = np.array(self.goal_locs)
 
 	# ---- Custom environmental features ---- #
@@ -65,10 +65,19 @@ class Environment(object):
 					features[feat][index] = self.origin_features(waypts[index+1])
 				elif feat_list[feat] == 'efficiency':
 					features[feat][index] = self.efficiency_features(waypts[index+1],waypts[index])
+				# TODO: this is bad design because only 10 goals can be supported, but shouldn't matter
+				elif "goal" in feat_list[feat]:
+					features[feat][index] = self.goal_dist_features(feat_list[feat][4], waypts[index+1])
 		return features
 
-	# -- Efficiency -- #
+	# -- Goal Distance -- #
+	def goal_dist_features(self, goal_num, waypt):
+		with self.robot:
+			self.robot.SetDOFValues(np.append(waypt.reshape(7), np.array([0,0,0])))
+			coords = robotToCartesian(self.robot)[6]
+		return np.linalg.norm(self.goal_locs[goal_num], coords)**2
 
+	# -- Efficiency -- #
 	def efficiency_features(self, waypt, prev_waypt):
 		"""
 		Computes efficiency feature for waypoint, confirmed to match trajopt.
@@ -78,7 +87,6 @@ class Environment(object):
 		return np.linalg.norm(waypt - prev_waypt)**2
 
 	# -- Distance to Robot Base (origin of world) -- #
-
 	def origin_features(self, waypt):
 		"""
 		Computes the total feature value over waypoints based on
@@ -98,7 +106,6 @@ class Environment(object):
 		return EEcoord_y
 
 	# -- Distance to Table -- #
-
 	def table_features(self, waypt):
 		"""
 		Computes the total feature value over waypoints based on
@@ -116,7 +123,6 @@ class Environment(object):
 		return EEcoord_z
 
 	# -- Coffee (or z-orientation of end-effector) -- #
-
 	def coffee_features(self, waypt):
 		"""
 		Computes the distance to table feature value for waypoint
@@ -145,7 +151,6 @@ class Environment(object):
 		return (pitch + 1.5)
 
 	# -- Distance to Laptop -- #
-
 	def laptop_features(self, waypt, prev_waypt):
 		"""
 		Computes laptop feature value over waypoints, interpolating and
@@ -181,7 +186,6 @@ class Environment(object):
 		return -dist
 
 	# -- Distance to Human -- #
-
 	def human_features(self, waypt, prev_waypt):
 		"""
 		Computes human feature value over waypoints, interpolating and
@@ -217,7 +221,6 @@ class Environment(object):
 		return -dist
 
 	# ---- Custom environmental constraints --- #
-
 	def table_constraint(self, waypt):
 		"""
 		Constrains z-axis of robot's end-effector to always be
@@ -260,7 +263,6 @@ class Environment(object):
 			return np.array([np.cross(self.robot.GetJoints()[i].GetAxis(), world_dir)[:2] for i in range(7)]).T.copy()
 
 	# ---- Helper functions ---- #
-
 	def update_pos(self, curr_pos):
 		"""
 		Updates DOF values in OpenRAVE simulation based on curr_pos.
