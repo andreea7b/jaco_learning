@@ -32,3 +32,4 @@ learner:
     betas: [0.1, 1, 10]
     belief: [0.5, 0.5]
     inference_method: "dragan"
+    assistance_method: "blend"

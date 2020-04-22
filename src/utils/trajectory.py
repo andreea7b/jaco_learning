@@ -70,6 +70,14 @@ class Trajectory(object):
 
 		return Trajectory(waypts, waypts_time)
 
+	def resample(self, num_waypts):
+		if len(self.waypts) == num_waypts:
+			return self
+		elif len(self.waypts) < num_waypts:
+			return self.downsample(num_waypts)
+		else:
+			return self.upsample(num_waypts)
+
 	def interpolate(self, t):
 		"""
 		Gets the desired position along trajectory at time t by interpolating between waypoints.
@@ -98,7 +106,7 @@ class Trajectory(object):
 	def deform(self, u_h, t, alpha, n):
 		"""
 		Deforms the next n waypoints of the trajectory.
-		
+
 		Params:
 			u_h -- Deformation torque.
 			t [float] -- The time of deformation.
@@ -134,4 +142,3 @@ class Trajectory(object):
 			gamma[:,joint] = alpha*np.dot(H, u_h[joint])
 		waypts_deform[deform_waypt_idx : n + deform_waypt_idx, :] += gamma
 		return Trajectory(waypts_deform, self.waypts_time)
-

@@ -200,7 +200,8 @@ class TrajoptPlanner(object):
 			result = trajoptpy.OptimizeProblem(prob)
 			return result.GetTraj()
 
-	def replan(self, start, goal, goal_pose, weights, T, timestep, seed=None):
+	def replan(self, start, goal, goal_pose, weights, T, timestep, start_time=0.0,
+			   seed=None, return_plan=False, return_both=False):
 		"""
 		Replan the trajectory from start to goal given weights.
 		---
@@ -218,9 +219,14 @@ class TrajoptPlanner(object):
 		assert weights is not None, "The weights vector is empty. Cannot plan without a cost preference."
 		self.weights = weights
 		waypts = self.trajOpt(start, goal, goal_pose, traj_seed=seed)
-		waypts_time = np.linspace(0.0, T, self.num_waypts)
+		waypts_time = np.linspace(start_time, T, self.num_waypts)
 		traj = Trajectory(waypts, waypts_time)
-		return traj.upsample(int(T/timestep) + 1)
+		if return_both:
+			return traj.resample(int((T-start_time)/timestep) + 1), traj
+		elif return_plan:
+			return traj
+		else:
+			return traj.resample(int((T-start_time)/timestep) + 1)
 
 def expected_goal(belief, goals):
 	return np.sum([goal*prob for goal, prob in zip(goals, belief)], axis=0)

@@ -24,7 +24,7 @@ class PIDController(object):
 		max_cmd    - maximum allowed torque command
 	"""
 
-	def __init__(self, P, I, D, epsilon, max_cmd):
+	def __init__(self, P, I, D, epsilon, max_cmd, main=None):
 		# ----- PID Parameter Setup ----- #
 
 		# Basic PID controller initialization.
@@ -34,20 +34,30 @@ class PIDController(object):
 		self.epsilon = epsilon
 
 		# Stores maximum COMMANDED joint torques.
-		self.max_cmd = max_cmd 
+		self.max_cmd = max_cmd
 
 		# Tracks running time since beginning and end of the path.
 		self.path_start_T = None
 		self.path_end_T = None
 
-	def set_trajectory(self, trajectory):
+		# Tracks when the episode starts
+		self.start_T = None
+
+		# Stores a reference to the TeleopInference object to update its start_T
+		self.main = main
+
+	def set_trajectory(self, trajectory, path_start_T=None):
 		"""
 		Setter method that sets the trajectory and relevant parameters.
 		"""
 		# Set the trajectory, which may be updated.
 		self.traj = trajectory
 
-		# Save the intermediate target configuration. 
+		# Updates start time if we change the trajectory being followed
+		if path_start_T is not None:
+			self.path_start_T = path_start_T
+
+		# Save the intermediate target configuration.
 		self.target_pos = self.traj.waypts[0].reshape((7,1))
 
 	def get_command(self, current_pos):
@@ -72,7 +82,10 @@ class PIDController(object):
 			is_at_start = all([dist_from_start[i] < self.epsilon for i in range(7)])
 			if is_at_start:
 				self.path_start_T = time.time()
-		else:			
+				self.start_T = self.path_start_T
+				if self.main is not None:
+					self.main.start_T = self.start_T
+		else:
 			t = time.time() - self.path_start_T
 
 			# Get next target position from position along trajectory.
@@ -87,6 +100,8 @@ class PIDController(object):
 				is_at_goal = all([dist_from_goal[i] < self.epsilon for i in range(7)])
 				if is_at_goal:
 					self.path_end_T = time.time()
+					if self.main is not None:
+						self.main.reached_goal = True
 
 		# Update cmd from PID based on current position.
 		error = -((self.target_pos - current_pos + math.pi)%(2*math.pi) - math.pi)

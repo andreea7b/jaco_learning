@@ -85,8 +85,8 @@ class TeleopInference():
 					break
 				## TODO: this should be done in another thread like a normal subscriber
 				if loop_iter % 10 == 0:
-					joint_angles = self.sim_environment.robot.GetDOFValues() * (180/np.pi)
-					self.joint_angles_callback(ros_utils.cmd_to_JointAnglesMsg(np.diag(joint_angles)))
+					joint_angles = np.diag(self.sim_environment.robot.GetDOFValues() * (180/np.pi))
+					self.joint_angles_callback(ros_utils.cmd_to_JointAnglesMsg(joint_angles))
 					loop_iter = 0
 				self.sim_environment.update_vel(self.cmd) ## TODO: make sure that update_vel is supposed to take radians
 				loop_iter += 1
@@ -106,7 +106,13 @@ class TeleopInference():
 		self.start = np.array(rospy.get_param("setup/start"))*(math.pi/180.0)
 		# TODO: remove one of these
 		#self.goal_poses = np.array(rospy.get_param("setup/goal_poses"))
-		self.goals = np.array(rospy.get_param("setup/goals"))*(math.pi/180.0)
+		fixed_goals = np.array(rospy.get_param("setup/goals"))*(math.pi/180.0)
+		try:
+    		learned_goals = np.load('learned_goals.npy')
+			print "Loaded learned goals"
+			self.goals = np.vstack((fixed_goals, learned_goals))
+		except FileNotFoundError:
+    		self.goals = fixed_goals
 		self.T = rospy.get_param("setup/T")
 		self.timestep = rospy.get_param("setup/timestep")
 		self.save_dir = rospy.get_param("setup/save_dir")
@@ -141,8 +147,8 @@ class TeleopInference():
 		print self.traj.waypts_time
 		print self.traj_plan
 
-		# Track if you have reached the start/goal of the path.
-		self.reached_start = False
+		# Track if you have reached the goal of the path and the episode start time
+		self.start_T = None
 		self.reached_goal = False
 
 		# Save the current configuration.
@@ -184,12 +190,16 @@ class TeleopInference():
 		inference_method = rospy.get_param("learner/inference_method")
 		self.learner = TeleopLearner(self, prior_belief, betas, inference_method)
 		self.running_inference = False
+		self.last_inf_idx = -1
 
 		# ----- Input Device Setup ----- #
 		self.joy_environment = Environment(model_filename, object_centers,
 										   goals=self.goals,
 										   use_viewer=False,
 										   plot_objects=False)
+		self.joy_cmd = np.zeros((7,7))
+		self.assistance_method = rospy.get_param("learner/assistance_method")
+		self.alpha = 0. # in [0, 1]; higher numbers give more control to robot
 
 		# ----- Simulation Setup ----- #
 		if mode == "sim":
@@ -223,43 +233,53 @@ class TeleopInference():
 		# Convert to radians.
 		self.curr_pos = curr_pos*(math.pi/180.0)
 
-		if self.reached_start and \
-		   (time.time() - self.controller.path_start_T >= self.timestep * self.next_waypt_idx) \
-		   and not self.reached_goal and not self.next_waypt_idx >= len(self.traj_hist):
+		if self.start_T is not None and \
+		   (time.time() - self.start_T >= self.timestep * self.next_waypt_idx) \
+		    and not self.next_waypt_idx >= len(self.traj_hist):
 			self.traj_hist[self.next_waypt_idx] = self.curr_pos.reshape(7)
 			self.next_waypt_idx += 1
-			print "next timestep"
-			print self.next_waypt_idx
+			print "timestep:", self.next_waypt_idx
 			if not self.running_inference:
 				self.running_inference = True
 				inference_thread = Thread(target=self.learner.inference_step)
 				inference_thread.start()
 
+		if self.assistance_method == "blend":
+			ctl_cmd = self.controller.get_command(self.curr_pos)
+			if self.learner.last_inf_idx > self.last_inf_idx: # new inference step complete
+				self.last_inf_idx = self.learner.last_inf_idx
+				goal, beta = self.learner.argmax_joint_beliefs
+				self.alpha = beta_arbitration(beta)
+				self.traj = self.learner.cache['goal_traj_by_idx'][self.last_inf_idx][goal]
+				self.traj_plan = self.learner.cache['goal_traj_plan_by_idx'][self.last_inf_idx][goal]
+				self.controller.set_trajectory(self.traj,
+											   path_start_T=self.idx_to_time(self.last_inf_idx))
+			if np.allclose(self.joy_cmd, np.zeros((7,7))):
+				self.cmd = self.joy_cmd
+			else:
+				self.cmd = (1. - self.alpha) * self.joy_cmd + self.alpha * ctl_cmd
+		elif self.assistance_method == "expected":
+			raise NotImplementedError
+		else:
+			raise ValueError
 		# Update cmd from PID based on current position.
 		#self.cmd = self.controller.get_command(self.curr_pos)
-		self.controller.get_command(self.curr_pos)
-
-		# Check is start/goal has been reached.
-		if self.controller.path_start_T is not None:
-			self.reached_start = True
-		if self.controller.path_end_T is not None:
-			self.reached_goal = True
 
 	def joystick_input_callback(self, msg):
 		"""
 		Reads joystick commands
 		"""
 		FREQ = 10
-		#joy_cmd = (msg.axes[1], msg.axes[0], msg.axes[2]) # corrects orientation
-		joy_cmd = (msg.axes[1], msg.axes[0], msg.axes[3])
+		#joy_input = (msg.axes[1], msg.axes[0], msg.axes[2]) # corrects orientation
+		joy_input = (msg.axes[1], msg.axes[0], msg.axes[3])
 
 		#pos = self.curr_pos.reshape(7) + np.array([0,0,np.pi,0,0,0,0])
 		curr_angles = np.append(self.curr_pos.reshape(7), np.array([0,0,0]))
 
 		# not using EE orientation
-		dis = np.array(joy_cmd)
+		dis = np.array(joy_input)
 		# preserving EE orientation
-		#dis = np.array(joy_cmd + (0,0,0))
+		#dis = np.array(joy_input + (0,0,0))
 
 		# clamp/scale dis
 		dis = dis / FREQ
@@ -268,7 +288,7 @@ class TeleopInference():
 		err = dis
 		angles = np.copy(curr_angles)
 		if np.linalg.norm(err) < 0.1 / FREQ:
-			self.cmd = np.zeros((10, 10))
+			self.joy_cmd = np.zeros((7, 7))
 			return
 		with self.joy_environment.robot:
 			self.joy_environment.robot.SetDOFValues(angles)
@@ -287,7 +307,7 @@ class TeleopInference():
 				xyz = new_xyz
 		cmd = (angles - curr_angles) * FREQ
 		# clamp large joints if you want here
-		self.cmd = np.diag(cmd)
+		self.joy_cmd = np.diag(cmd)
 
 	def _joystick_input_callback(self, msg):
 		"""
@@ -327,6 +347,12 @@ class TeleopInference():
 		# clamp large joints if you want here
 		self.cmd = np.diag(cmd)
 
+	def idx_to_time(self, idx):
+		return self.start_T + idx * self.timestep
 
 if __name__ == '__main__':
 	TeleopInference()
+
+def beta_arbitration(beta):
+	#return np.clip(1. / beta, 0, 1)
+	return np.clip(np.exp(-beta + 0.1), 0, 1)

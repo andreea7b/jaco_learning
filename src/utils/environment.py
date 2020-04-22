@@ -26,7 +26,7 @@ class Environment(object):
 		if plot_objects:
 			plotCabinet(self.env)
 			plotLaptop(self.env,self.bodies,object_centers['LAPTOP_CENTER'])
-			plotSphere(self.env,self.bodies,object_centers['HUMAN_CENTER'], 0.015)
+			plotSphere(self.env,self.bodies,object_centers['HUMAN_CENTER'], 0.05)
 
 		# Plot and add the goals
 		if goals is not None:
