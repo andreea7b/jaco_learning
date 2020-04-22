@@ -15,7 +15,7 @@ class TeleopLearner(object):
 		# assumes uniform prior over betas
 		self.joint_beliefs_prior = np.outer(goal_beliefs, np.ones(len(betas),)/len(betas))
 		self.joint_beliefs = self.joint_beliefs_prior
-		self.last_inf_idx = 0 # holds the index of the last time from which inference was run
+		self.last_inf_idx = -1 # holds the index of the last time from which inference was run
 		# so other parts of the program don't need to recompute trajectories
 		self.cache = {}
 
@@ -53,12 +53,13 @@ class TeleopLearner(object):
 			goal_traj, goal_traj_plan = main.planner.replan(curr_pos, main.goals[i], list(main.goal_locs[i]), main.weights,
 											                main.T - curr_time, main.timestep, return_both=True)
 			goal_traj_costs[i] = np.sum(main.weights * np.sum(main.environment.featurize(goal_traj.waypts, main.feat_list), axis=1))
-			self.cache['goal_traj_by_idx'][this_idx].append(traj)
-			self.cache['goal_traj_plan_by_idx'][this_idx].append(traj_plan)
+			self.cache['goal_traj_by_idx'][this_idx].append(goal_traj)
+			self.cache['goal_traj_plan_by_idx'][this_idx].append(goal_traj_plan)
 		cond_prob_traj = np.exp(np.outer(curr_traj_cost + goal_traj_costs - self.optimal_costs, -self.betas)) * \
 		                 (self.betas / (2*np.pi)) ** (this_idx / 2)
 		prob_traj_joint = cond_prob_traj * self.joint_beliefs_prior
 		self.joint_beliefs = prob_traj_joint / np.sum(prob_traj_joint)
+		self._update_argmax_joint()
 		self.last_inf_idx = this_idx
 		main.running_inference = False
 

@@ -74,9 +74,9 @@ class Trajectory(object):
 		if len(self.waypts) == num_waypts:
 			return self
 		elif len(self.waypts) < num_waypts:
-			return self.downsample(num_waypts)
-		else:
 			return self.upsample(num_waypts)
+		else:
+			return self.downsample(num_waypts)
 
 	def interpolate(self, t):
 		"""

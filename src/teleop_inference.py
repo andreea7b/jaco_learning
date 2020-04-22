@@ -108,11 +108,10 @@ class TeleopInference():
 		#self.goal_poses = np.array(rospy.get_param("setup/goal_poses"))
 		fixed_goals = np.array(rospy.get_param("setup/goals"))*(math.pi/180.0)
 		try:
-    		learned_goals = np.load('learned_goals.npy')
-			print "Loaded learned goals"
+			learned_goals = np.load('learned_goals.npy')
 			self.goals = np.vstack((fixed_goals, learned_goals))
-		except FileNotFoundError:
-    		self.goals = fixed_goals
+		except IOError:
+			self.goals = fixed_goals
 		self.T = rospy.get_param("setup/T")
 		self.timestep = rospy.get_param("setup/timestep")
 		self.save_dir = rospy.get_param("setup/save_dir")
@@ -174,7 +173,7 @@ class TeleopInference():
 			# Stores maximum COMMANDED joint torques.
 			MAX_CMD = rospy.get_param("controller/max_cmd") * np.eye(7)
 
-			self.controller = PIDController(P, I, D, epsilon, MAX_CMD)
+			self.controller = PIDController(P, I, D, epsilon, MAX_CMD, self)
 		else:
 			raise Exception('Controller {} not implemented.'.format(controller_type))
 
@@ -199,7 +198,7 @@ class TeleopInference():
 										   plot_objects=False)
 		self.joy_cmd = np.zeros((7,7))
 		self.assistance_method = rospy.get_param("learner/assistance_method")
-		self.alpha = 0. # in [0, 1]; higher numbers give more control to robot
+		self.alpha = 1. # in [0, 1]; higher numbers give more control to human
 
 		# ----- Simulation Setup ----- #
 		if mode == "sim":
@@ -249,6 +248,8 @@ class TeleopInference():
 			if self.learner.last_inf_idx > self.last_inf_idx: # new inference step complete
 				self.last_inf_idx = self.learner.last_inf_idx
 				goal, beta = self.learner.argmax_joint_beliefs
+				print 'goal:', goal, 'beta:', beta
+				print self.learner.joint_beliefs
 				self.alpha = beta_arbitration(beta)
 				self.traj = self.learner.cache['goal_traj_by_idx'][self.last_inf_idx][goal]
 				self.traj_plan = self.learner.cache['goal_traj_plan_by_idx'][self.last_inf_idx][goal]
@@ -257,7 +258,7 @@ class TeleopInference():
 			if np.allclose(self.joy_cmd, np.zeros((7,7))):
 				self.cmd = self.joy_cmd
 			else:
-				self.cmd = (1. - self.alpha) * self.joy_cmd + self.alpha * ctl_cmd
+				self.cmd = self.alpha * self.joy_cmd + (1. - self.alpha) * ctl_cmd
 		elif self.assistance_method == "expected":
 			raise NotImplementedError
 		else:
@@ -307,7 +308,7 @@ class TeleopInference():
 				xyz = new_xyz
 		cmd = (angles - curr_angles) * FREQ
 		# clamp large joints if you want here
-		self.joy_cmd = np.diag(cmd)
+		self.joy_cmd = np.diag(cmd[:7])
 
 	def _joystick_input_callback(self, msg):
 		"""
@@ -350,9 +351,9 @@ class TeleopInference():
 	def idx_to_time(self, idx):
 		return self.start_T + idx * self.timestep
 
+def beta_arbitration(beta):
+	return np.clip(10. / beta, 0, 1)
+	#return np.clip(np.exp(-beta + 0.1), 0, 1)
+
 if __name__ == '__main__':
 	TeleopInference()
-
-def beta_arbitration(beta):
-	#return np.clip(1. / beta, 0, 1)
-	return np.clip(np.exp(-beta + 0.1), 0, 1)
