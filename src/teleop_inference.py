@@ -27,7 +27,7 @@ from utils.openrave_utils import robotToCartesian
 import numpy as np
 import pickle
 
-from openravepy import RaveCreatePhysicsEngine
+from openravepy import RaveCreatePhysicsEngine, RaveCreateModule
 
 
 class TeleopInference():
@@ -53,6 +53,13 @@ class TeleopInference():
 		self.load_parameters(mode)
 		self.register_callbacks(mode)
 
+		# For presentation recording (TODO: delete later)
+		#recorder = RaveCreateModule(self.sim_environment.env, 'viewerrecorder')
+		#self.sim_environment.env.AddModule(recorder, '')
+		#codecs = recorder.SendCommand('GetCodecs')
+		#filename = 'sim.mpg'
+		#codec = 13
+
 		# Start admittance control mode.
 		if mode == "real":
 			ros_utils.start_admittance_mode(self.prefix)
@@ -75,8 +82,12 @@ class TeleopInference():
 			print "Simulating robot, press ENTER to quit:"
 			physics_engine = RaveCreatePhysicsEngine(self.sim_environment.env, 'ode')
 			self.sim_environment.env.SetPhysicsEngine(physics_engine)
-			self.sim_environment.env.StartSimulation(1e-2, True)
+			self.sim_environment.env.StartSimulation(1e-1, True)
 			self.sim_environment.robot.SetDOFValues( np.hstack((self.start, np.array([0,0,0]))) )
+
+			# TODO: remove
+			#self.recorder = recorder
+			#recorder.SendCommand('Start 640 480 30 codec %d timing realtime filename %s\nviewer %s'%(codec, filename, self.sim_environment.env.GetViewer().GetName()))
 
 			loop_iter = 0
 			while not rospy.is_shutdown():
@@ -88,7 +99,7 @@ class TeleopInference():
 					joint_angles = np.diag(self.sim_environment.robot.GetDOFValues() * (180/np.pi))
 					self.joint_angles_callback(ros_utils.cmd_to_JointAnglesMsg(joint_angles))
 					loop_iter = 0
-				self.sim_environment.update_vel(self.cmd) ## TODO: make sure that update_vel is supposed to take radians
+					self.sim_environment.update_vel(self.cmd) ## TODO: make sure that update_vel is supposed to take radians
 				loop_iter += 1
 				r.sleep()
 
@@ -117,12 +128,13 @@ class TeleopInference():
 		self.save_dir = rospy.get_param("setup/save_dir")
 		self.feat_list = rospy.get_param("setup/feat_list")
 		self.weights = rospy.get_param("setup/feat_weights")
-		self.weights = ([0.] * len(self.goals)) + self.weights
+		self.weights = self.weights + ([0.] * len(self.goals))
 		self.goal_weights = []
+		num_feats = len(self.feat_list)
 		for goal_num in range(len(self.goals)):
 			self.feat_list.append("goal"+str(goal_num)+"_dist")
 			goal_weights = list(self.weights)
-			goal_weights[goal_num] = 1.
+			#goal_weights[num_feats + goal_num] = 1.
 			self.goal_weights.append(goal_weights)
 
 		# Openrave parameters for the environment.
@@ -149,9 +161,6 @@ class TeleopInference():
 		# TODO: do something better than goals[0]?
 		self.traj = self.planner.replan(self.start, self.goals[0], None, self.goal_weights[0], self.T, self.timestep)
 		self.traj_plan = self.traj.downsample(self.planner.num_waypts)
-		print self.traj.waypts
-		print self.traj.waypts_time
-		print self.traj_plan
 
 		# Track if you have reached the goal of the path and the episode start time
 		self.start_T = None
@@ -192,10 +201,14 @@ class TeleopInference():
 
 		# ----- Learner Setup ----- #
 		betas = np.array(rospy.get_param("learner/betas"))
-		goal_beliefs = rospy.get_param("learner/goal_beliefs")
+		if len(fixed_goals) == len(self.goals):
+			goal_beliefs = np.ones(len(self.goals))/len(self.goals)
+		else:
+			goal_beliefs = rospy.get_param("learner/goal_beliefs")
 		beta_beliefs = rospy.get_param("learner/beta_beliefs")
 		inference_method = rospy.get_param("learner/inference_method")
-		self.learner = TeleopLearner(self, goal_beliefs, beta_beliefs, betas, inference_method)
+		self.beta_method = rospy.get_param("learner/beta_method")
+		self.learner = TeleopLearner(self, goal_beliefs, beta_beliefs, betas, inference_method, self.beta_method)
 		self.running_inference = False
 		self.last_inf_idx = -1
 
@@ -234,6 +247,10 @@ class TeleopInference():
 		Reads the latest position of the robot and publishes an
 		appropriate velocity command to move the robot to the target.
 		"""
+		# TODO: remove
+		#if self.next_waypt_idx >= 40:
+		#	self.recorder.SendCommand('Stop')
+
 		# Read the current joint angles from the robot.
 		curr_pos = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
 
@@ -255,9 +272,12 @@ class TeleopInference():
 			ctl_cmd = self.controller.get_command(self.curr_pos)
 			if self.learner.last_inf_idx > self.last_inf_idx: # new inference step complete
 				self.last_inf_idx = self.learner.last_inf_idx
-				goal, beta = self.learner.argmax_joint_beliefs
-				print 'goal:', goal, 'beta:', beta
-				print self.learner.joint_beliefs
+				if self.beta_method == "joint":
+					goal, beta = self.learner.argmax_joint_beliefs
+					print 'goal:', goal, 'beta:', beta
+					print self.learner.joint_beliefs
+				elif self.beta_method == "estimate":
+					raise NotImplementedError
 				self.alpha = beta_arbitration(beta)
 				self.traj = self.learner.cache['goal_traj_by_idx'][self.last_inf_idx][goal]
 				self.traj_plan = self.learner.cache['goal_traj_plan_by_idx'][self.last_inf_idx][goal]
@@ -278,9 +298,10 @@ class TeleopInference():
 		"""
 		Reads joystick commands
 		"""
+		#start = time.time()
 		FREQ = 10
 		#joy_input = (msg.axes[1], msg.axes[0], msg.axes[2]) # corrects orientation
-		joy_input = (msg.axes[1], msg.axes[0], msg.axes[3])
+		joy_input = (msg.axes[1], msg.axes[0], -msg.axes[3])
 
 		#pos = self.curr_pos.reshape(7) + np.array([0,0,np.pi,0,0,0,0])
 		curr_angles = np.append(self.curr_pos.reshape(7), np.array([0,0,0]))
@@ -291,7 +312,7 @@ class TeleopInference():
 		#dis = np.array(joy_input + (0,0,0))
 
 		# clamp/scale dis
-		dis = dis / FREQ
+		dis = dis * 0.5 / FREQ
 		#dis = np.clip(dis, -0.5, 0.5)
 
 		err = dis
@@ -302,7 +323,7 @@ class TeleopInference():
 		with self.joy_environment.robot:
 			self.joy_environment.robot.SetDOFValues(angles)
 			xyz = robotToCartesian(self.joy_environment.robot)[6]
-			for k in range(10):
+			for k in range(3):
 				Jt = self.joy_environment.robot.ComputeJacobianTranslation(7, xyz)
 				#Jo = self.joy_environment.robot.ComputeJacobianAxisAngle(7)
 				J = Jt # J = np.vstack((Jt, Jo))
@@ -317,6 +338,8 @@ class TeleopInference():
 		cmd = (angles - curr_angles) * FREQ
 		# clamp large joints if you want here
 		self.joy_cmd = np.diag(cmd[:7])
+		#end = time.time()
+		#print 'command time', end - start
 
 	def _joystick_input_callback(self, msg):
 		"""
@@ -360,7 +383,8 @@ class TeleopInference():
 		return self.start_T + idx * self.timestep
 
 def beta_arbitration(beta):
-	return np.clip(5. / beta, 0, 1)
+	return 1
+	#return np.clip(0.5 / beta, 0, 1)
 	#return np.clip(np.exp(-beta + 0.1), 0, 1)
 
 if __name__ == '__main__':

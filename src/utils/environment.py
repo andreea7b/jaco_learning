@@ -38,8 +38,17 @@ class Environment(object):
 					cartesian_coords = robotToCartesian(self.robot)
 					goal_loc = cartesian_coords[6]
 					self.goal_locs.append(goal_loc)
-				plotSphere(self.env, self.bodies, goal_loc, 0.05) # may need to change colors
+					plotSphere(self.env, self.bodies, goal_loc, 0.05, color=[1,0,0]) # may need to change colors
 			self.goal_locs = np.array(self.goal_locs)
+
+		# true goal for presentation
+		goal = np.array([260.0, 90.0, 180.0, 160.0, 270.0, 180.0, 280.0])*np.pi/180
+		with self.robot:
+			angles = goal if len(goal) == 10 else np.append(goal, np.array([0,0,0]))
+			self.robot.SetDOFValues(angles)
+			cartesian_coords = robotToCartesian(self.robot)
+			goal_loc = cartesian_coords[6]
+			plotSphere(self.env, self.bodies, goal_loc, 0.05, color=[0,1,0])
 
 	# ---- Custom environmental features ---- #
 	def featurize(self, waypts, feat_list):
@@ -67,7 +76,7 @@ class Environment(object):
 					features[feat][index] = self.efficiency_features(waypts[index+1],waypts[index])
 				# TODO: this is bad design because only 10 goals can be supported, but shouldn't matter
 				elif "goal" in feat_list[feat]:
-					features[feat][index] = self.goal_dist_features(feat_list[feat][4], waypts[index+1])
+					features[feat][index] = self.goal_dist_features(int(feat_list[feat][4]), waypts[index+1])
 		return features
 
 	# -- Goal Distance -- #
@@ -75,7 +84,7 @@ class Environment(object):
 		with self.robot:
 			self.robot.SetDOFValues(np.append(waypt.reshape(7), np.array([0,0,0])))
 			coords = robotToCartesian(self.robot)[6]
-		return np.linalg.norm(self.goal_locs[goal_num], coords)**2
+		return np.linalg.norm(self.goal_locs[goal_num] - coords)**2
 
 	# -- Efficiency -- #
 	def efficiency_features(self, waypt, prev_waypt):

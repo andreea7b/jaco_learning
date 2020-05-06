@@ -1,45 +1,58 @@
 import numpy as np
 import math
+import time
 
 class TeleopLearner(object):
 	"""
 	This class performs goal and confidence inference given user inputs.
 	"""
 
-	def __init__(self, main, goal_beliefs, beta_beliefs, betas, inference_method="dragan"):
+	def __init__(self, main, goal_beliefs, beta_beliefs, betas, inference_method, beta_method):
 		self.main = main # store a reference to the TeleopInference object
 		self.goal_beliefs = goal_beliefs
 		self.beta_beliefs = beta_beliefs
 		assert(len(main.goals) == len(goal_beliefs))
 		self.betas = betas
-		# joint_beliefs is shape (len(goals), len(betas))
-		self.joint_beliefs_prior = np.outer(goal_beliefs, beta_beliefs)
-		self.joint_beliefs = self.joint_beliefs_prior
 		self.last_inf_idx = -1 # holds the index of the last time from which inference was run
 		# so other parts of the program don't need to recompute trajectories
 		self.cache = {}
-
-		if inference_method == "dragan":
-			self._update_argmax_joint()
-			# precompute the costs of optimal trajectories to all goals for later
-			self.optimal_costs = np.zeros(len(goal_beliefs))
-			self.cache['goal_traj_by_idx'] = {0: []} # these can be reused elsewhere
-			self.cache['goal_traj_plan_by_idx'] = {0: []}
-			for i in range(len(goal_beliefs)):
-				traj, traj_plan = main.planner.replan(main.start, main.goals[i], list(main.goal_locs[i]), main.goal_weights[i],
-				                                      main.T, main.timestep, return_both=True)
-				traj_cost = np.sum(main.goal_weights[i] * np.sum(main.environment.featurize(traj.waypts, main.feat_list), axis=1))
-				self.optimal_costs[i] = traj_cost
-				self.cache['goal_traj_by_idx'][0].append(traj)
-				self.cache['goal_traj_plan_by_idx'][0].append(traj_plan)
-			self.inference_step = self._dragan_belief_update
-		elif inference_method == "javdani":
-			raise NotImplementedError
+		if beta_method == "joint":
+			# joint_beliefs is shape (len(goals), len(betas))
+			self.joint_beliefs_prior = np.outer(goal_beliefs, beta_beliefs)
+			self.joint_beliefs = self.joint_beliefs_prior
+			if inference_method == "dragan":
+				self._update_argmax_joint()
+				# precompute the costs of optimal trajectories to all goals for later
+				self.optimal_costs = np.zeros(len(goal_beliefs))
+				self.cache['goal_traj_by_idx'] = {0: []} # these can be reused elsewhere
+				self.cache['goal_traj_plan_by_idx'] = {0: []}
+				for i in range(len(goal_beliefs)):
+					traj, traj_plan = main.planner.replan(main.start, main.goals[i], list(main.goal_locs[i]), main.goal_weights[i],
+					                                      main.T, main.timestep, return_both=True)
+					traj_cost = np.sum(main.goal_weights[i] * np.sum(main.environment.featurize(traj.waypts, main.feat_list), axis=1))
+					self.optimal_costs[i] = traj_cost
+					self.cache['goal_traj_by_idx'][0].append(traj)
+					self.cache['goal_traj_plan_by_idx'][0].append(traj_plan)
+				self.last_inf_idx = 0
+				self.inference_step = self._dragan_joint_belief_update
+			elif inference_method == "javdani":
+				raise NotImplementedError
+			else:
+				raise ValueError
+		elif beta_method == "estimate":
+			if inference_method == "dragan":
+				pass
+			elif inference_method == "javdani":
+				raise NotImplementedError
+			else:
+				raise ValueError
 		else:
 			raise ValueError
 
-	def _dragan_belief_update(self):
+
+	def _dragan_joint_belief_update(self):
 		main = self.main
+		start = time.time() # TODO: remove
 		this_idx = main.next_waypt_idx - 1
 		curr_traj = main.traj_hist[:this_idx + 1]
 		curr_pos = curr_traj[-1]
@@ -51,17 +64,30 @@ class TeleopLearner(object):
 		self.cache['goal_traj_plan_by_idx'][this_idx] = []
 		for i in range(len(self.goal_beliefs)):
 			# TODO: redo in a way that is not time-invariant (modify planner.trajOpt to take waypoint times and pass them into costs)
-			goal_traj, goal_traj_plan = main.planner.replan(curr_pos, main.goals[i], list(main.goal_locs[i]), main.goal_weights[i],
+			# Using default (straight line) initialization
+			#goal_traj, goal_traj_plan = main.planner.replan(curr_pos, main.goals[i], list(main.goal_locs[i]), main.goal_weights[i],
+			#								                main.T - curr_time, main.timestep, return_both=True)
+			# Using last plan initialization
+			#seed = self.cache['goal_traj_plan_by_idx'][self.last_inf_idx][i].waypts
+			#seed[0] = curr_pos
+			#goal_traj, goal_traj_plan = main.planner.replan(curr_pos, main.goals[i], list(main.goal_locs[i]), main.goal_weights[i],
+			#								                main.T - curr_time, main.timestep, return_both=True,
+			#								                seed=seed)
+			# Using last final waypoint and straight line initialization
+			goal_waypt = self.cache['goal_traj_plan_by_idx'][self.last_inf_idx][i].waypts[-1]
+			goal_traj, goal_traj_plan = main.planner.replan(curr_pos, goal_waypt, list(main.goal_locs[i]), main.goal_weights[i],
 											                main.T - curr_time, main.timestep, return_both=True)
 			goal_traj_costs[i] = np.sum(main.goal_weights[i] * np.sum(main.environment.featurize(goal_traj.waypts, main.feat_list), axis=1))
 			self.cache['goal_traj_by_idx'][this_idx].append(goal_traj)
 			self.cache['goal_traj_plan_by_idx'][this_idx].append(goal_traj_plan)
 		cond_prob_traj = np.exp(np.outer(curr_traj_costs + goal_traj_costs - self.optimal_costs, -self.betas)) * \
-		                 (self.betas / (2*np.pi)) ** (this_idx / 2)
+		                 (((self.betas/(2*np.pi))**this_idx))**(7/2)
 		prob_traj_joint = cond_prob_traj * self.joint_beliefs_prior
 		self.joint_beliefs = prob_traj_joint / np.sum(prob_traj_joint)
 		self._update_argmax_joint()
 		self.last_inf_idx = this_idx
+		end = time.time() #TODO: remove
+		print 'inference time:', end - start #TODO: remove
 		main.running_inference = False
 
 	def _update_argmax_joint(self):

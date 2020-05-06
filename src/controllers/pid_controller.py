@@ -83,6 +83,7 @@ class PIDController(object):
 			if is_at_start:
 				self.path_start_T = time.time()
 				self.start_T = self.path_start_T
+				print "starting trajectory"
 				if self.main is not None:
 					self.main.start_T = self.start_T
 		else:

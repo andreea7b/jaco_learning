@@ -4,7 +4,12 @@ setup:
     object_centers: {'HUMAN_CENTER': [-0.6,-0.55,0.0], 'LAPTOP_CENTER': [-0.7929,-0.1,0.0]}
     feat_list: ['efficiency']
     feat_weights: [1.0]
-    start: [180.0, 160.0, 175.0, 40.0, 275.0, 180.0, 280.0]
+    #start: [180.0, 160.0, 175.0, 40.0, 275.0, 180.0, 280.0]
+    #goals: [
+    #    [160.0, 90.0, 180.0, 160.0, 270.0, 180.0, 280.0],
+    #    [200.0, 90.0, 180.0, 160.0, 270.0, 180.0, 280.0]
+    #]
+    start: [180.0, 150.0, 180.0, 270.0, 180.0, 180.0, 280.0]
     goals: [
         [160.0, 90.0, 180.0, 160.0, 270.0, 180.0, 280.0],
         [200.0, 90.0, 180.0, 160.0, 270.0, 180.0, 280.0]
@@ -29,8 +34,12 @@ controller:
     max_cmd: 40.0
 
 learner:
-    betas: [0.1, 1, 10]
-    goal_beliefs: [0.5, 0.5]
+    betas: [0.1, 1, 10.]
+    #betas: [0.1, 1, 10]
+    goal_beliefs: [0.5, 0.5] #just for debugging, if there are saved goals then uniform gets used
+    #goal_beliefs: [1.]
+    #beta_beliefs: [0.4, 0.4, 0.2]
     beta_beliefs: [0.4, 0.4, 0.2]
     inference_method: "dragan"
     assistance_method: "blend"
+    beta_method: "joint"

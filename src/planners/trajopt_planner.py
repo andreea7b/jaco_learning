@@ -201,7 +201,7 @@ class TrajoptPlanner(object):
 				if 'efficiency' in self.feat_list:
 					prob.AddCost(self.efficiency_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "efficiency%i"%t)
 			goal_num = 0
-			while 'goal'+goal_num+'_dist' in self.feat_list:
+			while 'goal'+str(goal_num)+'_dist' in self.feat_list:
 				for t in range(1, self.num_waypts):
 					prob.AddCost(self.gen_goal_cost(goal_num), [(t,j) for j in range(7)], "goal%i_dist%i"%(goal_num, t))
 				goal_num += 1
