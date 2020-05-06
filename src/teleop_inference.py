@@ -386,7 +386,8 @@ class TeleopInference():
 		return self.start_T + idx * self.timestep
 
 def beta_arbitration(beta):
-	return 1
+	#return 1
+	return np.clip(1 / beta, 0, 1)
 	#return np.clip(0.5 / beta, 0, 1)
 	#return np.clip(np.exp(-beta + 0.1), 0, 1)
 

@@ -21,7 +21,7 @@ class TeleopLearner(object):
 		self.optimal_costs = np.zeros(len(goal_priors))
 		self.cache['goal_traj_by_idx'] = {0: []} # these can be reused elsewhere
 		self.cache['goal_traj_plan_by_idx'] = {0: []}
-		for i in range(len(goal_beliefs)):
+		for i in range(len(goal_priors)):
 			traj, traj_plan = main.planner.replan(main.start, main.goals[i], list(main.goal_locs[i]), main.goal_weights[i],
 												  main.T, main.timestep, return_both=True)
 			traj_cost = np.sum(main.goal_weights[i] * np.sum(main.environment.featurize(traj.waypts, main.feat_list), axis=1))
@@ -41,7 +41,7 @@ class TeleopLearner(object):
 			else:
 				raise ValueError
 		elif beta_method == "estimate":
-			self.beta_estimates = np.full(len(goal_beliefs), 1e-6)
+			self.beta_estimates = np.full(len(goal_priors), 1e-6)
 			if inference_method == "dragan":
 				self._update_argmax_estimate()
 				self.inference_step = lambda: self._dragan_update(False)
@@ -83,6 +83,7 @@ class TeleopLearner(object):
 			self.cache['goal_traj_by_idx'][this_idx].append(goal_traj)
 			self.cache['goal_traj_plan_by_idx'][this_idx].append(goal_traj_plan)
 		suboptimality = curr_traj_costs + goal_traj_costs - self.optimal_costs
+		suboptimality *= (3.5 / (0.01 * 1.))
 		print 'suboptimality:', suboptimality
 		print 'suboptimality/time:', suboptimality / this_idx
 		if is_joint:
