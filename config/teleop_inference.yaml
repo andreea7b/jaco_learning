@@ -35,11 +35,9 @@ controller:
 
 learner:
     betas: [0.1, 1, 10.]
-    #betas: [0.1, 1, 10]
     goal_beliefs: [0.5, 0.5] #just for debugging, if there are saved goals then uniform gets used
-    #goal_beliefs: [1.]
-    #beta_beliefs: [0.4, 0.4, 0.2]
-    beta_beliefs: [0.4, 0.4, 0.2]
     inference_method: "dragan"
     assistance_method: "blend"
     beta_method: "joint"
+    beta_priors: [0.4, 0.4, 0.2] # if "joint" these are probabilities, if "estimate"
+                                 # these are exponential distribution rate parameters

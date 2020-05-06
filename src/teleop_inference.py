@@ -205,10 +205,10 @@ class TeleopInference():
 			goal_beliefs = np.ones(len(self.goals))/len(self.goals)
 		else:
 			goal_beliefs = rospy.get_param("learner/goal_beliefs")
-		beta_beliefs = rospy.get_param("learner/beta_beliefs")
+		beta_priors = rospy.get_param("learner/beta_priors")
 		inference_method = rospy.get_param("learner/inference_method")
 		self.beta_method = rospy.get_param("learner/beta_method")
-		self.learner = TeleopLearner(self, goal_beliefs, beta_beliefs, betas, inference_method, self.beta_method)
+		self.learner = TeleopLearner(self, goal_beliefs, beta_priors, betas, inference_method, self.beta_method)
 		self.running_inference = False
 		self.last_inf_idx = -1
 
@@ -275,9 +275,12 @@ class TeleopInference():
 				if self.beta_method == "joint":
 					goal, beta = self.learner.argmax_joint_beliefs
 					print 'goal:', goal, 'beta:', beta
-					print self.learner.joint_beliefs
+					print 'joint beliefs:', self.learner.joint_beliefs
 				elif self.beta_method == "estimate":
-					raise NotImplementedError
+					goal, beta = self.learner.argmax_estimate
+					print 'goal:', goal, 'beta:', beta
+					print 'beta estimates:', self.learner.beta_estimates
+					print 'goal beliefs:', self.learner.goal_beliefs
 				self.alpha = beta_arbitration(beta)
 				self.traj = self.learner.cache['goal_traj_by_idx'][self.last_inf_idx][goal]
 				self.traj_plan = self.learner.cache['goal_traj_plan_by_idx'][self.last_inf_idx][goal]
@@ -301,7 +304,6 @@ class TeleopInference():
 		#start = time.time()
 		FREQ = 10
 		#joy_input = (msg.axes[1], msg.axes[0], msg.axes[2]) # corrects orientation
-		#joy_input = (msg.axes[1], msg.axes[0], -msg.axes[3])
 		joy_input = (msg.axes[0], -msg.axes[1], msg.axes[4])
 
 		#pos = self.curr_pos.reshape(7) + np.array([0,0,np.pi,0,0,0,0])
