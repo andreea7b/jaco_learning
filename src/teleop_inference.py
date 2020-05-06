@@ -301,7 +301,8 @@ class TeleopInference():
 		#start = time.time()
 		FREQ = 10
 		#joy_input = (msg.axes[1], msg.axes[0], msg.axes[2]) # corrects orientation
-		joy_input = (msg.axes[1], msg.axes[0], -msg.axes[3])
+		#joy_input = (msg.axes[1], msg.axes[0], -msg.axes[3])
+		joy_input = (msg.axes[0], -msg.axes[1], msg.axes[4])
 
 		#pos = self.curr_pos.reshape(7) + np.array([0,0,np.pi,0,0,0,0])
 		curr_angles = np.append(self.curr_pos.reshape(7), np.array([0,0,0]))
