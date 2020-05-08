@@ -14,8 +14,6 @@ class TeleopLearner(object):
 		self.beta_priors = beta_priors
 		assert(len(main.goals) == len(goal_priors))
 		self.betas = betas
-		self.last_inf_idx = -1 # holds the index of the last time from which inference was run
-		# so other parts of the program don't need to recompute trajectories
 		self.cache = {}
 		# precompute the costs of optimal trajectories to all goals for later
 		self.optimal_costs = np.zeros(len(goal_priors))
@@ -28,7 +26,7 @@ class TeleopLearner(object):
 			self.optimal_costs[i] = traj_cost
 			self.cache['goal_traj_by_idx'][0].append(traj)
 			self.cache['goal_traj_plan_by_idx'][0].append(traj_plan)
-		self.last_inf_idx = 0
+		self.last_inf_idx = 0 # holds the index of the last time from which inference was run
 		if beta_method == "joint":
 			# joint_beliefs is shape (len(goals), len(betas))
 			self.joint_beliefs_prior = np.outer(goal_priors, beta_priors)
@@ -36,6 +34,7 @@ class TeleopLearner(object):
 			if inference_method == "dragan":
 				self._update_argmax_joint()
 				self.inference_step = lambda: self._dragan_update(True)
+				self.final_step = lambda: self._dragan_update_final(True)
 			elif inference_method == "javdani":
 				raise NotImplementedError
 			else:
@@ -45,6 +44,7 @@ class TeleopLearner(object):
 			if inference_method == "dragan":
 				self._update_argmax_estimate()
 				self.inference_step = lambda: self._dragan_update(False)
+				self.final_step = lambda: self._dragan_update_final(False)
 			elif inference_method == "javdani":
 				raise NotImplementedError
 			else:
@@ -86,7 +86,7 @@ class TeleopLearner(object):
 		suboptimality *= (3.5 / (0.01 * 1.))
 		print 'suboptimality:', suboptimality
 		print 'suboptimality/time:', suboptimality / this_idx
-		if is_joint:
+		if is_joint: # joint inference over beta and goals
 			cond_prob_traj = np.exp(np.outer(suboptimality, -self.betas)) * (((self.betas/(2*np.pi))**this_idx)**(7/2))
 			prob_traj_joint = cond_prob_traj * self.joint_beliefs_prior
 			self.joint_beliefs = prob_traj_joint / np.sum(prob_traj_joint)
@@ -101,6 +101,39 @@ class TeleopLearner(object):
 		end = time.time() #TODO: remove
 		print 'inference time:', end - start #TODO: remove
 		main.running_inference = False
+
+	def _dragan_update_final(self, is_joint):
+		main = self.main
+		traj_features = np.sum(main.environment.featurize(main.traj_hist, main.feat_list), axis=1)
+		traj_costs = np.array([np.sum(main.goal_weights[i] * traj_features) for i in range(len(self.goal_beliefs))])
+		constraint_costs = np.zeros(len(self.goal_beliefs))
+		#curr_time = len(main.traj_hist) * main.timestep
+		for i in range(len(self.goal_beliefs)):
+			# calculate constraint violation costs
+			if "efficiency" in main.feat_list:
+				constraint_costs[i] = main.environment.goal_dist_features(i, main.traj_hist[-1])
+				constraint_costs[i] *= main.goal_weights[i][main.feat_list.index("efficiency")]
+				constraint_costs[i] *= 1 # TODO: tune
+		suboptimality = curr_traj_costs + constraint_costs - self.optimal_costs
+		suboptimality *= (3.5 / (0.01 * 1.))
+		print 'final suboptimality:', suboptimality
+		print 'final suboptimality/time:', suboptimality / this_idx
+		if is_joint: # joint inference over beta and goals
+			cond_prob_traj = np.exp(np.outer(suboptimality, -self.betas)) * (((self.betas/(2*np.pi))**this_idx)**(7/2))
+			prob_traj_joint = cond_prob_traj * self.joint_beliefs_prior
+			self.joint_beliefs = prob_traj_joint / np.sum(prob_traj_joint)
+			self._update_argmax_joint()
+			print 'final beta: ', self.argmax_joint_beliefs[1]
+		else: # MAP estimation of beta
+			self.beta_estimates = (this_idx * 7 / 2) / (suboptimality + self.beta_priors)
+			cond_prob_traj = np.exp(suboptimality * -self.beta_estimates) * (((self.beta_estimates/(2*np.pi))**this_idx)**(7/2))
+			prob_traj_joint = cond_prob_traj * self.goal_priors
+			self.goal_beliefs = prob_traj_joint / np.sum(prob_traj_joint)
+			self._update_argmax_estimate()
+			print 'final beta: ', self.argmax_estimate[1]
+		if (is_joint and self.argmax_joint_beliefs[1] < 0.3) or (not is_joint and self.argmax_estimate[1] < 0.3):
+			# learn new goal here
+			print 'detected new goal:', main.traj_hist[-1]
 
 	def _update_argmax_joint(self):
 		goal, beta_idx = np.unravel_index(np.argmax(self.joint_beliefs), self.joint_beliefs.shape)

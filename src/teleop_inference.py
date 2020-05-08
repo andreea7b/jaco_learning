@@ -134,6 +134,7 @@ class TeleopInference():
 		for goal_num in range(len(self.goals)):
 			self.feat_list.append("goal"+str(goal_num)+"_dist")
 			goal_weights = list(self.weights)
+			# comment out this line to turn off goal dist features:
 			#goal_weights[num_feats + goal_num] = 1.
 			self.goal_weights.append(goal_weights)
 
@@ -210,7 +211,8 @@ class TeleopInference():
 		self.beta_method = rospy.get_param("learner/beta_method")
 		self.learner = TeleopLearner(self, goal_beliefs, beta_priors, betas, inference_method, self.beta_method)
 		self.running_inference = False
-		self.last_inf_idx = -1
+		self.last_inf_idx = 0
+		self.running_final_inference = False
 
 		# ----- Input Device Setup ----- #
 		self.joy_environment = Environment(model_filename, object_centers,
@@ -257,16 +259,20 @@ class TeleopInference():
 		# Convert to radians.
 		self.curr_pos = curr_pos*(math.pi/180.0)
 
-		if self.start_T is not None and \
-		   (time.time() - self.start_T >= self.timestep * self.next_waypt_idx) \
-		    and not self.next_waypt_idx >= len(self.traj_hist):
-			self.traj_hist[self.next_waypt_idx] = self.curr_pos.reshape(7)
-			self.next_waypt_idx += 1
-			print "timestep:", self.next_waypt_idx
-			if not self.running_inference:
-				self.running_inference = True
-				inference_thread = Thread(target=self.learner.inference_step)
-				inference_thread.start()
+		if self.start_T is not None and (time.time() - self.start_T >= self.timestep * self.next_waypt_idx):
+			if not self.next_waypt_idx >= len(self.traj_hist):
+				self.traj_hist[self.next_waypt_idx] = self.curr_pos.reshape(7)
+				self.next_waypt_idx += 1
+				print "timestep:", self.next_waypt_idx
+				if not self.running_inference:
+					self.running_inference = True
+					self.inference_thread = Thread(target=self.learner.inference_step)
+					self.inference_thread.start()
+			elif not self.running_final_inference:
+				self.running_final_inference = True
+				self.inference_thread.join()
+				self.inference_thread = Thread(target=self.learner.final_step)
+				self.inference_thread.start()
 
 		if self.assistance_method == "blend":
 			ctl_cmd = self.controller.get_command(self.curr_pos)
