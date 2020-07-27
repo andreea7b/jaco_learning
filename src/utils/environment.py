@@ -29,6 +29,7 @@ class Environment(object):
 			plotSphere(self.env,self.bodies,object_centers['HUMAN_CENTER'], 0.015)
 
 		# Plot and add the goals
+		i = 0
 		if goals is not None:
 			self.goal_locs = []
 			for goal in goals:
@@ -38,7 +39,12 @@ class Environment(object):
 					cartesian_coords = robotToCartesian(self.robot)
 					goal_loc = cartesian_coords[6]
 					self.goal_locs.append(goal_loc)
-					plotSphere(self.env, self.bodies, goal_loc, 0.05, color=[1,0,0]) # may need to change colors
+					if i == 0:
+						color = [1, 0, 0]
+					else:
+						color = [0, 0, 1]
+					i += 1
+					plotSphere(self.env, self.bodies, goal_loc, 0.05, color=color) # may need to change colors
 			self.goal_locs = np.array(self.goal_locs)
 
 		# true goal for presentation

@@ -135,7 +135,7 @@ class TeleopInference():
 			self.feat_list.append("goal"+str(goal_num)+"_dist")
 			goal_weights = list(self.weights)
 			# comment out this line to turn off goal dist features:
-			#goal_weights[num_feats + goal_num] = 1.
+			#goal_weights[num_feats + goal_num] = 0.1
 			self.goal_weights.append(goal_weights)
 
 		# Openrave parameters for the environment.
@@ -265,6 +265,7 @@ class TeleopInference():
 				self.next_waypt_idx += 1
 				print "timestep:", self.next_waypt_idx
 				if not self.running_inference:
+					print 'calling inference from', self.next_waypt_idx - 1
 					self.running_inference = True
 					self.inference_thread = Thread(target=self.learner.inference_step)
 					self.inference_thread.start()

@@ -8,6 +8,11 @@ class TeleopLearner(object):
 	"""
 
 	def __init__(self, main, goal_priors, beta_priors, betas, inference_method, beta_method):
+		# remove (for final project)
+		self.beta_hist = []
+		self.inf_hist = []
+		self.sub_hist = []
+
 		self.main = main # store a reference to the TeleopInference object
 		self.goal_priors = goal_priors
 		self.goal_beliefs = goal_priors
@@ -26,6 +31,7 @@ class TeleopLearner(object):
 			self.optimal_costs[i] = traj_cost
 			self.cache['goal_traj_by_idx'][0].append(traj)
 			self.cache['goal_traj_plan_by_idx'][0].append(traj_plan)
+		print self.cache['goal_traj_by_idx'][0][0].waypts[-1]
 		self.last_inf_idx = 0 # holds the index of the last time from which inference was run
 		if beta_method == "joint":
 			# joint_beliefs is shape (len(goals), len(betas))
@@ -56,6 +62,7 @@ class TeleopLearner(object):
 		main = self.main
 		start = time.time() # TODO: remove
 		this_idx = main.next_waypt_idx - 1
+		print 'doing inference from', this_idx
 		curr_traj = main.traj_hist[:this_idx + 1]
 		curr_pos = curr_traj[-1]
 		curr_traj_features = np.sum(main.environment.featurize(curr_traj, main.feat_list), axis=1)
@@ -80,8 +87,12 @@ class TeleopLearner(object):
 			goal_traj, goal_traj_plan = main.planner.replan(curr_pos, goal_waypt, list(main.goal_locs[i]), main.goal_weights[i],
 											                main.T - curr_time, main.timestep, return_both=True)
 			goal_traj_costs[i] = np.sum(main.goal_weights[i] * np.sum(main.environment.featurize(goal_traj.waypts, main.feat_list), axis=1))
+			print 'planned goal traj len', len(goal_traj.waypts)
 			self.cache['goal_traj_by_idx'][this_idx].append(goal_traj)
 			self.cache['goal_traj_plan_by_idx'][this_idx].append(goal_traj_plan)
+		#print 'curr traj costs', curr_traj_costs
+		#print 'goal traj costs', goal_traj_costs
+		#print 'optimal_costs', self.optimal_costs
 		suboptimality = curr_traj_costs + goal_traj_costs - self.optimal_costs
 		suboptimality *= (3.5 / (0.01 * 1.))
 		print 'suboptimality:', suboptimality
@@ -97,6 +108,11 @@ class TeleopLearner(object):
 			prob_traj_joint = cond_prob_traj * self.goal_priors
 			self.goal_beliefs = prob_traj_joint / np.sum(prob_traj_joint)
 			self._update_argmax_estimate()
+			# TODO: remove (for final project)
+			self.beta_hist.append(self.beta_estimates)
+			self.inf_hist.append(this_idx)
+			self.sub_hist.append(suboptimality)
+
 		self.last_inf_idx = this_idx
 		end = time.time() #TODO: remove
 		print 'inference time:', end - start #TODO: remove
@@ -107,15 +123,19 @@ class TeleopLearner(object):
 		traj_features = np.sum(main.environment.featurize(main.traj_hist, main.feat_list), axis=1)
 		traj_costs = np.array([np.sum(main.goal_weights[i] * traj_features) for i in range(len(self.goal_beliefs))])
 		constraint_costs = np.zeros(len(self.goal_beliefs))
-		#curr_time = len(main.traj_hist) * main.timestep
+		this_idx = len(main.traj_hist)
+		curr_time = this_idx * main.timestep
 		for i in range(len(self.goal_beliefs)):
 			# calculate constraint violation costs
 			if "efficiency" in main.feat_list:
 				constraint_costs[i] = main.environment.goal_dist_features(i, main.traj_hist[-1])
 				constraint_costs[i] *= main.goal_weights[i][main.feat_list.index("efficiency")]
-				constraint_costs[i] *= 1 # TODO: tune
-		suboptimality = curr_traj_costs + constraint_costs - self.optimal_costs
+				constraint_costs[i] *= 10 # TODO: tune
+		print 'constraint_costs', constraint_costs
+		suboptimality = traj_costs + constraint_costs - self.optimal_costs
 		suboptimality *= (3.5 / (0.01 * 1.))
+		print 'curr traj costs', traj_costs
+		print 'optimal_costs', self.optimal_costs
 		print 'final suboptimality:', suboptimality
 		print 'final suboptimality/time:', suboptimality / this_idx
 		if is_joint: # joint inference over beta and goals
@@ -130,10 +150,24 @@ class TeleopLearner(object):
 			prob_traj_joint = cond_prob_traj * self.goal_priors
 			self.goal_beliefs = prob_traj_joint / np.sum(prob_traj_joint)
 			self._update_argmax_estimate()
-			print 'final beta: ', self.argmax_estimate[1]
+
+			# TODO: remove all of the below (for final project)
+			self.beta_hist.append(self.beta_estimates)
+			self.inf_hist.append(this_idx)
+			self.sub_hist.append(suboptimality)
+			#np.save('/sub_hist.npy', np.array(self.sub_hist))
+			#np.save('/inf_hist.npy', np.array(self.inf_hist))
+			print 'beta:', np.array(self.beta_hist)
+			print 'suboptimality:', np.array(self.sub_hist)
+			print 'inference times:', np.array(self.inf_hist)
+
+			print 'final beta:', self.argmax_estimate[1]
 		if (is_joint and self.argmax_joint_beliefs[1] < 0.3) or (not is_joint and self.argmax_estimate[1] < 0.3):
 			# learn new goal here
 			print 'detected new goal:', main.traj_hist[-1]
+
+		np.save('/traj_hist.npy', np.array(main.traj_hist))
+		print 'saved trajectory'
 
 	def _update_argmax_joint(self):
 		goal, beta_idx = np.unravel_index(np.argmax(self.joint_beliefs), self.joint_beliefs.shape)
