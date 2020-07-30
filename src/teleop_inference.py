@@ -320,6 +320,7 @@ class TeleopInference():
 		dis = np.array(joy_input)
 		# preserving EE orientation
 		#dis = np.array(joy_input + (0,0,0))
+		#dis = self.get_target_displacement(joy_input) #TODO
 
 		# clamp/scale dis
 		dis = dis * 0.5 / FREQ
@@ -333,10 +334,15 @@ class TeleopInference():
 		with self.joy_environment.robot:
 			self.joy_environment.robot.SetDOFValues(angles)
 			xyz = robotToCartesian(self.joy_environment.robot)[6]
+			#xyz = np.append(xyz, np.zeros(3))
 			for k in range(3):
 				Jt = self.joy_environment.robot.ComputeJacobianTranslation(7, xyz)
 				#Jo = self.joy_environment.robot.ComputeJacobianAxisAngle(7)
-				J = Jt # J = np.vstack((Jt, Jo))
+				J = Jt 
+				#J = np.vstack((Jt, Jo))
+
+				#J = self.get_jacobian(self.joy_environment.robot, xyz) #TODO
+
 				angle_step_dir = np.dot(J.T, err)
 				pred_xyz_step = np.dot(J, angle_step_dir)
 				step_size = np.dot(err, pred_xyz_step)/(np.linalg.norm(pred_xyz_step) ** 2)

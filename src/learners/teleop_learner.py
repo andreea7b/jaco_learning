@@ -166,7 +166,7 @@ class TeleopLearner(object):
 			# learn new goal here
 			print 'detected new goal:', main.traj_hist[-1]
 
-		np.save('/traj_hist.npy', np.array(main.traj_hist))
+		np.save('traj_hist.npy', np.array(main.traj_hist))
 		print 'saved trajectory'
 
 	def _update_argmax_joint(self):
