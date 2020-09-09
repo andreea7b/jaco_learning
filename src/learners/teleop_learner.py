@@ -8,7 +8,7 @@ class TeleopLearner(object):
 	"""
 
 	def __init__(self, main, goal_priors, beta_priors, betas, inference_method, beta_method):
-		# remove (for final project)
+		# TODO: remove (for final project)
 		self.beta_hist = []
 		self.inf_hist = []
 		self.sub_hist = []
@@ -19,6 +19,14 @@ class TeleopLearner(object):
 		self.beta_priors = beta_priors
 		assert(len(main.goals) == len(goal_priors))
 		self.betas = betas
+
+		self.last_inf_idx = 0 # holds the index of the last time from which inference was run
+		
+		if inference_method == "none":
+			self.inference_step = self._no_inference
+			self.final_step = self._no_inference_final
+			return
+
 		self.cache = {}
 		# precompute the costs of optimal trajectories to all goals for later
 		self.optimal_costs = np.zeros(len(goal_priors))
@@ -31,8 +39,6 @@ class TeleopLearner(object):
 			self.optimal_costs[i] = traj_cost
 			self.cache['goal_traj_by_idx'][0].append(traj)
 			self.cache['goal_traj_plan_by_idx'][0].append(traj_plan)
-		print self.cache['goal_traj_by_idx'][0][0].waypts[-1]
-		self.last_inf_idx = 0 # holds the index of the last time from which inference was run
 		if beta_method == "joint":
 			# joint_beliefs is shape (len(goals), len(betas))
 			self.joint_beliefs_prior = np.outer(goal_priors, beta_priors)
@@ -166,8 +172,22 @@ class TeleopLearner(object):
 			# learn new goal here
 			print 'detected new goal:', main.traj_hist[-1]
 
-		np.save('traj_hist.npy', np.array(main.traj_hist))
+		#np.save('/home/matthew/traj_hist_nobj10.npy', np.array(main.traj_hist))
+		#print 'saved trajectory'
+
+	def _no_inference(self):
+		main = self.main
+		this_idx = main.next_waypt_idx - 1
+		self.last_inf_idx = this_idx
+		print 'ran dummy inference'
+		main.running_inference = False
+
+	def _no_inference_final(self):
+		main = self.main
+		np.save('/home/matthew/pour_red_5.npy', np.array(main.traj_hist))
 		print 'saved trajectory'
+
+
 
 	def _update_argmax_joint(self):
 		goal, beta_idx = np.unravel_index(np.argmax(self.joint_beliefs), self.joint_beliefs.shape)

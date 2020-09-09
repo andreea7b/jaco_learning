@@ -115,6 +115,7 @@ class TeleopInference():
 		# ----- General Setup ----- #
 		self.prefix = rospy.get_param("setup/prefix")
 		self.start = np.array(rospy.get_param("setup/start"))*(math.pi/180.0)
+		self.start += np.random.normal(0, 0.157, self.start.shape)
 		# TODO: remove one of these
 		#self.goal_poses = np.array(rospy.get_param("setup/goal_poses"))
 		fixed_goals = np.array(rospy.get_param("setup/goals"))*(math.pi/180.0)
@@ -214,6 +215,8 @@ class TeleopInference():
 		self.last_inf_idx = 0
 		self.running_final_inference = False
 
+		#import pdb; pdb.set_trace()
+
 		# ----- Input Device Setup ----- #
 		self.joy_environment = Environment(model_filename, object_centers,
 										   goals=self.goals,
@@ -249,9 +252,6 @@ class TeleopInference():
 		Reads the latest position of the robot and publishes an
 		appropriate velocity command to move the robot to the target.
 		"""
-		# TODO: remove
-		#if self.next_waypt_idx >= 40:
-		#	self.recorder.SendCommand('Stop')
 
 		# Read the current joint angles from the robot.
 		curr_pos = np.array([msg.joint1,msg.joint2,msg.joint3,msg.joint4,msg.joint5,msg.joint6,msg.joint7]).reshape((7,1))
@@ -275,8 +275,8 @@ class TeleopInference():
 				self.inference_thread = Thread(target=self.learner.final_step)
 				self.inference_thread.start()
 
+		ctl_cmd = self.controller.get_command(self.curr_pos)
 		if self.assistance_method == "blend":
-			ctl_cmd = self.controller.get_command(self.curr_pos)
 			if self.learner.last_inf_idx > self.last_inf_idx: # new inference step complete
 				self.last_inf_idx = self.learner.last_inf_idx
 				if self.beta_method == "joint":
@@ -299,6 +299,10 @@ class TeleopInference():
 				self.cmd = self.alpha * self.joy_cmd + (1. - self.alpha) * ctl_cmd
 		elif self.assistance_method == "expected":
 			raise NotImplementedError
+		elif self.assistance_method == "none":
+			if self.learner.last_inf_idx > self.last_inf_idx: # new inference step complete
+				self.last_inf_idx = self.learner.last_inf_idx
+			self.cmd = self.joy_cmd
 		else:
 			raise ValueError
 		# Update cmd from PID based on current position.
@@ -329,33 +333,41 @@ class TeleopInference():
 		err = dis
 		angles = np.copy(curr_angles)
 		if np.linalg.norm(err) < 0.1 / FREQ:
-			self.joy_cmd = np.zeros((7, 7))
-			return
-		with self.joy_environment.robot:
-			self.joy_environment.robot.SetDOFValues(angles)
-			xyz = robotToCartesian(self.joy_environment.robot)[6]
-			#xyz = np.append(xyz, np.zeros(3))
-			for k in range(3):
-				Jt = self.joy_environment.robot.ComputeJacobianTranslation(7, xyz)
-				#Jo = self.joy_environment.robot.ComputeJacobianAxisAngle(7)
-				J = Jt 
-				#J = np.vstack((Jt, Jo))
-
-				#J = self.get_jacobian(self.joy_environment.robot, xyz) #TODO
-
-				angle_step_dir = np.dot(J.T, err)
-				pred_xyz_step = np.dot(J, angle_step_dir)
-				step_size = np.dot(err, pred_xyz_step)/(np.linalg.norm(pred_xyz_step) ** 2)
-				angles += step_size * angle_step_dir
+			cmd = np.zeros(7)
+		else:
+			with self.joy_environment.robot:
 				self.joy_environment.robot.SetDOFValues(angles)
-				new_xyz = robotToCartesian(self.joy_environment.robot)[6]
-				err -= (new_xyz - xyz)
-				xyz = new_xyz
-		cmd = (angles - curr_angles) * FREQ
-		# clamp large joints if you want here
+				xyz = robotToCartesian(self.joy_environment.robot)[6]
+				#xyz = np.append(xyz, np.zeros(3))
+				for k in range(3):
+					Jt = self.joy_environment.robot.ComputeJacobianTranslation(7, xyz)
+					#Jo = self.joy_environment.robot.ComputeJacobianAxisAngle(7)
+					J = Jt 
+					#J = np.vstack((Jt, Jo))
+
+					#J = self.get_jacobian(self.joy_environment.robot, xyz) #TODO
+
+					angle_step_dir = np.dot(J.T, err)
+					pred_xyz_step = np.dot(J, angle_step_dir)
+					step_size = np.dot(err, pred_xyz_step)/(np.linalg.norm(pred_xyz_step) ** 2)
+					angles += step_size * angle_step_dir
+					self.joy_environment.robot.SetDOFValues(angles)
+					new_xyz = robotToCartesian(self.joy_environment.robot)[6]
+					err -= (new_xyz - xyz)
+					xyz = new_xyz
+			cmd = (angles - curr_angles) * FREQ
+			# clamp large joints if you want here
+
+
+
+		# can modify joint 6 separately since the above always gives it velocity 0
+		msg.axes[2] - msg.axes[5]
+		cmd[6] = (msg.axes[2] - msg.axes[5])
+
 		self.joy_cmd = np.diag(cmd[:7])
 		#end = time.time()
 		#print 'command time', end - start
+
 
 	def _joystick_input_callback(self, msg):
 		"""
@@ -399,7 +411,7 @@ class TeleopInference():
 		return self.start_T + idx * self.timestep
 
 def beta_arbitration(beta):
-	#return 1
+	#return 1 #all joystick
 	return np.clip(1 / beta, 0, 1)
 	#return np.clip(0.5 / beta, 0, 1)
 	#return np.clip(np.exp(-beta + 0.1), 0, 1)
