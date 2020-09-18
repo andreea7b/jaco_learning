@@ -1,4 +1,0 @@
-[submodule "src/FERL"]
-	path = src/FERL
-	url = https://github.com/matthewzurek/FERL.git
-	branch = sa_branch

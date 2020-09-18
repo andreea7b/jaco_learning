@@ -225,8 +225,11 @@ class TeleopInference():
 		self.running_final_inference = False
 
 		# ----- Input Device Setup ----- #
-		self.joy_environment = Environment(model_filename, object_centers,
-										   goals=self.goals,
+		self.joy_environment = Environment(model_filename,
+										   object_centers,
+										   list(), # doesn't need to know about features
+										   dict(),
+										   #goals=self.goals,
 										   use_viewer=False,
 										   plot_objects=False)
 		self.joy_cmd = np.zeros((7,7))
@@ -235,7 +238,10 @@ class TeleopInference():
 
 		# ----- Simulation Setup ----- #
 		if mode == "sim":
-			self.sim_environment = Environment(model_filename, object_centers,
+			self.sim_environment = Environment(model_filename,
+											   object_centers,
+											   list(),
+											   dict(),
 											   goals=self.goals,
 			                                   use_viewer=True,
 											   plot_objects=False)

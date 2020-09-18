@@ -8,7 +8,7 @@ import openravepy
 from openravepy import *
 
 from utils.openrave_utils import *
-from learned_feature import LearnedFeature
+#from learned_feature import LearnedFeature
 
 
 class Environment(object):
@@ -17,7 +17,7 @@ class Environment(object):
 	functionality needed for custom features and constraints.
 	"""
 	def __init__(self, model_filename, object_centers, feat_list, feat_range,
-				 goals=None, LF_dict=None, use_viewer=True, plot_objects=True):
+				 goals=[], LF_dict=None, use_viewer=True, plot_objects=True):
 		# ---- Create environment ---- #
 		self.env, self.robot = initialize(model_filename, use_viewer=use_viewer)
 
@@ -93,7 +93,7 @@ class Environment(object):
 
 
 	# ---- Compute features for all waypoints in trajectory ---- #
-	def featurize(self, waypts, feat_idx=None):
+	def featurize(self, waypts, feat_idxs=None):
 		"""
 		Computes the features for a given trajectory.
 		---
@@ -104,34 +104,35 @@ class Environment(object):
 			features -- list of feature values (T x num_features)
 		"""
 		# if no list of idx is provided use all of them
-		if feat_idx is None:
-			feat_idx = list(np.arange(self.num_feats))
+		if feat_idxs is None:
+			feat_idxs = list(np.arange(self.num_feats))
 
-		features = np.zeros((len(feat_idx), len(waypts)-1))
+		features = np.zeros((len(feat_idxs), len(waypts)-1))
 
 		for index in range(len(waypts)-1):
-			for feat in range(len(feat_idx)):
+			for feat in range(len(feat_idxs)):
 				waypt = waypts[index+1]
-				if self.feat_list[feat_idx[feat]] == 'efficiency':
+				if self.feat_list[feat_idxs[feat]] == 'efficiency':
 					waypt = np.concatenate((waypts[index+1],waypts[index]))
-				features[feat][index] = self.featurize_single(waypt, feat_idx[feat])
+				features[feat][index] = self.featurize_single(waypt, feat_idxs[feat])
 
-			for feat in range(num_features):
-				if feat_list[feat] == 'table':
-					features[feat][index] = self.table_features(waypts[index+1])
-				elif feat_list[feat] == 'coffee':
-					features[feat][index] = self.coffee_features(waypts[index+1])
-				elif feat_list[feat] == 'human':
-					features[feat][index] = self.human_features(waypts[index+1],waypts[index])
-				elif feat_list[feat] == 'laptop':
-					features[feat][index] = self.laptop_features(waypts[index+1],waypts[index])
-				elif feat_list[feat] == 'origin':
-					features[feat][index] = self.origin_features(waypts[index+1])
-				elif feat_list[feat] == 'efficiency':
-					features[feat][index] = self.efficiency_features(waypts[index+1],waypts[index])
-				# TODO: this is bad design because only 10 goals can be supported, but shouldn't matter
-				elif "goal" in feat_list[feat]:
-					features[feat][index] = self.goal_dist_features(int(feat_list[feat][4]), waypts[index+1])
+			# for feat in range(len(feat_idxs)):
+			# 	feat_idx = feat_idxs[feat]
+			# 	if self.feat_list[feat_idx] == 'table':
+			# 		features[feat][index] = self.table_features(waypts[index+1])
+			# 	elif self.feat_list[feat_idx] == 'coffee':
+			# 		features[feat][index] = self.coffee_features(waypts[index+1])
+			# 	elif self.feat_list[feat_idx] == 'human':
+			# 		features[feat][index] = self.human_features(waypts[index+1],waypts[index])
+			# 	elif self.feat_list[feat_idx] == 'laptop':
+			# 		features[feat][index] = self.laptop_features(waypts[index+1],waypts[index])
+			# 	elif self.feat_list[feat_idx] == 'origin':
+			# 		features[feat][index] = self.origin_features(waypts[index+1])
+			# 	elif self.feat_list[feat_idx] == 'efficiency':
+			# 		features[feat][index] = self.efficiency_features(waypts[index+1],waypts[index])
+			# 	# TODO: this is bad design because only 10 goals can be supported, but shouldn't matter
+			# 	elif "goal" in self.feat_list[feat_idx]:
+			# 		features[feat][index] = self.goal_dist_features(int(feat_list[feat][4]), waypts[index+1])
 		return features
 
 	# -- Compute single feature for single waypoint -- #
@@ -154,7 +155,7 @@ class Environment(object):
 			featval = featval[0][0]
 		else:
 			if self.feat_range is not None:
-				featval /= self.feat_range[feat_idx]
+				featval /= self.feat_range[self.feat_list[feat_idx]]
 		return featval
 
 	# -- Return raw features -- #
