@@ -2,6 +2,7 @@ import numpy as np
 import math
 import json
 import copy
+import torch
 
 import trajoptpy
 
@@ -10,22 +11,32 @@ from utils.trajectory import Trajectory
 
 class TrajoptPlanner(object):
 	"""
-	This class plans a trajectory from start to goal with TrajOpt, given
-	features and feature weights (optionally).
+	This class plans a trajectory from start to goal with TrajOpt.
 	"""
-	def __init__(self, feat_list, max_iter, num_waypts, environment):
+	def __init__(self, max_iter, num_waypts, environment):
 
 		# ---- Important internal variables ---- #
-		self.feat_list = feat_list		# 'table', 'human', 'coffee', 'origin', 'laptop'
-		self.num_features = len(self.feat_list)
-		self.weights = [0.0] * self.num_features
-
 		# These variables are trajopt parameters.
 		self.MAX_ITER = max_iter
 		self.num_waypts = num_waypts
 
 		# Set OpenRAVE environment.
 		self.environment = environment
+
+	# -- Interpolate feature value between neighboring waypoints to help planner optimization. -- #
+
+	def interpolate_features(self, waypt, prev_waypt, feat_idx, NUM_STEPS=4):
+		"""
+		Computes feature value over waypoints, interpolating and
+		sampling between each pair to check for intermediate collisions.
+		---
+		input neighboring waypoints and feature function, output scalar feature
+		"""
+		feat_val = 0.0
+		for step in range(NUM_STEPS):
+			inter_waypt = prev_waypt + ((1.0 + step)/NUM_STEPS)*(waypt - prev_waypt)
+			feat_val += self.environment.featurize_single(inter_waypt, feat_idx)
+		return feat_val / NUM_STEPS
 
 	# ---- Costs ---- #
 
@@ -35,21 +46,22 @@ class TrajoptPlanner(object):
 		---
 		input waypoint, output scalar cost
 		"""
-		prev_waypt = waypt[0:7]
-		curr_waypt = waypt[7:14]
-		feature = self.environment.efficiency_features(curr_waypt,prev_waypt)
-		feature_idx = self.feat_list.index('efficiency')
+		feature_idx = self.environment.feat_list.index('efficiency')
+		feature = self.interpolate_features(waypt, waypt, feature_idx, NUM_STEPS=1)
 		return feature*self.weights[feature_idx]
 
 	def origin_cost(self, waypt):
 		"""
 		Computes the total distance from EE to base of robot cost.
 		---
+
 		input waypoint, output scalar cost
 		"""
-		feature = self.environment.origin_features(waypt)
-		feature_idx = self.feat_list.index('origin')
-		return feature*self.weights[feature_idx]
+		prev_waypt = waypt[0:7]
+		curr_waypt = waypt[7:14]
+		feature_idx = self.environment.feat_list.index('origin')
+		feature = self.interpolate_features(curr_waypt, prev_waypt, feature_idx)
+		return feature*self.weights[feature_idx]*np.linalg.norm(curr_waypt - prev_waypt)
 
 	def table_cost(self, waypt):
 		"""
@@ -57,9 +69,11 @@ class TrajoptPlanner(object):
 		---
 		input waypoint, output scalar cost
 		"""
-		feature = self.environment.table_features(waypt)
-		feature_idx = self.feat_list.index('table')
-		return feature*self.weights[feature_idx]
+		prev_waypt = waypt[0:7]
+		curr_waypt = waypt[7:14]
+		feature_idx = self.environment.feat_list.index('table')
+		feature = self.interpolate_features(curr_waypt, prev_waypt, feature_idx)
+		return feature*self.weights[feature_idx]*np.linalg.norm(curr_waypt - prev_waypt)
 
 	def coffee_cost(self, waypt):
 		"""
@@ -67,9 +81,11 @@ class TrajoptPlanner(object):
 		---
 		input waypoint, output scalar cost
 		"""
-		feature = self.environment.coffee_features(waypt)
-		feature_idx = self.feat_list.index('coffee')
-		return feature*self.weights[feature_idx]
+		prev_waypt = waypt[0:7]
+		curr_waypt = waypt[7:14]
+		feature_idx = self.environment.feat_list.index('coffee')
+		feature = self.interpolate_features(curr_waypt, prev_waypt, feature_idx)
+		return feature*self.weights[feature_idx]*np.linalg.norm(curr_waypt - prev_waypt)
 
 	def laptop_cost(self, waypt):
 		"""
@@ -79,8 +95,8 @@ class TrajoptPlanner(object):
 		"""
 		prev_waypt = waypt[0:7]
 		curr_waypt = waypt[7:14]
-		feature = self.environment.laptop_features(curr_waypt,prev_waypt)
-		feature_idx = self.feat_list.index('laptop')
+		feature_idx = self.environment.feat_list.index('laptop')
+		feature = self.interpolate_features(curr_waypt, prev_waypt, feature_idx)
 		return feature*self.weights[feature_idx]*np.linalg.norm(curr_waypt - prev_waypt)
 
 	def human_cost(self, waypt):
@@ -91,15 +107,68 @@ class TrajoptPlanner(object):
 		"""
 		prev_waypt = waypt[0:7]
 		curr_waypt = waypt[7:14]
-		feature = self.environment.human_features(curr_waypt,prev_waypt)
-		feature_idx = self.feat_list.index('human')
+		feature_idx = self.environment.feat_list.index('human')
+		feature = self.interpolate_features(curr_waypt, prev_waypt, feature_idx)
 		return feature*self.weights[feature_idx]*np.linalg.norm(curr_waypt - prev_waypt)
 
+	def learned_feature_costs(self, waypt):
+		"""
+		Computes the cost for all the learned features.
+		---
+		input waypoint, output scalar cost
+		"""
+		prev_waypt = waypt[0:7]
+		curr_waypt = waypt[7:14]
+		# get the number of learned features
+		n_learned = self.environment.feat_list.count('learned_feature')
+
+		feature_values = []
+		for i, feature in enumerate(self.environment.learned_feats):
+			# get the value of the feature
+			feat_idx = self.environment.num_feats - n_learned + i
+			feature_values.append(self.interpolate_features(curr_waypt, prev_waypt, feat_idx))
+		# calculate the cost
+		return np.matmul(self.weights[-n_learned:], np.array(feature_values))*np.linalg.norm(curr_waypt - prev_waypt)
+
+	def learned_feature_cost_derivatives(self, waypt):
+		"""
+		Computes the cost derivatives for all the learned features.
+		---
+		input waypoint, output scalar cost
+		"""
+		# get the number of learned features
+		n_learned = self.environment.feat_list.count('learned_feature')
+
+		J = []
+		sols = []
+		for i, feature in enumerate(self.environment.learned_feats):
+			# Setup for computing Jacobian.
+			x = torch.tensor(waypt, requires_grad=True)
+
+			# Get the value of the feature
+			feat_idx = self.environment.num_feats - n_learned + i
+			feat_val = torch.tensor(0.0, requires_grad=True)
+			NUM_STEPS = 4
+			for step in range(NUM_STEPS):
+				delta = torch.tensor((1.0 + step)/NUM_STEPS, requires_grad=True)
+				inter_waypt = x[:7] + delta * (x[7:] - x[:7])
+				# Compute feature value.
+				z = self.environment.feat_func_list[feat_idx](self.environment.raw_features(inter_waypt).float(), torchify=True)
+				feat_val = feat_val + z
+			y = feat_val / torch.tensor(float(NUM_STEPS), requires_grad=True)
+			y = y * torch.tensor(self.weights[-n_learned+i:], requires_grad=True) * torch.norm(x[7:] - x[:7])
+			y.backward()
+			J.append(x.grad.data.numpy())
+		return np.sum(np.array(J), axis = 0).reshape((1,-1))
+
+	# TODO: add interpolation for goal_dist cost so it behaves like other costs
 	def gen_goal_cost(self, goal_num):
 		def goal_cost(waypt):
-			feature = self.environment.goal_dist_features(goal_num, waypt)
+			prev_waypt = waypt[0:7]
+			curr_waypt = waypt[7:14]
 			feature_idx = self.feat_list.index('goal'+str(goal_num)+'_dist')
-			return feature*self.weights[feature_idx]
+			feature = self.environment.goal_dist_features(goal_num, waypt)
+			return feature*self.weights[feature_idx]*np.linalg.norm(curr_waypt - prev_waypt)
 		return goal_cost
 
 	# ---- Here's TrajOpt --- #
@@ -185,23 +254,24 @@ class TrajoptPlanner(object):
 
 			s = json.dumps(request)
 			prob = trajoptpy.ConstructProblem(s, self.environment.env)
-
-			for t in range(1,self.num_waypts):
-				if 'coffee' in self.feat_list:
-					prob.AddCost(self.coffee_cost, [(t,j) for j in range(7)], "coffee%i"%t)
-				if 'table' in self.feat_list:
-					prob.AddCost(self.table_cost, [(t,j) for j in range(7)], "table%i"%t)
-				if 'laptop' in self.feat_list:
-					prob.AddErrorCost(self.laptop_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "HINGE", "laptop%i"%t)
-					prob.AddCost(self.laptop_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "laptop%i"%t)
-				if 'origin' in self.feat_list:
-					prob.AddCost(self.origin_cost, [(t,j) for j in range(7)], "origin%i"%t)
-				if 'human' in self.feat_list:
-					prob.AddCost(self.human_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "human%i"%t)
-				if 'efficiency' in self.feat_list:
-					prob.AddCost(self.efficiency_cost, [(t-1,j) for j in range(7)]+[(t,j) for j in range(7)], "efficiency%i"%t)
+			for t in range(1, self.num_waypts):
+				if 'coffee' in self.environment.feat_list:
+					prob.AddCost(self.coffee_cost, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "coffee%i"%t)
+				if 'table' in self.environment.feat_list:
+					prob.AddCost(self.table_cost, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "table%i"%t)
+				if 'laptop' in self.environment.feat_list:
+					prob.AddCost(self.laptop_cost, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "laptop%i"%t)
+				if 'origin' in self.environment.feat_list:
+					prob.AddCost(self.origin_cost, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "origin%i"%t)
+				if 'human' in self.environment.feat_list:
+					prob.AddCost(self.human_cost, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "human%i"%t)
+				if 'efficiency' in self.environment.feat_list:
+					prob.AddCost(self.efficiency_cost, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "efficiency%i"%t)
+				if 'learned_feature' in self.environment.feat_list:
+					prob.AddErrorCost(self.learned_feature_costs, self.learned_feature_cost_derivatives, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "ABS", "learned_features%i"%t)
+			# give goal_dist cost 2 time points like the above costs
 			goal_num = 0
-			while 'goal'+str(goal_num)+'_dist' in self.feat_list:
+			while 'goal'+str(goal_num)+'_dist' in self.environment.feat_list:
 				for t in range(1, self.num_waypts):
 					prob.AddCost(self.gen_goal_cost(goal_num), [(t,j) for j in range(7)], "goal%i_dist%i"%(goal_num, t))
 				goal_num += 1

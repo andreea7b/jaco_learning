@@ -53,13 +53,6 @@ class TeleopInference():
 		self.load_parameters(mode)
 		self.register_callbacks(mode)
 
-		# For presentation recording (TODO: delete later)
-		#recorder = RaveCreateModule(self.sim_environment.env, 'viewerrecorder')
-		#self.sim_environment.env.AddModule(recorder, '')
-		#codecs = recorder.SendCommand('GetCodecs')
-		#filename = 'sim.mpg'
-		#codec = 13
-
 		# Start admittance control mode.
 		if mode == "real":
 			ros_utils.start_admittance_mode(self.prefix)
@@ -84,10 +77,6 @@ class TeleopInference():
 			self.sim_environment.env.SetPhysicsEngine(physics_engine)
 			self.sim_environment.env.StartSimulation(1e-1, True)
 			self.sim_environment.robot.SetDOFValues( np.hstack((self.start, np.array([0,0,0]))) )
-
-			# TODO: remove
-			#self.recorder = recorder
-			#recorder.SendCommand('Start 640 480 30 codec %d timing realtime filename %s\nviewer %s'%(codec, filename, self.sim_environment.env.GetViewer().GetName()))
 
 			loop_iter = 0
 			while not rospy.is_shutdown():
@@ -114,8 +103,14 @@ class TeleopInference():
 		"""
 		# ----- General Setup ----- #
 		self.prefix = rospy.get_param("setup/prefix")
+		self.T = rospy.get_param("setup/T")
+		self.timestep = rospy.get_param("setup/timestep")
+		self.save_dir = rospy.get_param("setup/save_dir")
+
 		self.start = np.array(rospy.get_param("setup/start"))*(math.pi/180.0)
 		self.start += np.random.normal(0, 0.157, self.start.shape)
+
+		# ----- Goals and goal weights setup ----- #
 		# TODO: remove one of these
 		#self.goal_poses = np.array(rospy.get_param("setup/goal_poses"))
 		fixed_goals = np.array(rospy.get_param("setup/goals"))*(math.pi/180.0)
@@ -124,29 +119,38 @@ class TeleopInference():
 			self.goals = np.vstack((fixed_goals, learned_goals))
 		except IOError:
 			self.goals = fixed_goals
-		self.T = rospy.get_param("setup/T")
-		self.timestep = rospy.get_param("setup/timestep")
-		self.save_dir = rospy.get_param("setup/save_dir")
-		self.feat_list = rospy.get_param("setup/feat_list")
-		self.weights = rospy.get_param("setup/feat_weights")
-		self.weights = self.weights + ([0.] * len(self.goals))
-		self.goal_weights = []
-		num_feats = len(self.feat_list)
-		for goal_num in range(len(self.goals)):
-			self.feat_list.append("goal"+str(goal_num)+"_dist")
-			goal_weights = list(self.weights)
-			# comment out this line to turn off goal dist features:
-			#goal_weights[num_feats + goal_num] = 0.1
-			self.goal_weights.append(goal_weights)
+
+		self.feat_list = rospy.get_param("setup/common_feat_list")
+		feat_range = {'table': 0.98,
+					  'coffee': 1.0,
+					  'laptop': 0.3,
+					  'human': 0.3,
+					  'efficiency': 0.22,
+					  'proxemics': 0.3,
+					  'betweenobjects': 0.2}
+		common_weights = rospy.get_param("setup/common_feat_weights")
+		goals_weights = []
+		goal_dist_feat_weight = rospy.get_param("setup/goal_dist_feat_weight")
+		if goal_dist_feat_weight != 0.0:
+			common_weights = common_weights + ([0.] * len(self.goals))
+			num_feats = len(self.feat_list)
+			for goal_num in range(len(self.goals)):
+				self.feat_list.append("goal"+str(goal_num)+"_dist")
+				goal_weights = np.array(common_weights)
+				goal_weights[num_feats + goal_num] = goal_dist_feat_weight
+				goals_weights.append(goal_weights)
+		self.goal_weights = goals_weights
 
 		# Openrave parameters for the environment.
 		model_filename = rospy.get_param("setup/model_filename")
 		object_centers = rospy.get_param("setup/object_centers")
-		self.environment = Environment(model_filename, object_centers,
+		self.environment = Environment(model_filename,
+									   object_centers,
+									   self.feat_list,
+									   feat_range,
 									   goals=self.goals,
-		                               use_viewer=(mode == "real"),
+		                               use_viewer=False,
 									   plot_objects=False)
-		# turns off the viewer for the calculations environment when in sim mode
 		self.goal_locs = self.environment.goal_locs
 
 		# ----- Planner Setup ----- #
@@ -157,12 +161,11 @@ class TeleopInference():
 			num_waypts = rospy.get_param("planner/num_waypts")
 
 			# Initialize planner and compute trajectory to track.
-			self.planner = TrajoptPlanner(self.feat_list, max_iter, num_waypts, self.environment)
+			self.planner = TrajoptPlanner(max_iter, num_waypts, self.environment)
 		else:
 			raise Exception('Planner {} not implemented.'.format(planner_type))
 		# TODO: do something better than goals[0]?
-		self.traj = self.planner.replan(self.start, self.goals[0], None, self.goal_weights[0], self.T, self.timestep)
-		self.traj_plan = self.traj.downsample(self.planner.num_waypts)
+		self.traj, self.traj_plan = self.planner.replan(self.start, self.goals[0], None, self.goal_weights[0], self.T, self.timestep, return_both=True)
 
 		# Track if you have reached the goal of the path and the episode start time
 		self.start_T = None
@@ -203,10 +206,11 @@ class TeleopInference():
 
 		# ----- Learner Setup ----- #
 		betas = np.array(rospy.get_param("learner/betas"))
-		if len(fixed_goals) == len(self.goals):
-			goal_beliefs = np.ones(len(self.goals))/len(self.goals)
-		else:
+		if len(fixed_goals) == len(self.goals): # no learned goals
 			goal_beliefs = rospy.get_param("learner/goal_beliefs")
+			goal_beliefs = goal_beliefs / np.linalg.norm(goal_beliefs)
+		else:
+			goal_beliefs = np.ones(len(self.goals))/len(self.goals)
 		beta_priors = rospy.get_param("learner/beta_priors")
 		inference_method = rospy.get_param("learner/inference_method")
 		self.beta_method = rospy.get_param("learner/beta_method")
@@ -214,8 +218,6 @@ class TeleopInference():
 		self.running_inference = False
 		self.last_inf_idx = 0
 		self.running_final_inference = False
-
-		#import pdb; pdb.set_trace()
 
 		# ----- Input Device Setup ----- #
 		self.joy_environment = Environment(model_filename, object_centers,
@@ -342,7 +344,7 @@ class TeleopInference():
 				for k in range(3):
 					Jt = self.joy_environment.robot.ComputeJacobianTranslation(7, xyz)
 					#Jo = self.joy_environment.robot.ComputeJacobianAxisAngle(7)
-					J = Jt 
+					J = Jt
 					#J = np.vstack((Jt, Jo))
 
 					#J = self.get_jacobian(self.joy_environment.robot, xyz) #TODO

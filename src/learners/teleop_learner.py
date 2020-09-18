@@ -21,7 +21,7 @@ class TeleopLearner(object):
 		self.betas = betas
 
 		self.last_inf_idx = 0 # holds the index of the last time from which inference was run
-		
+
 		if inference_method == "none":
 			self.inference_step = self._no_inference
 			self.final_step = self._no_inference_final
@@ -35,7 +35,7 @@ class TeleopLearner(object):
 		for i in range(len(goal_priors)):
 			traj, traj_plan = main.planner.replan(main.start, main.goals[i], list(main.goal_locs[i]), main.goal_weights[i],
 												  main.T, main.timestep, return_both=True)
-			traj_cost = np.sum(main.goal_weights[i] * np.sum(main.environment.featurize(traj.waypts, main.feat_list), axis=1))
+			traj_cost = np.sum(main.goal_weights[i] * np.sum(main.environment.featurize(traj.waypts), axis=1))
 			self.optimal_costs[i] = traj_cost
 			self.cache['goal_traj_by_idx'][0].append(traj)
 			self.cache['goal_traj_plan_by_idx'][0].append(traj_plan)
@@ -71,7 +71,7 @@ class TeleopLearner(object):
 		print 'doing inference from', this_idx
 		curr_traj = main.traj_hist[:this_idx + 1]
 		curr_pos = curr_traj[-1]
-		curr_traj_features = np.sum(main.environment.featurize(curr_traj, main.feat_list), axis=1)
+		curr_traj_features = np.sum(main.environment.featurize(curr_traj), axis=1)
 		curr_traj_costs = np.array([np.sum(main.goal_weights[i] * curr_traj_features) for i in range(len(self.goal_beliefs))])
 		goal_traj_costs = np.zeros(len(self.goal_beliefs))
 		curr_time = this_idx * main.timestep
@@ -92,7 +92,7 @@ class TeleopLearner(object):
 			goal_waypt = self.cache['goal_traj_plan_by_idx'][self.last_inf_idx][i].waypts[-1]
 			goal_traj, goal_traj_plan = main.planner.replan(curr_pos, goal_waypt, list(main.goal_locs[i]), main.goal_weights[i],
 											                main.T - curr_time, main.timestep, return_both=True)
-			goal_traj_costs[i] = np.sum(main.goal_weights[i] * np.sum(main.environment.featurize(goal_traj.waypts, main.feat_list), axis=1))
+			goal_traj_costs[i] = np.sum(main.goal_weights[i] * np.sum(main.environment.featurize(goal_traj.waypts), axis=1))
 			print 'planned goal traj len', len(goal_traj.waypts)
 			self.cache['goal_traj_by_idx'][this_idx].append(goal_traj)
 			self.cache['goal_traj_plan_by_idx'][this_idx].append(goal_traj_plan)
@@ -126,7 +126,7 @@ class TeleopLearner(object):
 
 	def _dragan_update_final(self, is_joint):
 		main = self.main
-		traj_features = np.sum(main.environment.featurize(main.traj_hist, main.feat_list), axis=1)
+		traj_features = np.sum(main.environment.featurize(main.traj_hist), axis=1)
 		traj_costs = np.array([np.sum(main.goal_weights[i] * traj_features) for i in range(len(self.goal_beliefs))])
 		constraint_costs = np.zeros(len(self.goal_beliefs))
 		this_idx = len(main.traj_hist)

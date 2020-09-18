@@ -2,20 +2,23 @@ setup:
     prefix: 'j2s7s300_driver'
     model_filename: "jaco_dynamics"
     object_centers: {'HUMAN_CENTER': [-0.6,-0.55,0.0], 'LAPTOP_CENTER': [-0.7929,-0.1,0.0]}
-    feat_list: ['efficiency']
-    feat_weights: [1.0]
+    # for the features and weights that are shared between all goals
+    common_feat_list: ['efficiency']
+    common_feat_weights: [1.0]
     #start: [180.0, 160.0, 175.0, 40.0, 275.0, 180.0, 280.0]
     #goals: [
     #    [160.0, 90.0, 180.0, 160.0, 270.0, 180.0, 280.0],
     #    [200.0, 90.0, 180.0, 160.0, 270.0, 180.0, 280.0]
     #]
     start: [180.0, 150.0, 180.0, 270.0, 180.0, 180.0, 190.0]
+    # for generating goal-specific feature weights
     goals: [
         #[140.0, 90.0, 180.0, 160.0, 270.0, 180.0, 280.0],
         #[220.0, 90.0, 180.0, 160.0, 270.0, 180.0, 280.0],
         [150.0, 130.0, 160.0, 240.0, 180.0, 172.0, 280.0],
         [210.0, 130.0, 200.0, 240.0, 180.0, 172.0, 280.0]
     ]
+    goal_dist_feat_weight: 0.0
     T: 20.0
     timestep: 0.5
     save_dir: "/data/teleoperation/"
