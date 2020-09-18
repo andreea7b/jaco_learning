@@ -340,7 +340,7 @@ class TeleopInference():
 		#dis = self.get_target_displacement(joy_input) #TODO
 
 		# clamp/scale dis
-		dis = dis * 0.5 / FREQ
+		dis = dis * 0.25 / FREQ
 		#dis = np.clip(dis, -0.5, 0.5)
 
 		err = dis
