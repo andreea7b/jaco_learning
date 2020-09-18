@@ -132,6 +132,7 @@ class TeleopInference():
 		goals_weights = []
 		goal_dist_feat_weight = rospy.get_param("setup/goal_dist_feat_weight")
 		if goal_dist_feat_weight != 0.0:
+			# add features for distance from each of the goals
 			common_weights = common_weights + ([0.] * len(self.goals))
 			num_feats = len(self.feat_list)
 			for goal_num in range(len(self.goals)):
@@ -139,6 +140,10 @@ class TeleopInference():
 				goal_weights = np.array(common_weights)
 				goal_weights[num_feats + goal_num] = goal_dist_feat_weight
 				goals_weights.append(goal_weights)
+		else:
+			# make copies of the common weights
+			for goal_num in range(len(self.goals)):
+				goals_weights.append(np.array(common_weights))
 		self.goal_weights = goals_weights
 
 		# Openrave parameters for the environment.

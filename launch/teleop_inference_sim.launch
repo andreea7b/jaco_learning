@@ -6,7 +6,7 @@
 
 	<!-- joy node -->
 	<node respawn="true" pkg="joy" type="joy_node" name="turtle_joy" >
-		<param name="dev" type="string" value="/dev/input/js1" />
+		<param name="dev" type="string" value="/dev/input/js2" />
 		<param name="autorepeat_rate" type="double" value="10" />
 	</node>
 

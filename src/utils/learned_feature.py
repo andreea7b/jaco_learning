@@ -6,7 +6,7 @@ import math
 from tqdm import trange
 import itertools
 from transform_input import transform_input, get_subranges
-from networks import DNN
+from maxent_irl.maxent_irl_utils import DNN
 from torch.utils.data import Dataset, DataLoader
 
 
