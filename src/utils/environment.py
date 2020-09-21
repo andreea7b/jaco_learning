@@ -147,11 +147,11 @@ class Environment(object):
 			featval -- feature value
 		"""
 		# If it's a learned feature, feed in raw_features to the NN.
-		if self.feat_list[feat_idx] == 'learned_feature':
+		if 'learned_feature' in self.feat_list[feat_idx]:
 			waypt = self.raw_features(waypt)
 		# Compute feature value.
 		featval = self.feat_func_list[feat_idx](waypt)
-		if self.feat_list[feat_idx] == 'learned_feature':
+		if 'learned_feature': in self.feat_list[feat_idx]:
 			featval = featval[0][0]
 		else:
 			if self.feat_range is not None:
@@ -272,9 +272,9 @@ class Environment(object):
 
 	# -- Instantiate a new learned feature -- #
 
-	def new_learned_feature(self, nb_layers, nb_units, checkpoint_name=None):
+	def new_FERL_learned_feature(self, nb_layers, nb_units, checkpoint_name=None):
 		"""
-		Adds a new learned feature to the environment.
+		Adds a new FERL learned feature to the environment.
 		--
 		Params:
 			nb_layers -- number of NN layers
@@ -294,6 +294,36 @@ class Environment(object):
 			here = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../../'))
 			self.learned_feats[-1] = torch.load(here+'/data/final_models/' + checkpoint_name)
 
+		self.feat_func_list.append(self.learned_feats[-1].function)
+
+	def load_meirl_learned_feature(self, planner, weight, save_dict_path):
+		save_dict = torch.load(save_dict_path)
+		self.new_meirl_learned_feature(planner,
+									   weight,
+									   save_dict['s_g_exp_trajs'],
+									   save_dict['goal_poses'],
+									   save_dict['known_feat_list'],
+									   save_dict['NN_dict'],
+									   save_dict['gen'])
+		meirl_obj = self.learned_feats[-1]
+		meirl_obj.cost_nn.load_state_dict(save_dict['cost_nn'])
+		meirl_obj.max_label = save_dict['max_label']
+		meirl_obj.min_label = save_dict['min_label']
+
+
+	def new_meirl_learned_feature(self, planner, weight, s_g_exp_trajs, goal_poses, known_feat_list, NN_dict, gen, T=20., timestep=0.5):
+		"""
+		Adds a new maxent irl learned feature to the environment.
+		--
+		Params:
+			nb_layers -- number of NN layers
+			nb_units -- number of NN units per layer
+			checkpoint_name -- name of NN model to load (optional)
+		"""
+		meirl_obj = DeepMaxEntIRL(self, planner, weight, s_g_exp_trajs, goal_poses, known_feat_list, NN_dict, gen, T, timestep)
+		self.learned_feats.append(meirl_obj)
+		self.feat_list.append('learned_feature')
+		self.num_feats += 1
 		self.feat_func_list.append(self.learned_feats[-1].function)
 
 	# -- Goal Distance -- #

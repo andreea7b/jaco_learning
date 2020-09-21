@@ -35,23 +35,12 @@ class DeepMaxEntIRL:
 
 	"""
 
-	def __init__(self, s_g_exp_trajs, goal_poses, known_feat_list, NN_dict, gen, T=20., timestep=0.5,
-				 obj_center_dict = {'HUMAN_CENTER': [-0.6, -0.55, 0.0], 'LAPTOP_CENTER': [-0.8, 0., 0.]},
-				 feat_range_dict={'table': 0.98, 'coffee': 1.0, 'laptop': 0.3, 'human': 0.3, 'efficiency': 0.22,'proxemics': 0.3, 'betweenobjects': 0.2}):
-
-		# Create an Env with only ReLuNet as learned FT, weight 1
-		env, planner = init_env(feat_list=[], weights=[], object_centers=obj_center_dict, feat_range=feat_range_dict)
+	def __init__(self, env, planner, weight, s_g_exp_trajs, goal_poses, known_feat_list, NN_dict, gen, T=20., timestep=0.5):		
 		self.planner = planner
+		self.weight # weight to use in planner for this feature
 		# planner settings
 		self.T = T
 		self.timestep = timestep
-
-		# Make Env IRL ready
-		env.learned_features.append(self)
-		env.feature_list.append('learned_feature')
-		env.num_features += 1
-		env.weights = np.array([1.])
-		env.feature_func_list.append(self.function)
 
 		self.env = env
 		self.gen = gen
@@ -153,8 +142,9 @@ class DeepMaxEntIRL:
 			Output:  	List of n_traj induced trajectories in 97D
 		"""
 		if self.gen == 'waypt':
-			cur_rew_traj = generate_Gaus_MaxEnt_trajs(self.planner, std,
+			cur_rew_traj = generate_Gaus_MaxEnt_trajs(self.planner, self.weight, std,
 													  n_traj, start, goal, pose, self.T, self.timestep)
+		# note/TODO: 'cost' doesn't work
 		elif self.gen == 'cost':
 			cur_rew_traj = generate_cost_perturb_trajs(self.planner, self.env, std,
 													   n_traj, start, goal, pose, self.T, self.timestep)
@@ -236,3 +226,18 @@ class DeepMaxEntIRL:
 
 		# update normalizer once in the end
 		self.update_normalizer()
+
+	def save(self, path):
+	    torch.save({
+	        "known_feat_list": self.known_feat_list,
+	        "s_g_exp_trajs": self.s_g_exp_trajs,
+	        "goal_poses": self.goal_poses,
+	        "NN_dict": self.NN_dict,
+	        "gen": self.gen,
+	        "cost_nn_state_dict": self.cost_nn.state_dict()
+	        "max_label": self.max_label,
+	        "min_label": self.min_label
+	    }, path)
+
+	def load_cost_nn_state_dict(self, state_dict):
+		self.cost_nn.load_state_dict(state_dict)
