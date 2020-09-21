@@ -72,6 +72,23 @@ def robotToCartesian(robot):
 
 	return cartesian
 
+def robotToOrientation(robot):
+	"""
+	Converts robot configuration into a list of z-axis
+	orientations for each of the robot's links.
+	------
+	Returns: 7-dimensional list of 3 xyz values
+	"""
+	links = robot.GetLinks()
+	orientation = [None]*7
+	i = 0
+	for i in range(1,8):
+		link = links[i]
+		tf = link.GetTransform()
+		orientation[i-1] = tf[:3,:3]
+
+	return orientation
+
 def manipToCartesian(robot, offset_z):
 	"""
 	Gets center of robot's manipulator in cartesian space

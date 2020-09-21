@@ -190,7 +190,7 @@ class TeleopInference():
 		for i in range(len(self.goal_weights)):
 			self.goal_weights[i] = np.hstack((self.goal_weights[i], 0))
 		learned_goal_weight = np.array(common_weights)
-		learned_goal_weight[len(self.goal_weights)] = 1.
+		learned_goal_weight[len(self.feat_list)] = 1.
 		self.goal_weights.append(learned_goal_weight)
 
 		# 2. add cost to environment

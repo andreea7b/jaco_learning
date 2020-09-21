@@ -1,5 +1,5 @@
 from maxent_irl_utils import *
-from src.utils.transform_input import transform_input, get_subranges
+from utils.transform_input import transform_input, get_subranges
 import random
 import torch.optim as optim
 from tqdm import trange
@@ -35,9 +35,9 @@ class DeepMaxEntIRL:
 
 	"""
 
-	def __init__(self, env, planner, weight, s_g_exp_trajs, goal_poses, known_feat_list, NN_dict, gen, T=20., timestep=0.5):		
+	def __init__(self, env, planner, weight, s_g_exp_trajs, goal_poses, known_feat_list, NN_dict, gen, T=20., timestep=0.5):
 		self.planner = planner
-		self.weight # weight to use in planner for this feature
+		self.weight = weight # weight to use in planner for this feature
 		# planner settings
 		self.T = T
 		self.timestep = timestep
@@ -47,9 +47,10 @@ class DeepMaxEntIRL:
 
 		# care about known features
 		self.known_feat_list = known_feat_list
-		self.known_feat_transformer = TorchFeatureTransform(obj_center_dict, known_feat_list, feat_range_dict)
+		self.known_feat_transformer = TorchFeatureTransform(env.object_centers, known_feat_list, env.feat_range)
 
 		# get some derivative data from the s_g_exp_trajs
+		self.init_s_g_exp_trajs = s_g_exp_trajs
 		self.s_g_exp_trajs = []
 		self.starts = []
 		self.goals = []
@@ -230,11 +231,11 @@ class DeepMaxEntIRL:
 	def save(self, path):
 	    torch.save({
 	        "known_feat_list": self.known_feat_list,
-	        "s_g_exp_trajs": self.s_g_exp_trajs,
+	        "s_g_exp_trajs": self.init_s_g_exp_trajs,
 	        "goal_poses": self.goal_poses,
 	        "NN_dict": self.NN_dict,
 	        "gen": self.gen,
-	        "cost_nn_state_dict": self.cost_nn.state_dict()
+	        "cost_nn_state_dict": self.cost_nn.state_dict(),
 	        "max_label": self.max_label,
 	        "min_label": self.min_label
 	    }, path)

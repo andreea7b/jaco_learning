@@ -9,6 +9,9 @@ from openravepy import *
 
 from utils.openrave_utils import *
 #from learned_feature import LearnedFeature
+#import sys
+#sys.path.insert(0, './../maxent_irl')
+from maxent_irl.maxent_irl import DeepMaxEntIRL
 
 
 class Environment(object):
@@ -151,7 +154,7 @@ class Environment(object):
 			waypt = self.raw_features(waypt)
 		# Compute feature value.
 		featval = self.feat_func_list[feat_idx](waypt)
-		if 'learned_feature': in self.feat_list[feat_idx]:
+		if 'learned_feature' in self.feat_list[feat_idx]:
 			featval = featval[0][0]
 		else:
 			if self.feat_range is not None:
@@ -306,7 +309,7 @@ class Environment(object):
 									   save_dict['NN_dict'],
 									   save_dict['gen'])
 		meirl_obj = self.learned_feats[-1]
-		meirl_obj.cost_nn.load_state_dict(save_dict['cost_nn'])
+		meirl_obj.cost_nn.load_state_dict(save_dict['cost_nn_state_dict'])
 		meirl_obj.max_label = save_dict['max_label']
 		meirl_obj.min_label = save_dict['min_label']
 
