@@ -35,7 +35,8 @@ class TeleopLearner(object):
 		for i in range(len(goal_priors)):
 			traj, traj_plan = main.planner.replan(main.start, main.goals[i], list(main.goal_locs[i]), main.goal_weights[i],
 												  main.T, main.timestep, return_both=True)
-			traj_cost = np.sum(main.goal_weights[i] * np.sum(main.environment.featurize(traj.waypts), axis=1))
+			support = np.arange(len(main.goal_weights[i]))[main.goal_weights[i] != 0.0]
+			traj_cost = np.sum(main.goal_weights[i][support] * np.sum(main.environment.featurize(traj.waypts, support), axis=1))
 			self.optimal_costs[i] = traj_cost
 			self.cache['goal_traj_by_idx'][0].append(traj)
 			self.cache['goal_traj_plan_by_idx'][0].append(traj_plan)
@@ -92,7 +93,8 @@ class TeleopLearner(object):
 			goal_waypt = self.cache['goal_traj_plan_by_idx'][self.last_inf_idx][i].waypts[-1]
 			goal_traj, goal_traj_plan = main.planner.replan(curr_pos, goal_waypt, list(main.goal_locs[i]), main.goal_weights[i],
 											                main.T - curr_time, main.timestep, return_both=True)
-			goal_traj_costs[i] = np.sum(main.goal_weights[i] * np.sum(main.environment.featurize(goal_traj.waypts), axis=1))
+			support = np.arange(len(main.goal_weights[i]))[main.goal_weights[i] != 0.0]
+			goal_traj_costs[i] = np.sum(main.goal_weights[i][support] * np.sum(main.environment.featurize(goal_traj.waypts, support), axis=1))
 			print 'planned goal traj len', len(goal_traj.waypts)
 			self.cache['goal_traj_by_idx'][this_idx].append(goal_traj)
 			self.cache['goal_traj_plan_by_idx'][this_idx].append(goal_traj_plan)

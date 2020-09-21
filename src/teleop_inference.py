@@ -113,10 +113,10 @@ class TeleopInference():
 		# ----- Goals and goal weights setup ----- #
 		# TODO: remove one of these
 		#self.goal_poses = np.array(rospy.get_param("setup/goal_poses"))
-		fixed_goals = np.array(rospy.get_param("setup/goals"))*(math.pi/180.0)
+		fixed_goals = [np.array(goal)*(math.pi/180.0) for goal in rospy.get_param("setup/goals")]
 		try:
 			learned_goals = np.load('learned_goals.npy')
-			self.goals = np.vstack((fixed_goals, learned_goals))
+			self.goals = fixed_goals + learned_goals
 		except IOError:
 			self.goals = fixed_goals
 
@@ -193,9 +193,10 @@ class TeleopInference():
 		learned_goal_weight[len(self.feat_list)] = 1.
 		self.goal_weights.append(learned_goal_weight)
 
+		# this reuses the first goal for the learned feature
 		# 2. add cost to environment
 		meirl_goal_save_path = "/root/catkin_ws/src/jaco_learning/data/pour_red_meirl.pt"
-		self.environment.load_meirl_learned_feature(self.planner, learned_goal_weight, meirl_goal_save_path)
+		self.environment.load_meirl_learned_feature(self.planner, learned_goal_weight, self.goals[0], meirl_goal_save_path)
 
 		# ----- Controller Setup ----- #
 		# Retrieve controller specific parameters.
@@ -224,11 +225,13 @@ class TeleopInference():
 
 		# ----- Learner Setup ----- #
 		betas = np.array(rospy.get_param("learner/betas"))
-		if len(fixed_goals) == len(self.goals): # no learned goals
-			goal_beliefs = rospy.get_param("learner/goal_beliefs")
+		goal_beliefs = rospy.get_param("learner/goal_beliefs")
+		if goal_beliefs != "none":
 			goal_beliefs = goal_beliefs / np.linalg.norm(goal_beliefs)
 		else:
 			goal_beliefs = np.ones(len(self.goals))/len(self.goals)
+		assert(len(goal_beliefs) == len(self.goals))
+		assert(len(goal_beliefs) == len(self.goal_weights))
 		beta_priors = rospy.get_param("learner/beta_priors")
 		inference_method = rospy.get_param("learner/inference_method")
 		self.beta_method = rospy.get_param("learner/beta_method")

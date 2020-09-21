@@ -5,19 +5,14 @@ setup:
     # for the features and weights that are shared between all goals
     common_feat_list: ['efficiency']
     common_feat_weights: [1.0]
-    #start: [180.0, 160.0, 175.0, 40.0, 275.0, 180.0, 280.0]
-    #goals: [
-    #    [160.0, 90.0, 180.0, 160.0, 270.0, 180.0, 280.0],
-    #    [200.0, 90.0, 180.0, 160.0, 270.0, 180.0, 280.0]
-    #]
     start: [180.0, 150.0, 180.0, 270.0, 180.0, 180.0, 190.0]
-    # for generating goal-specific feature weights
     goals: [
         #[140.0, 90.0, 180.0, 160.0, 270.0, 180.0, 280.0],
         #[220.0, 90.0, 180.0, 160.0, 270.0, 180.0, 280.0],
         [150.0, 130.0, 160.0, 240.0, 180.0, 172.0, 280.0],
         [210.0, 130.0, 200.0, 240.0, 180.0, 172.0, 280.0]
     ]
+    # for generating goal-specific feature weights
     goal_dist_feat_weight: 0.0
     T: 20.0
     timestep: 0.5
@@ -40,11 +35,11 @@ controller:
 
 learner:
     betas: [0.1, 1, 10.]
-    goal_beliefs: [0.5, 0.5] #just for debugging, if there are saved goals then uniform gets used
+    goal_beliefs: "none" #if 'none' then uniform gets used
     inference_method: "dragan"
     #inference_method: "none"
     assistance_method: "blend"
     #assistance_method: "none"
     beta_method: "estimate"
     #beta_priors: [0.4, 0.4, 0.2] # if "joint" these are probabilities
-    beta_priors: [2, 2] #if "estimate" these are exponential rate parameters
+    beta_priors: [2, 2, 2] #if "estimate" these are exponential rate parameters

@@ -173,7 +173,7 @@ class TrajoptPlanner(object):
 
 	# ---- Here's TrajOpt --- #
 
-	def trajOpt(self, start, goal, goal_pose, traj_seed=None):
+	def trajOpt(self, start, goal, goal_pose, traj_seed=None, goal_constraint=True):
 		"""
 		Computes a plan from start to goal using trajectory optimizer.
 		Reference: http://joschu.net/docs/trajopt-paper.pdf
@@ -188,6 +188,11 @@ class TrajoptPlanner(object):
 			waypts_plan -- A downsampled trajectory resulted from the TrajOpt
 			optimization problem solution.
 		"""
+		support = np.arange(len(self.weights))[self.weights != 0.0]
+		nonzero_feat_list = np.array(self.environment.feat_list)[support]
+		print "Planning with features:", nonzero_feat_list
+
+		goal_constraint = not ("learned_feature" in nonzero_feat_list)
 
 		# --- Initialization --- #
 		if len(start) < 10:
@@ -222,7 +227,7 @@ class TrajoptPlanner(object):
 									}
 					}
 				]
-			else:
+			elif goal_constraint:
 				print("Using goal for trajopt computation.")
 				constraint = [
 					{
@@ -230,7 +235,8 @@ class TrajoptPlanner(object):
 						"params": {"vals": goal.tolist()}
 					}
 				]
-
+			else:
+				constraint = []
 			request = {
 				"basic_info": {
 					"n_steps": self.num_waypts,
@@ -240,10 +246,10 @@ class TrajoptPlanner(object):
 				},
 				# this is implemented instead through the use of the efficiency feature
 				"costs": [
-				{
-					"type": "joint_vel",
-					"params": {"coeffs": [0.0]}
-				}
+				#{
+				#	"type": "joint_vel",
+				#	"params": {"coeffs": [0.0]}
+				#}
 				],
 				"constraints": constraint,
 				"init_info": {
@@ -255,23 +261,23 @@ class TrajoptPlanner(object):
 			s = json.dumps(request)
 			prob = trajoptpy.ConstructProblem(s, self.environment.env)
 			for t in range(1, self.num_waypts):
-				if 'coffee' in self.environment.feat_list:
+				if 'coffee' in nonzero_feat_list:
 					prob.AddCost(self.coffee_cost, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "coffee%i"%t)
-				if 'table' in self.environment.feat_list:
+				if 'table' in nonzero_feat_list:
 					prob.AddCost(self.table_cost, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "table%i"%t)
-				if 'laptop' in self.environment.feat_list:
+				if 'laptop' in nonzero_feat_list:
 					prob.AddCost(self.laptop_cost, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "laptop%i"%t)
-				if 'origin' in self.environment.feat_list:
+				if 'origin' in nonzero_feat_list:
 					prob.AddCost(self.origin_cost, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "origin%i"%t)
-				if 'human' in self.environment.feat_list:
+				if 'human' in nonzero_feat_list:
 					prob.AddCost(self.human_cost, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "human%i"%t)
-				if 'efficiency' in self.environment.feat_list:
+				if 'efficiency' in nonzero_feat_list:
 					prob.AddCost(self.efficiency_cost, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "efficiency%i"%t)
-				if 'learned_feature' in self.environment.feat_list:
+				if 'learned_feature' in nonzero_feat_list:
 					prob.AddErrorCost(self.learned_feature_costs, self.learned_feature_cost_derivatives, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "ABS", "learned_features%i"%t)
 			# give goal_dist cost 2 time points like the above costs
 			goal_num = 0
-			while 'goal'+str(goal_num)+'_dist' in self.environment.feat_list:
+			while 'goal'+str(goal_num)+'_dist' in nonzero_feat_list:
 				for t in range(1, self.num_waypts):
 					prob.AddCost(self.gen_goal_cost(goal_num), [(t,j) for j in range(7)], "goal%i_dist%i"%(goal_num, t))
 				goal_num += 1

@@ -46,14 +46,14 @@ class Environment(object):
 				self.robot.SetDOFValues(angles)
 				cartesian_coords = robotToCartesian(self.robot)
 				goal_loc = cartesian_coords[6]
-				self.goal_locs.append(goal_loc)
+				self.goal_locs.append(np.array(goal_loc))
 				if i == 0:
 					color = [1, 0, 0]
 				else:
 					color = [0, 0, 1]
 				i += 1
 				plotSphere(self.env, self.bodies, goal_loc, 0.05, color=color) # TODO: change colors
-		self.goal_locs = np.array(self.goal_locs)
+		#self.goal_locs = np.array(self.goal_locs)
 
 		# true goal for presentation
 		goal = np.array([260.0, 90.0, 180.0, 160.0, 270.0, 180.0, 280.0])*np.pi/180
@@ -299,7 +299,7 @@ class Environment(object):
 
 		self.feat_func_list.append(self.learned_feats[-1].function)
 
-	def load_meirl_learned_feature(self, planner, weight, save_dict_path):
+	def load_meirl_learned_feature(self, planner, weight, goal, save_dict_path):
 		save_dict = torch.load(save_dict_path)
 		self.new_meirl_learned_feature(planner,
 									   weight,
@@ -312,7 +312,7 @@ class Environment(object):
 		meirl_obj.cost_nn.load_state_dict(save_dict['cost_nn_state_dict'])
 		meirl_obj.max_label = save_dict['max_label']
 		meirl_obj.min_label = save_dict['min_label']
-
+		self.add_goal(goal)
 
 	def new_meirl_learned_feature(self, planner, weight, s_g_exp_trajs, goal_poses, known_feat_list, NN_dict, gen, T=20., timestep=0.5):
 		"""
@@ -328,6 +328,16 @@ class Environment(object):
 		self.feat_list.append('learned_feature')
 		self.num_feats += 1
 		self.feat_func_list.append(self.learned_feats[-1].function)
+
+	def add_goal(self, goal):
+		self.goals.append(np.array(goal))
+		with self.robot:
+			angles = goal if len(goal) == 10 else np.append(goal, np.array([0,0,0]))
+			self.robot.SetDOFValues(angles)
+			cartesian_coords = robotToCartesian(self.robot)
+			goal_loc = cartesian_coords[6]
+			self.goal_locs.append(np.array(goal_loc))
+			plotSphere(self.env, self.bodies, goal_loc, 0.05, color=[1,1,1])
 
 	# -- Goal Distance -- #
 
