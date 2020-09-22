@@ -126,7 +126,7 @@ class TrajoptPlanner(object):
 		for i, feature in enumerate(self.environment.learned_feats):
 			# get the value of the feature
 			feat_idx = self.environment.num_feats - n_learned + i
-			feature_values.append(self.interpolate_features(curr_waypt, prev_waypt, feat_idx))
+			feature_values.append(self.interpolate_features(curr_waypt, prev_waypt, feat_idx, NUM_STEPS=1)) # CHANGED
 		# calculate the cost
 		return np.matmul(self.weights[-n_learned:], np.array(feature_values))*np.linalg.norm(curr_waypt - prev_waypt)
 
@@ -148,7 +148,7 @@ class TrajoptPlanner(object):
 			# Get the value of the feature
 			feat_idx = self.environment.num_feats - n_learned + i
 			feat_val = torch.tensor(0.0, requires_grad=True)
-			NUM_STEPS = 4
+			NUM_STEPS = 1 # CHANGED
 			for step in range(NUM_STEPS):
 				delta = torch.tensor((1.0 + step)/NUM_STEPS, requires_grad=True)
 				inter_waypt = x[:7] + delta * (x[7:] - x[:7])

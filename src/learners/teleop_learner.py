@@ -173,6 +173,7 @@ class TeleopLearner(object):
 		if (is_joint and self.argmax_joint_beliefs[1] < 0.3) or (not is_joint and self.argmax_estimate[1] < 0.3):
 			# learn new goal here
 			print 'detected new goal:', main.traj_hist[-1]
+		#import pdb; pdb.set_trace()
 
 		#np.save('/home/matthew/traj_hist_nobj10.npy', np.array(main.traj_hist))
 		#print 'saved trajectory'
