@@ -173,10 +173,15 @@ class TeleopLearner(object):
 		if (is_joint and self.argmax_joint_beliefs[1] < 0.3) or (not is_joint and self.argmax_estimate[1] < 0.3):
 			# learn new goal here
 			print 'detected new goal:', main.traj_hist[-1]
+		from utils.openrave_utils import plotTraj
+		plotTraj(main.sim_environment.env, main.sim_environment.robot, main.sim_environment.bodies, self.cache['goal_traj_plan_by_idx'][1][2].waypts, 0.05, [1,0,0])
+		plotTraj(main.sim_environment.env, main.sim_environment.robot, main.sim_environment.bodies, [main.start], 0.05, [1,0,1])
+		plotTraj(main.sim_environment.env, main.sim_environment.robot, main.sim_environment.bodies, self.cache['goal_traj_plan_by_idx'][1][1].waypts, 0.05, [0,1,0])
 		#import pdb; pdb.set_trace()
 
 		#np.save('/home/matthew/traj_hist_nobj10.npy', np.array(main.traj_hist))
 		#print 'saved trajectory'
+		main.final_inference_done=True
 
 	def _no_inference(self):
 		main = self.main
@@ -189,6 +194,7 @@ class TeleopLearner(object):
 		main = self.main
 		np.save('/root/catkin_ws/src/jaco_learning/data/pour_red4.npy', np.array(main.traj_hist))
 		print 'saved trajectory'
+		main.final_inference_done = True
 
 
 

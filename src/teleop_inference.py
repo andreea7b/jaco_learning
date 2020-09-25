@@ -239,6 +239,7 @@ class TeleopInference():
 		self.running_inference = False
 		self.last_inf_idx = 0
 		self.running_final_inference = False
+		self.final_inference_done = False
 
 		# ----- Input Device Setup ----- #
 		self.joy_environment = Environment(model_filename,
@@ -270,11 +271,11 @@ class TeleopInference():
 			# Create joint-velocity publisher.
 			self.vel_pub = rospy.Publisher(self.prefix + '/in/joint_velocity', kinova_msgs.msg.JointVelocity, queue_size=1)
 			# Create subscriber to joint_angles.
-			rospy.Subscriber(self.prefix + '/out/joint_angles', kinova_msgs.msg.JointAngles, self.joint_angles_callback, queue_size=1)
+			self.joint_subscriber = rospy.Subscriber(self.prefix + '/out/joint_angles', kinova_msgs.msg.JointAngles, self.joint_angles_callback, queue_size=1)
 		elif mode == "sim":
 			pass
 		# Create subscriber to input joystick.
-		rospy.Subscriber('joy', Joy, self.joystick_input_callback, queue_size=1)
+		self.joy_subscriber = rospy.Subscriber('joy', Joy, self.joystick_input_callback, queue_size=1)
 
 	def joint_angles_callback(self, msg):
 		"""
@@ -303,6 +304,9 @@ class TeleopInference():
 				self.inference_thread.join()
 				self.inference_thread = Thread(target=self.learner.final_step)
 				self.inference_thread.start()
+			elif self.final_inference_done:
+				self.joy_subscriber.unregister()
+				
 
 		ctl_cmd = self.controller.get_command(self.curr_pos)
 		if self.assistance_method == "blend":

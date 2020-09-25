@@ -192,7 +192,7 @@ def plotTraj(env,robot,bodies,waypts, size=10, color=[0, 1, 0]):
 	for i in range(0,len(waypts),1):
 		waypoint = waypts[i]
 		dof = np.append(waypoint, np.array([1, 1, 1]))
-		dof[2] += math.pi
+		#dof[2] += math.pi
 		print dof
 		robot.SetDOFValues(dof)
 		coord = robotToCartesian(robot)
