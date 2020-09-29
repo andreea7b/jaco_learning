@@ -102,7 +102,7 @@ class TeleopLearner(object):
 		#print 'goal traj costs', goal_traj_costs
 		#print 'optimal_costs', self.optimal_costs
 		suboptimality = curr_traj_costs + goal_traj_costs - self.optimal_costs
-		suboptimality *= (3.5 / (0.01 * 1.))
+		suboptimality *= (1. / self.optimal_costs)
 		print 'suboptimality:', suboptimality
 		print 'suboptimality/time:', suboptimality / this_idx
 		if is_joint: # joint inference over beta and goals
@@ -141,7 +141,7 @@ class TeleopLearner(object):
 				constraint_costs[i] *= 10 # TODO: tune
 		print 'constraint_costs', constraint_costs
 		suboptimality = traj_costs + constraint_costs - self.optimal_costs
-		suboptimality *= (3.5 / (0.01 * 1.))
+		suboptimality *= (1. / self.optimal_costs)
 		print 'curr traj costs', traj_costs
 		print 'optimal_costs', self.optimal_costs
 		print 'final suboptimality:', suboptimality
@@ -177,6 +177,7 @@ class TeleopLearner(object):
 		plotTraj(main.sim_environment.env, main.sim_environment.robot, main.sim_environment.bodies, self.cache['goal_traj_plan_by_idx'][1][2].waypts, 0.05, [1,0,0])
 		plotTraj(main.sim_environment.env, main.sim_environment.robot, main.sim_environment.bodies, [main.start], 0.05, [1,0,1])
 		plotTraj(main.sim_environment.env, main.sim_environment.robot, main.sim_environment.bodies, self.cache['goal_traj_plan_by_idx'][1][1].waypts, 0.05, [0,1,0])
+		print 'joint6_assist', main.exp_data['joint6_assist']
 		#import pdb; pdb.set_trace()
 
 		#np.save('/home/matthew/traj_hist_nobj10.npy', np.array(main.traj_hist))

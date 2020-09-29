@@ -14,7 +14,7 @@ setup:
     ]
     # for generating goal-specific feature weights
     goal_dist_feat_weight: 0.0
-    T: 20.0
+    T: 10.0
     timestep: 0.5
     save_dir: "/data/teleoperation/"
 
@@ -27,19 +27,22 @@ planner:
 controller:
     # These settings have been tuned for PID controller.
     type: "pid"
-    p_gain: 0.5
-    i_gain: 0.0
+    p_gain: 0.8
+    i_gain: 0.1
     d_gain: 0.1
     epsilon: 0.10
     max_cmd: 40.0
 
 learner:
     betas: [0.1, 1, 10.]
-    goal_beliefs: "none" #if 'none' then uniform gets used
+    #goal_beliefs: "none" #if 'none' then uniform gets used
+    goal_beliefs: [1., 0., 0.]
     inference_method: "dragan"
     #inference_method: "none"
     assistance_method: "blend"
     #assistance_method: "none"
     beta_method: "estimate"
     #beta_priors: [0.4, 0.4, 0.2] # if "joint" these are probabilities
-    beta_priors: [2, 2, 2] #if "estimate" these are exponential rate parameters
+    #beta_priors: [2, 2, 2] #if "estimate" these are exponential rate parameters
+    beta_priors: [-10000, 2, 2]
+    zero_input_assist: True

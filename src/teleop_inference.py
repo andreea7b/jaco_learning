@@ -252,6 +252,7 @@ class TeleopInference():
 		self.joy_cmd = np.zeros((7,7))
 		self.assistance_method = rospy.get_param("learner/assistance_method")
 		self.alpha = 1. # in [0, 1]; higher numbers give more control to human
+		self.zero_input_assist = rospy.get_param("learner/zero_input_assist")
 
 		# ----- Simulation Setup ----- #
 		if mode == "sim":
@@ -262,6 +263,10 @@ class TeleopInference():
 											   goals=self.goals,
 			                                   use_viewer=True,
 											   plot_objects=False)
+
+		self.exp_data = {
+			'joint6_assist': []
+		}
 
 	def register_callbacks(self, mode):
 		"""
@@ -305,10 +310,14 @@ class TeleopInference():
 				self.inference_thread = Thread(target=self.learner.final_step)
 				self.inference_thread.start()
 			elif self.final_inference_done:
-				self.joy_subscriber.unregister()
+				#self.joy_subscriber.unregister()
+				del self.joy_environment
+				del self.environment
 				
 
 		ctl_cmd = self.controller.get_command(self.curr_pos)
+		#print "joint 6 unblended assistance:", ctl_cmd[6,6]
+		self.exp_data['joint6_assist'].append(ctl_cmd[6,6])
 		if self.assistance_method == "blend":
 			if self.learner.last_inf_idx > self.last_inf_idx: # new inference step complete
 				self.last_inf_idx = self.learner.last_inf_idx
@@ -326,7 +335,7 @@ class TeleopInference():
 				self.traj_plan = self.learner.cache['goal_traj_plan_by_idx'][self.last_inf_idx][goal]
 				self.controller.set_trajectory(self.traj,
 											   path_start_T=self.idx_to_time(self.last_inf_idx))
-			if np.allclose(self.joy_cmd, np.zeros((7,7))):
+			if np.allclose(self.joy_cmd, np.zeros((7,7))) and not self.zero_input_assist:
 				self.cmd = self.joy_cmd
 			else:
 				self.cmd = self.alpha * self.joy_cmd + (1. - self.alpha) * ctl_cmd
