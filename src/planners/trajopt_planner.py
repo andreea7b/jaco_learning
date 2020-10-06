@@ -13,7 +13,7 @@ class TrajoptPlanner(object):
 	"""
 	This class plans a trajectory from start to goal with TrajOpt.
 	"""
-	def __init__(self, max_iter, num_waypts, environment):
+	def __init__(self, max_iter, num_waypts, environment, prefer_angles=True):
 
 		# ---- Important internal variables ---- #
 		# These variables are trajopt parameters.
@@ -22,6 +22,9 @@ class TrajoptPlanner(object):
 
 		# Set OpenRAVE environment.
 		self.environment = environment
+
+		# whether to use goal angles over goal pose for planning
+		self.prefer_angles = prefer_angles
 
 	# -- Interpolate feature value between neighboring waypoints to help planner optimization. -- #
 
@@ -191,7 +194,7 @@ class TrajoptPlanner(object):
 		support = np.arange(len(self.weights))[self.weights != 0.0]
 		nonzero_feat_list = np.array(self.environment.feat_list)[support]
 		contains_learned_feat = any(np.array(self.environment.is_learned_feat)[support])
-		print "Planning with features:", nonzero_feat_list
+		#print "Planning with features:", nonzero_feat_list
 
 		use_constraint = not contains_learned_feat
 
@@ -203,18 +206,18 @@ class TrajoptPlanner(object):
 
 			# --- Linear interpolation seed --- #
 			if traj_seed is None:
-				print("Using straight line initialization!")
+				#print("Using straight line initialization!")
 				init_waypts = np.zeros((self.num_waypts,7))
 				for count in range(self.num_waypts):
 					init_waypts[count,:] = start + count/(self.num_waypts - 1.0)*(goal - start)
 			else:
-				print("Using trajectory seed initialization!")
+				#print("Using trajectory seed initialization!")
 				init_waypts = traj_seed
 
 			# --- Request construction --- #
 			# If pose is given, must include pose constraint.
-			if goal_pose is not None and use_constraint:
-				print("Using goal pose for trajopt computation.")
+			if goal_pose is not None and not self.prefer_angles and use_constraint:
+				#print("Using goal pose for trajopt computation.")
 				xyz_target = goal_pose
 				quat_target = [1,0,0,0] # wxyz
 				constraint = [
@@ -229,7 +232,7 @@ class TrajoptPlanner(object):
 					}
 				]
 			elif use_constraint:
-				print("Using goal for trajopt computation.")
+				#print("Using goal for trajopt computation.")
 				constraint = [
 					{
 						"type": "joint",

@@ -2,6 +2,8 @@ import numpy as np
 import math
 import time
 
+DEBUG = False
+
 class TeleopLearner(object):
 	"""
 	This class performs goal and confidence inference given user inputs.
@@ -12,6 +14,7 @@ class TeleopLearner(object):
 		self.beta_hist = []
 		self.inf_hist = []
 		self.sub_hist = []
+		self.belief_hist = []
 
 		self.main = main # store a reference to the TeleopInference object
 		self.goal_priors = goal_priors
@@ -69,7 +72,7 @@ class TeleopLearner(object):
 		main = self.main
 		start = time.time() # TODO: remove
 		this_idx = main.next_waypt_idx - 1
-		print 'doing inference from', this_idx
+		#print 'doing inference from', this_idx
 		curr_traj = main.traj_hist[:this_idx + 1]
 		curr_pos = curr_traj[-1]
 		curr_traj_features = np.sum(main.environment.featurize(curr_traj), axis=1)
@@ -107,8 +110,8 @@ class TeleopLearner(object):
 		#print 'optimal_costs', self.optimal_costs
 		suboptimality = curr_traj_costs + goal_traj_costs - self.optimal_costs
 		suboptimality *= (1. / self.optimal_costs)
-		print 'suboptimality:', suboptimality
-		print 'suboptimality/time:', suboptimality / this_idx
+		#print 'suboptimality:', suboptimality
+		#print 'suboptimality/time:', suboptimality / this_idx
 		if is_joint: # joint inference over beta and goals
 			cond_prob_traj = np.exp(np.outer(suboptimality, -self.betas)) * (((self.betas/(2*np.pi))**this_idx)**(7/2))
 			prob_traj_joint = cond_prob_traj * self.joint_beliefs_prior
@@ -124,6 +127,7 @@ class TeleopLearner(object):
 			self.beta_hist.append(self.beta_estimates)
 			self.inf_hist.append(this_idx)
 			self.sub_hist.append(suboptimality)
+			self.belief_hist.append(self.goal_beliefs)
 
 		self.last_inf_idx = this_idx
 		end = time.time() #TODO: remove
@@ -167,20 +171,25 @@ class TeleopLearner(object):
 			self.beta_hist.append(self.beta_estimates)
 			self.inf_hist.append(this_idx)
 			self.sub_hist.append(suboptimality)
+			self.belief_hist.append(self.goal_beliefs)
 			#np.save('/sub_hist.npy', np.array(self.sub_hist))
 			#np.save('/inf_hist.npy', np.array(self.inf_hist))
 			print 'beta:', np.array(self.beta_hist)
 			print 'suboptimality:', np.array(self.sub_hist)
 			print 'inference times:', np.array(self.inf_hist)
+			main.exp_data['beta_hist'] = np.array(self.beta_hist)
+			main.exp_data['sub_hist'] = np.array(self.sub_hist)
+			main.exp_data['belief_hist'] = np.array(self.belief_hist)
 
 			print 'final beta:', self.argmax_estimate[1]
 		if (is_joint and self.argmax_joint_beliefs[1] < 0.3) or (not is_joint and self.argmax_estimate[1] < 0.3):
 			# learn new goal here
 			print 'detected new goal:', main.traj_hist[-1]
-		from utils.openrave_utils import plotTraj
-		plotTraj(main.sim_environment.env, main.sim_environment.robot, main.sim_environment.bodies, self.cache['goal_traj_plan_by_idx'][1][2].waypts, 0.05, [1,0,0])
-		plotTraj(main.sim_environment.env, main.sim_environment.robot, main.sim_environment.bodies, [main.start], 0.05, [1,0,1])
-		plotTraj(main.sim_environment.env, main.sim_environment.robot, main.sim_environment.bodies, self.cache['goal_traj_plan_by_idx'][1][1].waypts, 0.05, [0,1,0])
+		if DEBUG:
+			from utils.openrave_utils import plotTraj
+			plotTraj(main.sim_environment.env, main.sim_environment.robot, main.sim_environment.bodies, self.cache['goal_traj_plan_by_idx'][1][2].waypts, 0.05, [1,0,0])
+			plotTraj(main.sim_environment.env, main.sim_environment.robot, main.sim_environment.bodies, [main.start], 0.05, [1,0,1])
+			plotTraj(main.sim_environment.env, main.sim_environment.robot, main.sim_environment.bodies, self.cache['goal_traj_plan_by_idx'][1][1].waypts, 0.05, [0,1,0])
 		#print 'joint6_assist', main.exp_data['joint6_assist']
 		#import pdb; pdb.set_trace()
 

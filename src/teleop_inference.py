@@ -300,9 +300,9 @@ class TeleopInference():
 			if not self.next_waypt_idx >= len(self.traj_hist):
 				self.traj_hist[self.next_waypt_idx] = self.curr_pos.reshape(7)
 				self.next_waypt_idx += 1
-				print "timestep:", self.next_waypt_idx
+				#print "timestep:", self.next_waypt_idx
 				if not self.running_inference:
-					print 'calling inference from', self.next_waypt_idx - 1
+					#print 'calling inference from', self.next_waypt_idx - 1
 					self.running_inference = True
 					self.inference_thread = Thread(target=self.learner.inference_step)
 					self.inference_thread.start()
@@ -326,13 +326,13 @@ class TeleopInference():
 				self.last_inf_idx = self.learner.last_inf_idx
 				if self.beta_method == "joint":
 					goal, beta = self.learner.argmax_joint_beliefs
-					print 'goal:', goal, 'beta:', beta
-					print 'joint beliefs:', self.learner.joint_beliefs
+					#print 'goal:', goal, 'beta:', beta
+					#print 'joint beliefs:', self.learner.joint_beliefs
 				elif self.beta_method == "estimate":
 					goal, beta = self.learner.argmax_estimate
-					print 'goal:', goal, 'beta:', beta
-					print 'beta estimates:', self.learner.beta_estimates
-					print 'goal beliefs:', self.learner.goal_beliefs
+					#print 'goal:', goal, 'beta:', beta
+					#print 'beta estimates:', self.learner.beta_estimates
+					#print 'goal beliefs:', self.learner.goal_beliefs
 				self.alpha = beta_arbitration(beta)
 				self.traj = self.learner.cache['goal_traj_by_idx'][self.last_inf_idx][goal]
 				self.traj_plan = self.learner.cache['goal_traj_plan_by_idx'][self.last_inf_idx][goal]
