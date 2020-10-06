@@ -67,6 +67,7 @@ class Environment(object):
 		# Create the initial feature function list.
 		self.feat_func_list = []
 		self.feat_list = feat_list
+		self.is_learned_feat = np.zeros(len(feat_list), dtype=bool)
 		self.num_feats = len(self.feat_list)
 		self.feat_range = feat_range
 		for feat in self.feat_list:
@@ -150,11 +151,11 @@ class Environment(object):
 			featval -- feature value
 		"""
 		# If it's a learned feature, feed in raw_features to the NN.
-		if 'learned_feature' in self.feat_list[feat_idx]:
+		if self.is_learned_feat[feat_idx]:
 			waypt = self.raw_features(waypt)
 		# Compute feature value.
 		featval = self.feat_func_list[feat_idx](waypt)
-		if 'learned_feature' in self.feat_list[feat_idx]:
+		if self.is_learned_feat[feat_idx]:
 			featval = featval[0][0]
 		else:
 			if self.feat_range is not None:
@@ -288,7 +289,8 @@ class Environment(object):
 		self.feat_list.append('learned_feature')
 		self.num_feats += 1
 
-		# make sure that existing goal weights get a zero added to them
+		# TODO: make sure that existing goal weights get a zero added to them
+		# TODO: update the is_learned_feat list
 		## initialize new feature weight with zero
 		#self.weights = np.hstack((self.weights, np.zeros((1, ))))
 
@@ -299,7 +301,7 @@ class Environment(object):
 
 		self.feat_func_list.append(self.learned_feats[-1].function)
 
-	def load_meirl_learned_feature(self, planner, weight, goal, save_dict_path):
+	def load_meirl_learned_feature(self, planner, weight, save_dict_path, goal=None):
 		save_dict = torch.load(save_dict_path)
 		self.new_meirl_learned_feature(planner,
 									   weight,
@@ -312,22 +314,25 @@ class Environment(object):
 		meirl_obj.cost_nn.load_state_dict(save_dict['cost_nn_state_dict'])
 		meirl_obj.max_label = save_dict['max_label']
 		meirl_obj.min_label = save_dict['min_label']
-		self.add_goal(goal)
 
-	def new_meirl_learned_feature(self, planner, weight, s_g_exp_trajs, goal_poses, known_feat_list, NN_dict, gen, T=20., timestep=0.5):
+	def new_meirl_learned_feature(self, planner, weight, s_g_exp_trajs, goal_poses, known_feat_list, NN_dict, gen, name='', T=20., timestep=0.5, goal=None):
 		"""
 		Adds a new maxent irl learned feature to the environment.
 		--
 		Params:
 			nb_layers -- number of NN layers
 			nb_units -- number of NN units per layer
-			checkpoint_name -- name of NN model to load (optional)
 		"""
 		meirl_obj = DeepMaxEntIRL(self, planner, weight, s_g_exp_trajs, goal_poses, known_feat_list, NN_dict, gen, T, timestep)
 		self.learned_feats.append(meirl_obj)
-		self.feat_list.append('learned_feature')
+		self.feat_list.append('learned_feature'+name)
 		self.num_feats += 1
+		self.is_learned_feat = np.hstack((self.is_learned_feat, np.array([True])))
 		self.feat_func_list.append(self.learned_feats[-1].function)
+		if goal is None:
+			self.add_goal(np.mean([item[0][-1] for item in s_g_exp_trajs], axis=0))
+		else:
+			self.add_goal(goal)
 
 	def add_goal(self, goal):
 		self.goals.append(np.array(goal))

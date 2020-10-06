@@ -120,7 +120,7 @@ class TrajoptPlanner(object):
 		prev_waypt = waypt[0:7]
 		curr_waypt = waypt[7:14]
 		# get the number of learned features
-		n_learned = self.environment.feat_list.count('learned_feature')
+		n_learned = np.count_nonzero(self.environment.is_learned_feat)
 
 		feature_values = []
 		for i, feature in enumerate(self.environment.learned_feats):
@@ -137,7 +137,7 @@ class TrajoptPlanner(object):
 		input waypoint, output scalar cost
 		"""
 		# get the number of learned features
-		n_learned = self.environment.feat_list.count('learned_feature')
+		n_learned = np.count_nonzero(self.environment.is_learned_feat)
 
 		J = []
 		sols = []
@@ -173,7 +173,7 @@ class TrajoptPlanner(object):
 
 	# ---- Here's TrajOpt --- #
 
-	def trajOpt(self, start, goal, goal_pose, traj_seed=None, goal_constraint=True):
+	def trajOpt(self, start, goal, goal_pose, traj_seed=None, use_constraint=True):
 		"""
 		Computes a plan from start to goal using trajectory optimizer.
 		Reference: http://joschu.net/docs/trajopt-paper.pdf
@@ -190,9 +190,10 @@ class TrajoptPlanner(object):
 		"""
 		support = np.arange(len(self.weights))[self.weights != 0.0]
 		nonzero_feat_list = np.array(self.environment.feat_list)[support]
+		contains_learned_feat = any(np.array(self.environment.is_learned_feat)[support])
 		print "Planning with features:", nonzero_feat_list
 
-		goal_constraint = not ("learned_feature" in nonzero_feat_list)
+		use_constraint = not contains_learned_feat
 
 		# --- Initialization --- #
 		if len(start) < 10:
@@ -212,7 +213,7 @@ class TrajoptPlanner(object):
 
 			# --- Request construction --- #
 			# If pose is given, must include pose constraint.
-			if goal_pose is not None:
+			if goal_pose is not None and use_constraint:
 				print("Using goal pose for trajopt computation.")
 				xyz_target = goal_pose
 				quat_target = [1,0,0,0] # wxyz
@@ -227,7 +228,7 @@ class TrajoptPlanner(object):
 									}
 					}
 				]
-			elif goal_constraint:
+			elif use_constraint:
 				print("Using goal for trajopt computation.")
 				constraint = [
 					{
@@ -273,7 +274,7 @@ class TrajoptPlanner(object):
 					prob.AddCost(self.human_cost, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "human%i"%t)
 				if 'efficiency' in nonzero_feat_list:
 					prob.AddCost(self.efficiency_cost, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "efficiency%i"%t)
-				if 'learned_feature' in nonzero_feat_list:
+				if contains_learned_feat:
 					prob.AddErrorCost(self.learned_feature_costs, self.learned_feature_cost_derivatives, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "ABS", "learned_features%i"%t)
 			# give goal_dist cost 2 time points like the above costs
 			goal_num = 0

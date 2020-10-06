@@ -1,4 +1,5 @@
 from maxent_irl_utils import *
+#from maxent_irl_utils import TorchFeatureTransform
 from utils.transform_input import transform_input, get_subranges
 import random
 import torch.optim as optim

@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 # stuff for TarjOpt
 from planners.trajopt_planner import TrajoptPlanner
 from utils.plot_utils import *
-from utils.environment import Environment
+#from utils.environment import Environment
 
 
 def map_to_raw_dim(env, expert_demos):
@@ -70,7 +70,7 @@ def generate_cost_perturb_trajs(planner, env, std, n_traj, start, goal, goal_pos
 	return expert_demos
 
 
-def generate_Gaus_MaxEnt_trajs(planner, scale, n_traj, start, goal, goal_pose, T, timestep):
+def generate_Gaus_MaxEnt_trajs(planner, weight, scale, n_traj, start, goal, goal_pose, T, timestep):
 	"""
 		Generate a set of n_traj near optimal trajectories under the reward in the env.
 		Idea: let's perturb the 7D angle waypoints with a normal distribution to get soft-optimal trajectories
@@ -83,7 +83,7 @@ def generate_Gaus_MaxEnt_trajs(planner, scale, n_traj, start, goal, goal_pose, T
 		start, goal, goal_pose	settings for TrajOpt
 		T, timestep				settings for TrajOpt
 	"""
-	opt_traj = planner.replan(start, goal, goal_pose, T, timestep, seed=None)
+	opt_traj = planner.replan(start, goal, goal_pose, weight, T, timestep, seed=None)
 
 	# Step 2: generate n_demos-1 soft-optimal trajectories
 	expert_demos = [opt_traj.waypts]
@@ -97,33 +97,33 @@ def generate_Gaus_MaxEnt_trajs(planner, scale, n_traj, start, goal, goal_pose, T
 	return expert_demos
 
 
-def init_env(feat_list, weights, env_only=False,
-			 object_centers={'HUMAN_CENTER': [-0.6, -0.55, 0.0], 'LAPTOP_CENTER': [-0.8, 0.0, 0.0]},
-			 feat_range = {'table': 0.98, 'coffee': 1.0, 'laptop': 0.3, 'human': 0.3, 'efficiency': 0.22, 'proxemics': 0.3, 'betweenobjects': 0.2}
-			 ):
-	"""
-		initialize an openrave environment and TrajOpt planner and return them.
-		----
-		Input:
-		feat_list		List of strings with the active features
-		weights			List of weights for the feat_list features
-		env_only		if True, only an env object gets created & returned
-		obj_center_dict	Dict of human & laptop positions
-		feat_range_dict	Dict of factors for the different features to scale them to 0-1.
-	"""
-	model_filename = "jaco_dynamics"
-	feat_range = [feat_range[feat_list[feat]] for feat in range(len(feat_list))]
+# def init_env(feat_list, weights, env_only=False,
+# 			 object_centers={'HUMAN_CENTER': [-0.6, -0.55, 0.0], 'LAPTOP_CENTER': [-0.8, 0.0, 0.0]},
+# 			 feat_range = {'table': 0.98, 'coffee': 1.0, 'laptop': 0.3, 'human': 0.3, 'efficiency': 0.22, 'proxemics': 0.3, 'betweenobjects': 0.2}
+# 			 ):
+# 	"""
+# 		initialize an openrave environment and TrajOpt planner and return them.
+# 		----
+# 		Input:
+# 		feat_list		List of strings with the active features
+# 		weights			List of weights for the feat_list features
+# 		env_only		if True, only an env object gets created & returned
+# 		obj_center_dict	Dict of human & laptop positions
+# 		feat_range_dict	Dict of factors for the different features to scale them to 0-1.
+# 	"""
+# 	model_filename = "jaco_dynamics"
+# 	feat_range = [feat_range[feat_list[feat]] for feat in range(len(feat_list))]
 
-	# Planner
-	max_iter = 50
-	num_waypts = 5
+# 	# Planner
+# 	max_iter = 50
+# 	num_waypts = 5
 
-	environment = Environment(model_filename, object_centers, feat_list, feat_range, np.array(weights), viewer=False)
-	if env_only:
-		return environment
-	else:
-		planner = TrajoptPlanner(max_iter, num_waypts, environment)
-		return environment, planner
+# 	environment = Environment(model_filename, object_centers, feat_list, feat_range, np.array(weights), viewer=False)
+# 	if env_only:
+# 		return environment
+# 	else:
+# 		planner = TrajoptPlanner(max_iter, num_waypts, environment)
+# 		return environment, planner
 
 
 class ReLuNet(nn.Module):

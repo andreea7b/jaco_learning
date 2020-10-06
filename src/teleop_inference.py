@@ -193,10 +193,12 @@ class TeleopInference():
 		learned_goal_weight[len(self.feat_list)] = 1.
 		self.goal_weights.append(learned_goal_weight)
 
-		# this reuses the first goal for the learned feature
 		# 2. add cost to environment
 		meirl_goal_save_path = "/root/catkin_ws/src/jaco_learning/data/pour_red_meirl.pt"
-		self.environment.load_meirl_learned_feature(self.planner, learned_goal_weight, self.goals[0], meirl_goal_save_path)
+		# this reuses the first goal for the learned feature
+		#self.environment.load_meirl_learned_feature(self.planner, learned_goal_weight, meirl_goal_save_path, goal=self.goals[0])
+		# this uses the average demonstration final position
+		self.environment.load_meirl_learned_feature(self.planner, learned_goal_weight, meirl_goal_save_path)
 
 		# ----- Controller Setup ----- #
 		# Retrieve controller specific parameters.
@@ -310,9 +312,10 @@ class TeleopInference():
 				self.inference_thread = Thread(target=self.learner.final_step)
 				self.inference_thread.start()
 			elif self.final_inference_done:
+				pass
 				#self.joy_subscriber.unregister()
-				del self.joy_environment
-				del self.environment
+				#del self.joy_environment
+				#del self.environment
 				
 
 		ctl_cmd = self.controller.get_command(self.curr_pos)

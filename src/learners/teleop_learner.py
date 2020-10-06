@@ -91,7 +91,11 @@ class TeleopLearner(object):
 			#								                seed=seed)
 			# Using last final waypoint and straight line initialization
 			goal_waypt = self.cache['goal_traj_plan_by_idx'][self.last_inf_idx][i].waypts[-1]
-			goal_traj, goal_traj_plan = main.planner.replan(curr_pos, goal_waypt, list(main.goal_locs[i]), main.goal_weights[i],
+			# with cartesian goal constraint
+			#goal_traj, goal_traj_plan = main.planner.replan(curr_pos, goal_waypt, list(main.goal_locs[i]), main.goal_weights[i],
+			#								                main.T - curr_time, main.timestep, return_both=True)
+			# without cartesian goal constraint
+			goal_traj, goal_traj_plan = main.planner.replan(curr_pos, goal_waypt, None, main.goal_weights[i],
 											                main.T - curr_time, main.timestep, return_both=True)
 			support = np.arange(len(main.goal_weights[i]))[main.goal_weights[i] != 0.0]
 			goal_traj_costs[i] = np.sum(main.goal_weights[i][support] * np.sum(main.environment.featurize(goal_traj.waypts, support), axis=1))
@@ -177,7 +181,7 @@ class TeleopLearner(object):
 		plotTraj(main.sim_environment.env, main.sim_environment.robot, main.sim_environment.bodies, self.cache['goal_traj_plan_by_idx'][1][2].waypts, 0.05, [1,0,0])
 		plotTraj(main.sim_environment.env, main.sim_environment.robot, main.sim_environment.bodies, [main.start], 0.05, [1,0,1])
 		plotTraj(main.sim_environment.env, main.sim_environment.robot, main.sim_environment.bodies, self.cache['goal_traj_plan_by_idx'][1][1].waypts, 0.05, [0,1,0])
-		print 'joint6_assist', main.exp_data['joint6_assist']
+		#print 'joint6_assist', main.exp_data['joint6_assist']
 		#import pdb; pdb.set_trace()
 
 		#np.save('/home/matthew/traj_hist_nobj10.npy', np.array(main.traj_hist))
