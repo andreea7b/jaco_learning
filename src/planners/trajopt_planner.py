@@ -129,7 +129,11 @@ class TrajoptPlanner(object):
 		for i, feature in enumerate(self.environment.learned_feats):
 			# get the value of the feature
 			feat_idx = self.environment.num_feats - n_learned + i
-			feature_values.append(self.interpolate_features(curr_waypt, prev_waypt, feat_idx, NUM_STEPS=1)) # CHANGED
+			if self.weights[feat_idx] == 0.0:
+				feature_value = 0.0
+			else:
+				feature_value = self.interpolate_features(curr_waypt, prev_waypt, feat_idx, NUM_STEPS=1) # CHANGED
+			feature_values.append(feature_value)
 		# calculate the cost
 		return np.matmul(self.weights[-n_learned:], np.array(feature_values))*np.linalg.norm(curr_waypt - prev_waypt)
 
@@ -145,11 +149,15 @@ class TrajoptPlanner(object):
 		J = []
 		sols = []
 		for i, feature in enumerate(self.environment.learned_feats):
+			feat_idx = self.environment.num_feats - n_learned + i
+			if self.weights[feat_idx] == 0.0:
+				J.append(np.zeros(len(waypt)))
+				continue
+			
 			# Setup for computing Jacobian.
 			x = torch.tensor(waypt, requires_grad=True)
 
 			# Get the value of the feature
-			feat_idx = self.environment.num_feats - n_learned + i
 			feat_val = torch.tensor(0.0, requires_grad=True)
 			NUM_STEPS = 1 # CHANGED
 			for step in range(NUM_STEPS):
@@ -159,7 +167,7 @@ class TrajoptPlanner(object):
 				z = self.environment.feat_func_list[feat_idx](self.environment.raw_features(inter_waypt).float(), torchify=True)
 				feat_val = feat_val + z
 			y = feat_val / torch.tensor(float(NUM_STEPS), requires_grad=True)
-			y = y * torch.tensor(self.weights[-n_learned+i:], requires_grad=True) * torch.norm(x[7:] - x[:7])
+			y = y * torch.tensor(self.weights[-n_learned+i], requires_grad=True) * torch.norm(x[7:] - x[:7])
 			y.backward()
 			J.append(x.grad.data.numpy())
 		return np.sum(np.array(J), axis = 0).reshape((1,-1))
@@ -196,7 +204,7 @@ class TrajoptPlanner(object):
 		contains_learned_feat = any(np.array(self.environment.is_learned_feat)[support])
 		#print "Planning with features:", nonzero_feat_list
 
-		use_constraint = not contains_learned_feat
+		#use_constraint = not contains_learned_feat
 
 		# --- Initialization --- #
 		if len(start) < 10:

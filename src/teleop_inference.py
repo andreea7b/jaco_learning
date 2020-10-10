@@ -185,20 +185,21 @@ class TeleopInference():
 		self.traj_hist[0] = self.start
 
 		# ----- Add in learned cost function goals -----
-		# 1. create new weight vectors
-		common_weights = common_weights + [0]
-		for i in range(len(self.goal_weights)):
-			self.goal_weights[i] = np.hstack((self.goal_weights[i], 0))
-		learned_goal_weight = np.array(common_weights)
-		learned_goal_weight[len(self.feat_list)] = 1.
-		self.goal_weights.append(learned_goal_weight)
+		for learned_goal_save_path in rospy.get_param('setup/learned_goals'):
+			# 1. create new weight vectors
+			common_weights = common_weights + [0]
+			for i in range(len(self.goal_weights)):
+				self.goal_weights[i] = np.hstack((self.goal_weights[i], 0))
+			learned_goal_weight = np.array(common_weights)
+			learned_goal_weight[len(self.feat_list)] = 1.
+			self.goal_weights.append(learned_goal_weight)
 
-		# 2. add cost to environment
-		meirl_goal_save_path = "/root/catkin_ws/src/jaco_learning/data/pour_red_meirl.pt"
-		# this reuses the first goal for the learned feature
-		#self.environment.load_meirl_learned_feature(self.planner, learned_goal_weight, meirl_goal_save_path, goal=self.goals[0])
-		# this uses the average demonstration final position
-		self.environment.load_meirl_learned_feature(self.planner, learned_goal_weight, meirl_goal_save_path)
+			# 2. add cost to environment
+			#meirl_goal_save_path = "/root/catkin_ws/src/jaco_learning/data/pour_red_meirl.pt"
+			# this reuses the first goal for the learned feature
+			#self.environment.load_meirl_learned_feature(self.planner, learned_goal_weight, meirl_goal_save_path, goal=self.goals[0])
+			# this uses the average demonstration final position
+			self.environment.load_meirl_learned_feature(self.planner, learned_goal_weight, learned_goal_save_path)
 
 		# ----- Controller Setup ----- #
 		# Retrieve controller specific parameters.

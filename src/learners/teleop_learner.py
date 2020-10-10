@@ -206,7 +206,7 @@ class TeleopLearner(object):
 
 	def _no_inference_final(self):
 		main = self.main
-		np.save('/root/catkin_ws/src/jaco_learning/data/pour_red4.npy', np.array(main.traj_hist))
+		np.save('/root/catkin_ws/src/jaco_learning/data/noisygoto_green0.npy', np.array(main.traj_hist))
 		print 'saved trajectory'
 		main.final_inference_done = True
 
