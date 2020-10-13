@@ -164,9 +164,12 @@ class TeleopInference():
 		if planner_type == "trajopt":
 			max_iter = rospy.get_param("planner/max_iter")
 			num_waypts = rospy.get_param("planner/num_waypts")
+			prefer_angles = rospy.get_param("planner/prefer_angles")
+			use_constraint_learned = rospy.get_param("planner/use_constraint_learned")
 
 			# Initialize planner and compute trajectory to track.
-			self.planner = TrajoptPlanner(max_iter, num_waypts, self.environment)
+			self.planner = TrajoptPlanner(max_iter, num_waypts, self.environment,
+										  prefer_angles=prefer_angles, use_constraint_learned=use_constraint_learned)
 		else:
 			raise Exception('Planner {} not implemented.'.format(planner_type))
 		# TODO: do something better than goals[0]?
@@ -458,7 +461,8 @@ class TeleopInference():
 
 def beta_arbitration(beta):
 	#return 1 #all joystick
-	return np.clip(1 / beta, 0, 1)
+	return 0
+	#return np.clip(1 / beta, 0, 1)
 	#return np.clip(0.5 / beta, 0, 1)
 	#return np.clip(np.exp(-beta + 0.1), 0, 1)
 

@@ -13,7 +13,7 @@ class TrajoptPlanner(object):
 	"""
 	This class plans a trajectory from start to goal with TrajOpt.
 	"""
-	def __init__(self, max_iter, num_waypts, environment, prefer_angles=True):
+	def __init__(self, max_iter, num_waypts, environment, prefer_angles=True, use_constraint_learned=True):
 
 		# ---- Important internal variables ---- #
 		# These variables are trajopt parameters.
@@ -25,6 +25,9 @@ class TrajoptPlanner(object):
 
 		# whether to use goal angles over goal pose for planning
 		self.prefer_angles = prefer_angles
+
+		# whether to use constraints when there are learned features
+		self.use_constraint_learned = use_constraint_learned
 
 	# -- Interpolate feature value between neighboring waypoints to help planner optimization. -- #
 
@@ -184,7 +187,7 @@ class TrajoptPlanner(object):
 
 	# ---- Here's TrajOpt --- #
 
-	def trajOpt(self, start, goal, goal_pose, traj_seed=None, use_constraint=True):
+	def trajOpt(self, start, goal, goal_pose, traj_seed=None):
 		"""
 		Computes a plan from start to goal using trajectory optimizer.
 		Reference: http://joschu.net/docs/trajopt-paper.pdf
@@ -202,9 +205,9 @@ class TrajoptPlanner(object):
 		support = np.arange(len(self.weights))[self.weights != 0.0]
 		nonzero_feat_list = np.array(self.environment.feat_list)[support]
 		contains_learned_feat = any(np.array(self.environment.is_learned_feat)[support])
-		#print "Planning with features:", nonzero_feat_list
+		print "Planning with features:", nonzero_feat_list
 
-		#use_constraint = not contains_learned_feat
+		use_constraint = self.use_constraint_learned or not contains_learned_feat
 
 		# --- Initialization --- #
 		if len(start) < 10:
@@ -317,7 +320,10 @@ class TrajoptPlanner(object):
 		"""
 		assert weights is not None, "The weights vector is empty. Cannot plan without a cost preference."
 		self.weights = weights
+		import time
+		trajopt_start_time = time.time()
 		waypts = self.trajOpt(start, goal, goal_pose, traj_seed=seed)
+		print "planning took:", time.time() - trajopt_start_time
 		waypts_time = np.linspace(start_time, T, self.num_waypts)
 		traj = Trajectory(waypts, waypts_time)
 		if return_both:

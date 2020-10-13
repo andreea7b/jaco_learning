@@ -15,9 +15,11 @@ setup:
     # for generating goal-specific feature weights
     goal_dist_feat_weight: 0.0
     learned_goals: [
-        "/root/catkin_ws/src/jaco_learning/data/pour_red_meirl.pt",
-        "/root/catkin_ws/src/jaco_learning/data/pour_red_meirl2.pt",
-        "/root/catkin_ws/src/jaco_learning/data/goto_green_meirl.pt"
+        "/root/catkin_ws/src/jaco_learning/data/pour_red_pose_uc.pt",
+        "/root/catkin_ws/src/jaco_learning/data/goto_green_pose_uc.pt"
+    #    "/root/catkin_ws/src/jaco_learning/data/pour_red_meirl.pt",
+    #    "/root/catkin_ws/src/jaco_learning/data/pour_red_meirl2.pt",
+    #    "/root/catkin_ws/src/jaco_learning/data/goto_green_meirl.pt"
     ]
     T: 20.0
     timestep: 0.5
@@ -28,6 +30,8 @@ planner:
     type: "trajopt"
     max_iter: 50
     num_waypts: 5
+    prefer_angles: False #whether to use goal angles over goal poses
+    use_constraint_learned: True
 
 controller:
     # These settings have been tuned for PID controller.
@@ -40,15 +44,16 @@ controller:
 
 learner:
     betas: [0.1, 1, 10.]
-    goal_beliefs: "none" #if 'none' then uniform gets used
-    #goal_beliefs: [0., 0., 1.]
+    #goal_beliefs: "none" #if 'none' then uniform gets used
+    goal_beliefs: [0., 0., 0., 1.]
     inference_method: "dragan"
     #inference_method: "none"
-    #assistance_method: "blend"
-    assistance_method: "none"
+    assistance_method: "blend"
+    #assistance_method: "none"
     beta_method: "estimate"
     #beta_priors: [0.4, 0.4, 0.2] # if "joint" these are probabilities
     #beta_priors: [2, 2, 2] #if "estimate" these are exponential rate parameters
-    beta_priors: [0, 0, 0, 0, 0]
+    beta_priors: [0, 0, 0, -10000]
+    #beta_priors: [0, 0, 0, 0, 0]
     #beta_priors: [2, 2, -10000]
-    zero_input_assist: False
+    zero_input_assist: True

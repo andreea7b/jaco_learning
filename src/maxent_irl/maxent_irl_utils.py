@@ -70,7 +70,7 @@ def generate_cost_perturb_trajs(planner, env, std, n_traj, start, goal, goal_pos
 	return expert_demos
 
 
-def generate_Gaus_MaxEnt_trajs(planner, weight, scale, n_traj, start, goal, goal_pose, T, timestep):
+def generate_Gaus_MaxEnt_trajs(planner, weight, scale, n_traj, start, goal, goal_pose, T, timestep, seed=None, return_opt_plan=False):
 	"""
 		Generate a set of n_traj near optimal trajectories under the reward in the env.
 		Idea: let's perturb the 7D angle waypoints with a normal distribution to get soft-optimal trajectories
@@ -83,8 +83,10 @@ def generate_Gaus_MaxEnt_trajs(planner, weight, scale, n_traj, start, goal, goal
 		start, goal, goal_pose	settings for TrajOpt
 		T, timestep				settings for TrajOpt
 	"""
-	opt_traj = planner.replan(start, goal, goal_pose, weight, T, timestep, seed=None)
-
+	if return_opt_plan:
+		opt_traj, opt_plan = planner.replan(start, goal, goal_pose, weight, T, timestep, seed=seed, return_both=True)
+	else:
+		opt_traj = planner.replan(start, goal, goal_pose, weight, T, timestep, seed=seed)
 	# Step 2: generate n_demos-1 soft-optimal trajectories
 	expert_demos = [opt_traj.waypts]
 
@@ -93,8 +95,10 @@ def generate_Gaus_MaxEnt_trajs(planner, weight, scale, n_traj, start, goal, goal
 		for i in range(opt_traj.waypts.shape[0]):
 			cur_traj.append(opt_traj.waypts[i, :] + np.random.normal(loc=0, scale=scale, size=7))
 		expert_demos.append(np.array(cur_traj))
-
-	return expert_demos
+	if return_opt_plan:
+		return expert_demos, opt_plan
+	else:
+		return expert_demos
 
 
 # def init_env(feat_list, weights, env_only=False,

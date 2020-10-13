@@ -94,12 +94,12 @@ class TeleopLearner(object):
 			#								                seed=seed)
 			# Using last final waypoint and straight line initialization
 			goal_waypt = self.cache['goal_traj_plan_by_idx'][self.last_inf_idx][i].waypts[-1]
-			# with cartesian goal constraint
-			#goal_traj, goal_traj_plan = main.planner.replan(curr_pos, goal_waypt, list(main.goal_locs[i]), main.goal_weights[i],
-			#								                main.T - curr_time, main.timestep, return_both=True)
-			# without cartesian goal constraint
-			goal_traj, goal_traj_plan = main.planner.replan(curr_pos, goal_waypt, None, main.goal_weights[i],
+			# with cartesian goal constraint (as long as planner has prefer_angles=False)
+			goal_traj, goal_traj_plan = main.planner.replan(curr_pos, goal_waypt, list(main.goal_locs[i]), main.goal_weights[i],
 											                main.T - curr_time, main.timestep, return_both=True)
+			# without cartesian goal constraint
+			#goal_traj, goal_traj_plan = main.planner.replan(curr_pos, goal_waypt, None, main.goal_weights[i],
+			#								                main.T - curr_time, main.timestep, return_both=True)
 			support = np.arange(len(main.goal_weights[i]))[main.goal_weights[i] != 0.0]
 			goal_traj_costs[i] = np.sum(main.goal_weights[i][support] * np.sum(main.environment.featurize(goal_traj.waypts, support), axis=1))
 			print 'planned goal traj len', len(goal_traj.waypts)

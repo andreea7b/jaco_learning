@@ -4,6 +4,7 @@ from utils.transform_input import transform_input, get_subranges
 import random
 import torch.optim as optim
 from tqdm import trange
+import time #TODO: comment this out if not debugging
 
 
 class DeepMaxEntIRL:
@@ -131,7 +132,7 @@ class DeepMaxEntIRL:
 		self.max_label = np.amax(all_logits)
 		self.min_label = np.amin(all_logits)
 
-	def get_trajs_with_cur_reward(self, n_traj, std, start, goal, pose):
+	def get_trajs_with_cur_reward(self, n_traj, std, start, goal, pose, seed=None, return_opt_plan=False):
 		"""
 			Generate a set of induced trajectories for the current reward/cost.
 			----
@@ -145,7 +146,10 @@ class DeepMaxEntIRL:
 		"""
 		if self.gen == 'waypt':
 			cur_rew_traj = generate_Gaus_MaxEnt_trajs(self.planner, self.weight, std,
-													  n_traj, start, goal, pose, self.T, self.timestep)
+													  n_traj, start, goal, pose, self.T, self.timestep,
+													  seed=seed, return_opt_plan=return_opt_plan)
+			if return_opt_plan:
+				cur_rew_traj, opt_plan = cur_rew_traj
 		# note/TODO: 'cost' doesn't work
 		elif self.gen == 'cost':
 			cur_rew_traj = generate_cost_perturb_trajs(self.planner, self.env, std,
@@ -153,7 +157,10 @@ class DeepMaxEntIRL:
 		else:
 			print("gen has to be either waypt or cost")
 			assert False
-		return map_to_raw_dim(self.env, cur_rew_traj)
+		if return_opt_plan:
+			return map_to_raw_dim(self.env, cur_rew_traj), opt_plan
+		else:
+			return map_to_raw_dim(self.env, cur_rew_traj)
 
 	def get_total_cost(self, waypt_array):
 		"""
@@ -181,8 +188,12 @@ class DeepMaxEntIRL:
 		"""
 		loss_log = []
 		optimizer = optim.Adam(self.cost_nn.parameters(), lr=lr, weight_decay=weight_decay)
+		cur_rew_traj_cache = dict()
+		for i in range(len(self.starts)):
+			cur_rew_traj_cache[i] = None
 		with trange(n_iters) as T:
 			for it in T:
+				it_start_time = time.time()
 				T.set_description('Iteration %i' % it)
 				# Step 0: generate traj under current reward
 				s_g_specific_trajs = []
@@ -191,8 +202,13 @@ class DeepMaxEntIRL:
 				else:
 					g_poses = self.goal_poses
 
-				for start, goal, goal_pose in zip(self.starts, self.goals, g_poses):
-					s_g_specific_trajs.append(self.get_trajs_with_cur_reward(n_cur_rew_traj, std, start, goal, goal_pose))
+				for start, goal, goal_pose, dem_num in zip(self.starts, self.goals, g_poses, range(len(self.starts))):
+					seed = cur_rew_traj_cache[dem_num]
+					cur_rew_traj, cur_rew_traj_plan = self.get_trajs_with_cur_reward(n_cur_rew_traj, std,
+																					 start, goal, goal_pose,
+																					 seed=seed, return_opt_plan=True)
+					cur_rew_traj_cache[dem_num] = cur_rew_traj_plan.waypts
+					s_g_specific_trajs.append(cur_rew_traj)
 
 				# make dataset random
 				s_g_indices = np.arange(len(self.starts)).tolist()
@@ -225,6 +241,7 @@ class DeepMaxEntIRL:
 				loss_log.append(sum(loss_tracker) / len(loss_tracker))
 
 				T.set_postfix(avg_loss=loss_log[-1])
+				print 'iteration', it, 'time:', time.time() - it_start_time
 
 		# update normalizer once in the end
 		self.update_normalizer()
