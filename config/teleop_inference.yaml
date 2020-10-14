@@ -15,9 +15,9 @@ setup:
     # for generating goal-specific feature weights
     goal_dist_feat_weight: 0.0
     learned_goals: [
-        "/root/catkin_ws/src/jaco_learning/data/pour_red_meirl.pt",
-        "/root/catkin_ws/src/jaco_learning/data/pour_red_meirl2.pt",
-        "/root/catkin_ws/src/jaco_learning/data/goto_green_meirl.pt"
+        "/home/anca/catkin_ws/src/jaco_learning/data/pour_red_meirl.pt",
+        "/home/anca/catkin_ws/src/jaco_learning/data/pour_red_meirl2.pt",
+        "/home/anca/catkin_ws/src/jaco_learning/data/goto_green_meirl.pt"
     ]
     T: 20.0
     timestep: 0.5

@@ -95,38 +95,36 @@ class TeleopInference():
 				loop_iter += 1
 				r.sleep()
 
-        elif mode == "pybullet":
-            # Start simulation.
-            cameraDistance = 1
-            cameraYaw = 35
-            cameraPitch = -35
-            forward = 0
-            turn = 0
-            linkIdx = 7
-            p.changeDynamics(self.bullet_environment["robot"], linkIdx, linearDamping=0.9)
-            for i in range(11):
-                p.setJointMotorControl2(self.bullet_environment["robot"], i, p.VELOCITY_CONTROL, force=0)
+		elif mode == "pybullet":
+			# Start simulation.
+			cameraDistance = 1
+			cameraYaw = 35
+			cameraPitch = -35
+			linkIdx = 7
+			p.changeDynamics(self.bullet_environment["robot"], linkIdx, linearDamping=0.9)
+			for i in range(11):
+				p.setJointMotorControl2(self.bullet_environment["robot"], i, p.VELOCITY_CONTROL, force=0)
 			while not rospy.is_shutdown():
 				if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
 					line = raw_input()
 					break
-                EEPos = robot_coords(self.bullet_environment["robot"])[linkIdx-1]
-                p.resetDebugVisualizerCamera(cameraDistance, cameraYaw, cameraPitch, EEPos)
-                camInfo = p.getDebugVisualizerCamera()
-                camForward = camInfo[5]
-                forward, turn = self.keyboard_input_callback()
-                force = [forward * camForward[0], forward * camForward[1], 0]
-                cameraYaw = cameraYaw + turn
-                if (forward):
-                    p.applyExternalForce(self.bullet_environment["robot"], linkIdx, force, EEPos, flags=p.WORLD_FRAME)
-                p.stepSimulation()
+				EEPos = robot_coords(self.bullet_environment["robot"])[linkIdx-1]
+				p.resetDebugVisualizerCamera(cameraDistance, cameraYaw, cameraPitch, EEPos)
+				camInfo = p.getDebugVisualizerCamera()
+				camForward = camInfo[5]
+				forward, turn = self.keyboard_input_callback()
+				force = [forward * camForward[0], forward * camForward[1], 0]
+				cameraYaw = cameraYaw + turn
+				if (forward):
+					p.applyExternalForce(self.bullet_environment["robot"], linkIdx, force, EEPos, flags=p.WORLD_FRAME)
+				p.stepSimulation()
 				r.sleep()
 
-            # Disconnect once the session is over.
-            p.disconnect()
+			# Disconnect once the session is over.
+			p.disconnect()
 
-        print "----------------------------------"
-        self.joy_subscriber.unregister()
+		print "----------------------------------"
+		self.joy_subscriber.unregister()
 		del self.joy_environment
 		del self.environment
 
@@ -187,7 +185,7 @@ class TeleopInference():
 									   self.feat_list,
 									   feat_range,
 									   goals=self.goals,
-		                               use_viewer=False,
+									   use_viewer=False,
 									   plot_objects=False)
 		self.goal_locs = self.environment.goal_locs
 
@@ -277,61 +275,61 @@ class TeleopInference():
 		self.running_final_inference = False
 		self.final_inference_done = False
 
-        self.assistance_method = rospy.get_param("learner/assistance_method")
-        self.alpha = 1. # in [0, 1]; higher numbers give more control to human
-        self.zero_input_assist = rospy.get_param("learner/zero_input_assist")
-        self.joy_cmd = np.zeros((7,7))
+		self.assistance_method = rospy.get_param("learner/assistance_method")
+		self.alpha = 1. # in [0, 1]; higher numbers give more control to human
+		self.zero_input_assist = rospy.get_param("learner/zero_input_assist")
+		self.joy_cmd = np.zeros((7,7))
 
-        if mode == "pybullet":
-            # Connect to a physics simulator.
-            physicsClient = p.connect(p.GUI)
+		if mode == "pybullet":
+			# Connect to a physics simulator.
+			physicsClient = p.connect(p.GUI)
 
-            # Add path to data resources for the environment.
-            p.setAdditionalSearchPath("../data/resources")
+			# Add path to data resources for the environment.
+			p.setAdditionalSearchPath("/home/anca/catkin_ws/src/jaco_learning/data/resources")
 
-            # Setup the environment.
-            self.bullet_environment = setup_environment()
+			# Setup the environment.
+			self.bullet_environment = setup_environment()
 
-            # Get rid of gravity and make simulation happen in real time.
-            p.setGravity(0, 0, 0)
-            p.setRealTimeSimulation(0)
-        else:
-            # ----- Input Device Setup ----- #
-            self.joy_environment = Environment(model_filename,
-                                               object_centers,
-                                               list(), # doesn't need to know about features
-                                               dict(),
-                                               #goals=self.goals,
-                                               use_viewer=False,
-                                               plot_objects=False)
+			# Get rid of gravity and make simulation happen in real time.
+			p.setGravity(0, 0, 0)
+			p.setRealTimeSimulation(0)
+		else:
+			# ----- Input Device Setup ----- #
+			self.joy_environment = Environment(model_filename,
+											   object_centers,
+											   list(), # doesn't need to know about features
+											   dict(),
+											   #goals=self.goals,
+											   use_viewer=False,
+											   plot_objects=False)
 
-            # ----- Simulation Setup ----- #
-            if mode == "sim":
-                self.sim_environment = Environment(model_filename,
-                                                   object_centers,
-                                                   list(),
-                                                   dict(),
-                                                   goals=self.goals,
-                                                   use_viewer=True,
-                                                   plot_objects=False)
+			# ----- Simulation Setup ----- #
+			if mode == "sim":
+				self.sim_environment = Environment(model_filename,
+												   object_centers,
+												   list(),
+												   dict(),
+												   goals=self.goals,
+												   use_viewer=True,
+												   plot_objects=False)
 
-            self.exp_data = {
-                'joint6_assist': []
-            }
+			self.exp_data = {
+				'joint6_assist': []
+			}
 
 	def register_callbacks(self, mode):
 		"""
 		Sets up all the publishers/subscribers needed.
 		"""
-        if mode == "pybullet":
-            return
+		if mode == "pybullet":
+			return
 		elif mode == "real":
 			# Create joint-velocity publisher.
 			self.vel_pub = rospy.Publisher(self.prefix + '/in/joint_velocity', kinova_msgs.msg.JointVelocity, queue_size=1)
 			# Create subscriber to joint_angles.
 			self.joint_subscriber = rospy.Subscriber(self.prefix + '/out/joint_angles', kinova_msgs.msg.JointAngles, self.joint_angles_callback, queue_size=1)
 
-        # Create subscriber to input joystick.
+		# Create subscriber to input joystick.
 		self.joy_subscriber = rospy.Subscriber('joy', Joy, self.joystick_input_callback, queue_size=1)
 
 	def joint_angles_callback(self, msg):
@@ -399,29 +397,31 @@ class TeleopInference():
 		# Update cmd from PID based on current position.
 		#self.cmd = self.controller.get_command(self.curr_pos)
 
-    def keyboard_input_callback(self):
-        keys = p.getKeyboardEvents()
-        for k, v in keys.items():
+	def keyboard_input_callback(self):
+		forward = 0
+		turn = 0
+		keys = p.getKeyboardEvents()
+		for k, v in keys.items():
 
-            if (k == p.B3G_RIGHT_ARROW and (v & p.KEY_WAS_TRIGGERED)):
-              turn = -0.5
-            if (k == p.B3G_RIGHT_ARROW and (v & p.KEY_WAS_RELEASED)):
-              turn = 0
-            if (k == p.B3G_LEFT_ARROW and (v & p.KEY_WAS_TRIGGERED)):
-              turn = 0.5
-            if (k == p.B3G_LEFT_ARROW and (v & p.KEY_WAS_RELEASED)):
-              turn = 0
+			if (k == p.B3G_RIGHT_ARROW and (v & p.KEY_WAS_TRIGGERED)):
+			  turn = -0.5
+			if (k == p.B3G_RIGHT_ARROW and (v & p.KEY_WAS_RELEASED)):
+			  turn = 0
+			if (k == p.B3G_LEFT_ARROW and (v & p.KEY_WAS_TRIGGERED)):
+			  turn = 0.5
+			if (k == p.B3G_LEFT_ARROW and (v & p.KEY_WAS_RELEASED)):
+			  turn = 0
 
-            if (k == p.B3G_UP_ARROW and (v & p.KEY_WAS_TRIGGERED)):
-              forward = 1
-            if (k == p.B3G_UP_ARROW and (v & p.KEY_WAS_RELEASED)):
-              forward = 0
-            if (k == p.B3G_DOWN_ARROW and (v & p.KEY_WAS_TRIGGERED)):
-              forward = -1
-            if (k == p.B3G_DOWN_ARROW and (v & p.KEY_WAS_RELEASED)):
-              forward = 0
+			if (k == p.B3G_UP_ARROW and (v & p.KEY_WAS_TRIGGERED)):
+			  forward = 1
+			if (k == p.B3G_UP_ARROW and (v & p.KEY_WAS_RELEASED)):
+			  forward = 0
+			if (k == p.B3G_DOWN_ARROW and (v & p.KEY_WAS_TRIGGERED)):
+			  forward = -1
+			if (k == p.B3G_DOWN_ARROW and (v & p.KEY_WAS_RELEASED)):
+			  forward = 0
 
-        return forward, turn
+		return forward, turn
 
 	def joystick_input_callback(self, msg):
 		"""
