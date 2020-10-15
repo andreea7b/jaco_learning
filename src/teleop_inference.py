@@ -96,17 +96,21 @@ class TeleopInference():
 				r.sleep()
 
 		elif mode == "pybullet":
+			print("Simulating robot, press ENTER to quit:")
+			bullet_start = np.append(self.start.reshape(7), np.array([0,0,0]))
+			move_robot(self.bullet_environment["robot"], bullet_start)
 			# Start simulation.
 			while not rospy.is_shutdown():
 				if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
 					line = raw_input()
 					break
 
-				# Set velocity.
-				joint_velocities = self.keyboard_input_callback()
-				self.joy_cmd = np.diag(joint_velocities[1:8])
-				for i in range(p.getNumJoints(self.bullet_environment["robot"])):
-					p.setJointMotorControl2(self.bullet_environment["robot"], i, p.VELOCITY_CONTROL, targetVelocity=joint_velocities[i])
+				# Update position.
+				self.keyboard_input_callback()
+
+				# Update sim position with new velocity command.
+				for i in range(len(self.cmd)):
+					p.setJointMotorControl2(self.bullet_environment["robot"], i+1, p.VELOCITY_CONTROL, targetVelocity=self.cmd[i][i])
 
 				time.sleep(0.05)
 
@@ -272,7 +276,7 @@ class TeleopInference():
 
 		if mode == "pybullet":
 			# Connect to a physics simulator.
-			physicsClient = p.connect(p.GUI)#, options="--opengl2")
+			physicsClient = p.connect(p.GUI, options="--opengl2")
 
 			# Add path to data resources for the environment.
 			p.setAdditionalSearchPath("/home/anca/catkin_ws/src/jaco_learning/data/resources")
@@ -400,20 +404,16 @@ class TeleopInference():
 		state = p.getJointStates(self.bullet_environment["robot"], range(p.getNumJoints(self.bullet_environment["robot"])))
 		jointPoses = np.array([s[0] for s in state])
 
-		# Move arm in openrave as well.
-		joint_angles = np.diag(jointPoses * (180/np.pi))
-		self.joint_angles_callback(ros_utils.cmd_to_JointAnglesMsg(joint_angles))
-
 		# Parse keyboard commands.
 		keys = p.getKeyboardEvents()
 		if p.B3G_LEFT_ARROW in keys:
-			EEPos[1] += dist_step[1]
-		if p.B3G_RIGHT_ARROW in keys:
 			EEPos[1] -= dist_step[1]
+		if p.B3G_RIGHT_ARROW in keys:
+			EEPos[1] += dist_step[1]
 		if p.B3G_UP_ARROW in keys:
-			EEPos[0] += dist_step[0]
-		if p.B3G_DOWN_ARROW in keys:
 			EEPos[0] -= dist_step[0]
+		if p.B3G_DOWN_ARROW in keys:
+			EEPos[0] += dist_step[0]
 		if ord('i') in keys:
 			EEPos[2] += dist_step[2]
 		if ord('k') in keys:
@@ -428,7 +428,12 @@ class TeleopInference():
 		if ord('l') in keys:
 			jointVelocities[EElink] -= turn_step / time_step
 
-		return jointVelocities
+		# Update joystick command.
+		self.joy_cmd = np.diag(jointVelocities[1:8])
+
+		# Move arm in openrave as well.
+		joint_angles = np.diag(jointPoses[1:8] * (180/np.pi))
+		self.joint_angles_callback(ros_utils.cmd_to_JointAnglesMsg(joint_angles))
 
 	def joystick_input_callback(self, msg):
 		"""
