@@ -405,23 +405,24 @@ class TeleopInference():
 		jointPoses = np.array([s[0] for s in state])
 
 		# Parse keyboard commands.
+		EEPos_new = np.copy(EEPos)
 		keys = p.getKeyboardEvents()
 		if p.B3G_LEFT_ARROW in keys:
-			EEPos[1] -= dist_step[1]
+			EEPos_new[1] -= dist_step[1]
 		if p.B3G_RIGHT_ARROW in keys:
-			EEPos[1] += dist_step[1]
+			EEPos_new[1] += dist_step[1]
 		if p.B3G_UP_ARROW in keys:
-			EEPos[0] -= dist_step[0]
+			EEPos_new[0] -= dist_step[0]
 		if p.B3G_DOWN_ARROW in keys:
-			EEPos[0] += dist_step[0]
+			EEPos_new[0] += dist_step[0]
 		if ord('i') in keys:
-			EEPos[2] += dist_step[2]
+			EEPos_new[2] += dist_step[2]
 		if ord('k') in keys:
-			EEPos[2] -= dist_step[2]
+			EEPos_new[2] -= dist_step[2]
 
 		# Get new velocity.
-		if len(keys.keys()) > 0:
-			newPoses = np.asarray((0.0,) + p.calculateInverseKinematics(self.bullet_environment["robot"], EElink, EEPos))
+		if not np.array_equal(EEPos_new, EEPos):
+			newPoses = np.asarray((0.0,) + p.calculateInverseKinematics(self.bullet_environment["robot"], EElink, EEPos_new))
 			jointVelocities = (newPoses - jointPoses) / time_step
 		if ord('j') in keys:
 			jointVelocities[EElink] += turn_step / time_step
