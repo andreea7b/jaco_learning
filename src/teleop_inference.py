@@ -97,28 +97,17 @@ class TeleopInference():
 
 		elif mode == "pybullet":
 			# Start simulation.
-			cameraDistance = 1
-			cameraYaw = 35
-			cameraPitch = -35
-			linkIdx = 7
-			p.changeDynamics(self.bullet_environment["robot"], linkIdx, linearDamping=0.9)
-			for i in range(11):
-				p.setJointMotorControl2(self.bullet_environment["robot"], i, p.VELOCITY_CONTROL, force=0)
 			while not rospy.is_shutdown():
 				if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
 					line = raw_input()
 					break
-				EEPos = robot_coords(self.bullet_environment["robot"])[linkIdx-1]
-				p.resetDebugVisualizerCamera(cameraDistance, cameraYaw, cameraPitch, EEPos)
-				camInfo = p.getDebugVisualizerCamera()
-				camForward = camInfo[5]
-				forward, turn = self.keyboard_input_callback()
-				force = [forward * camForward[0], forward * camForward[1], 0]
-				cameraYaw = cameraYaw + turn
-				if (forward):
-					p.applyExternalForce(self.bullet_environment["robot"], linkIdx, force, EEPos, flags=p.WORLD_FRAME)
-				p.stepSimulation()
-				r.sleep()
+
+                # Set velocity.
+                jointVelocities = self.keyboard_input_callback()
+                for i in range(p.getNumJoints(self.bullet_environment["robot"])):
+                    p.setJointMotorControl2(self.bullet_environment["robot"], i, p.VELOCITY_CONTROL, targetVelocity=jointVelocities[i])
+
+                time.sleep(0.05)
 
 			# Disconnect once the session is over.
 			p.disconnect()
@@ -398,30 +387,43 @@ class TeleopInference():
 		#self.cmd = self.controller.get_command(self.curr_pos)
 
 	def keyboard_input_callback(self):
-		forward = 0
-		turn = 0
-		keys = p.getKeyboardEvents()
-		for k, v in keys.items():
+        # Reset variables.
+        jointVelocities = [0.0] * p.getNumJoints(self.bullet_environment["robot"])
+        dist_step = [0.01, 0.01, 0.01]
+        time_step = 0.05
+        turn_step = 0.05
+        EElink = 7
 
-			if (k == p.B3G_RIGHT_ARROW and (v & p.KEY_WAS_TRIGGERED)):
-			  turn = -0.5
-			if (k == p.B3G_RIGHT_ARROW and (v & p.KEY_WAS_RELEASED)):
-			  turn = 0
-			if (k == p.B3G_LEFT_ARROW and (v & p.KEY_WAS_TRIGGERED)):
-			  turn = 0.5
-			if (k == p.B3G_LEFT_ARROW and (v & p.KEY_WAS_RELEASED)):
-			  turn = 0
+        # Get current EE position.
+        EEPos = robot_coords(self.bullet_environment["robot"])[EElink-1]
+        state = p.getJointStates(self.bullet_environment["robot"], range(p.getNumJoints(self.bullet_environment["robot"])))
+        jointPoses = [s[0] for s in state]
 
-			if (k == p.B3G_UP_ARROW and (v & p.KEY_WAS_TRIGGERED)):
-			  forward = 1
-			if (k == p.B3G_UP_ARROW and (v & p.KEY_WAS_RELEASED)):
-			  forward = 0
-			if (k == p.B3G_DOWN_ARROW and (v & p.KEY_WAS_TRIGGERED)):
-			  forward = -1
-			if (k == p.B3G_DOWN_ARROW and (v & p.KEY_WAS_RELEASED)):
-			  forward = 0
+        # Parse keyboard commands.
+        keys = p.getKeyboardEvents()
+        if p.B3G_LEFT_ARROW in keys:
+            EEPos[1] += dist_step[1]
+        if p.B3G_RIGHT_ARROW in keys:
+            EEPos[1] -= dist_step[1]
+        if p.B3G_UP_ARROW in keys:
+            EEPos[0] += dist_step[0]
+        if p.B3G_DOWN_ARROW in keys:
+            EEPos[0] -= dist_step[0]
+        if ord('i') in keys:
+            EEPos[2] += dist_step[2]
+        if ord('k') in keys:
+            EEPos[2] -= dist_step[2]
 
-		return forward, turn
+        # Get new velocity.
+        if len(keys.keys()) > 0:
+            newPoses = (0.0,) + p.calculateInverseKinematics(self.bullet_environment["robot"], EElink, EEPos)
+            jointVelocities = (np.asarray(newPoses) - np.asarray(jointPoses)) / time_step
+        if ord('j') in keys:
+            jointVelocities[EElink] += turn_step / time_step
+        if ord('l') in keys:
+            jointVelocities[EElink] -= turn_step / time_step
+
+		return jointVelocities
 
 	def joystick_input_callback(self, msg):
 		"""
