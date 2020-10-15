@@ -1,7 +1,7 @@
 setup:
     prefix: 'j2s7s300_driver'
     model_filename: "jaco_dynamics"
-    object_centers: {'HUMAN_CENTER': [-0.6,-0.55,0.0], 'LAPTOP_CENTER': [-0.7929,-0.1,0.0]}
+    object_centers: {'HUMAN_CENTER': [-0.6,-0.55,0.0], 'LAPTOP_CENTER': [-0.7,-0.1,0.0]}
     # for the features and weights that are shared between all goals
     common_feat_list: ['efficiency']
     common_feat_weights: [1.0]
@@ -44,8 +44,8 @@ learner:
     #goal_beliefs: [0., 0., 1.]
     inference_method: "dragan"
     #inference_method: "none"
-    #assistance_method: "blend"
-    assistance_method: "none"
+    assistance_method: "blend"
+    #assistance_method: "none"
     beta_method: "estimate"
     #beta_priors: [0.4, 0.4, 0.2] # if "joint" these are probabilities
     #beta_priors: [2, 2, 2] #if "estimate" these are exponential rate parameters

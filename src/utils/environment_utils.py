@@ -6,45 +6,32 @@ import random
 def setup_environment():
     objectID = {}
 
-    # Add the floor.
-    objectID["plane"] = p.loadURDF("plane.urdf")
-
     # Add a table.
-    pos = [0, 0, 0]
+    pos = [-0.675, 0, -0.675]
     orientation = p.getQuaternionFromEuler([0, 0, 0])
     objectID["table"] = p.loadURDF("table/table.urdf", pos, orientation, useFixedBase=True)
 
     # Add a robot support.
-    pos = [-0.65, 0, 0.65]
+    pos = [0, 0, -0.025]
     orientation = p.getQuaternionFromEuler([0, 0, 0])
     objectID["stand"] = p.loadURDF("support.urdf", pos, orientation, useFixedBase=True)
 
     # Add the laptop.
-    pos = [-0.1, 0.0, 0.635]
+    pos = [-0.7, 0.0, -0.05]
     orientation = p.getQuaternionFromEuler([0, 0, 0])
     objectID["laptop"] = p.loadURDF("laptop.urdf", pos, orientation, useFixedBase=True)
 
-    # Add the human.
-    pos = [-0.4, 0.7, 0.9]
-    orientation = p.getQuaternionFromEuler([1.5, 0, -1.5])
-    objectID["human"] = p.loadURDF("humanoid/humanoid.urdf", pos, orientation, globalScaling=0.25, useFixedBase=True)
-
     # Add the Jaco robot and initialize it.
-    pos = [-0.65, 0, 0.675]
+    pos = [0, 0, 0]
     orientation = p.getQuaternionFromEuler([0, 0, 0])
     objectID["robot"] = p.loadURDF("jaco.urdf", pos, orientation, useFixedBase=True)
-    move_robot(objectID["robot"])
     return objectID
 
 
-def move_robot(robotID):
+def move_robot(robotID, jointPoses):
     """
-    Randomly move the robot to a legal position above the table.
+    Move the robot to a legal position.
     """
-    pos, _ = p.getBasePositionAndOrientation(robotID)
-    limits = [(pos[0], pos[0]+1.5), (pos[1]-1.0/2, pos[1]+1.0/2), (pos[2]+0.05, pos[2]+1.0)]
-    target = [random.uniform(l[0], l[1]) for l in limits]
-    jointPoses = p.calculateInverseKinematics(robotID, 7, target)
     for jointIndex in range(p.getNumJoints(robotID)-1):
         p.resetJointState(robotID, jointIndex+1, jointPoses[jointIndex])
 

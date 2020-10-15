@@ -96,18 +96,23 @@ class TeleopInference():
 				r.sleep()
 
 		elif mode == "pybullet":
+			print("Simulating robot, press ENTER to quit:")
+			bullet_start = np.append(self.start.reshape(7), np.array([0,0,0]))
+			move_robot(self.bullet_environment["robot"], bullet_start)
 			# Start simulation.
 			while not rospy.is_shutdown():
 				if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
 					line = raw_input()
 					break
 
-                # Set velocity.
-                jointVelocities = self.keyboard_input_callback()
-                for i in range(p.getNumJoints(self.bullet_environment["robot"])):
-                    p.setJointMotorControl2(self.bullet_environment["robot"], i, p.VELOCITY_CONTROL, targetVelocity=jointVelocities[i])
+				# Update position.
+				self.keyboard_input_callback()
 
-                time.sleep(0.05)
+				# Update sim position with new velocity command.
+				for i in range(len(self.cmd)):
+					p.setJointMotorControl2(self.bullet_environment["robot"], i+1, p.VELOCITY_CONTROL, targetVelocity=self.cmd[i][i])
+
+				time.sleep(0.05)
 
 			# Disconnect once the session is over.
 			p.disconnect()
@@ -271,7 +276,7 @@ class TeleopInference():
 
 		if mode == "pybullet":
 			# Connect to a physics simulator.
-			physicsClient = p.connect(p.GUI)
+			physicsClient = p.connect(p.GUI)#, options="--opengl2")
 
 			# Add path to data resources for the environment.
 			p.setAdditionalSearchPath("/home/anca/catkin_ws/src/jaco_learning/data/resources")
@@ -281,7 +286,7 @@ class TeleopInference():
 
 			# Get rid of gravity and make simulation happen in real time.
 			p.setGravity(0, 0, 0)
-			p.setRealTimeSimulation(0)
+			p.setRealTimeSimulation(1)
 		else:
 			# ----- Input Device Setup ----- #
 			self.joy_environment = Environment(model_filename,
@@ -302,9 +307,9 @@ class TeleopInference():
 												   use_viewer=True,
 												   plot_objects=False)
 
-			self.exp_data = {
-				'joint6_assist': []
-			}
+		self.exp_data = {
+			'joint6_assist': []
+		}
 
 	def register_callbacks(self, mode):
 		"""
@@ -387,43 +392,49 @@ class TeleopInference():
 		#self.cmd = self.controller.get_command(self.curr_pos)
 
 	def keyboard_input_callback(self):
-        # Reset variables.
-        jointVelocities = [0.0] * p.getNumJoints(self.bullet_environment["robot"])
-        dist_step = [0.01, 0.01, 0.01]
-        time_step = 0.05
-        turn_step = 0.05
-        EElink = 7
+		# Reset variables.
+		jointVelocities = [0.0] * p.getNumJoints(self.bullet_environment["robot"])
+		dist_step = [0.01, 0.01, 0.01]
+		time_step = 0.05
+		turn_step = 0.05
+		EElink = 7
 
-        # Get current EE position.
-        EEPos = robot_coords(self.bullet_environment["robot"])[EElink-1]
-        state = p.getJointStates(self.bullet_environment["robot"], range(p.getNumJoints(self.bullet_environment["robot"])))
-        jointPoses = [s[0] for s in state]
+		# Get current EE position.
+		EEPos = robot_coords(self.bullet_environment["robot"])[EElink-1]
+		state = p.getJointStates(self.bullet_environment["robot"], range(p.getNumJoints(self.bullet_environment["robot"])))
+		jointPoses = np.array([s[0] for s in state])
 
-        # Parse keyboard commands.
-        keys = p.getKeyboardEvents()
-        if p.B3G_LEFT_ARROW in keys:
-            EEPos[1] += dist_step[1]
-        if p.B3G_RIGHT_ARROW in keys:
-            EEPos[1] -= dist_step[1]
-        if p.B3G_UP_ARROW in keys:
-            EEPos[0] += dist_step[0]
-        if p.B3G_DOWN_ARROW in keys:
-            EEPos[0] -= dist_step[0]
-        if ord('i') in keys:
-            EEPos[2] += dist_step[2]
-        if ord('k') in keys:
-            EEPos[2] -= dist_step[2]
+		# Parse keyboard commands.
+		EEPos_new = np.copy(EEPos)
+		keys = p.getKeyboardEvents()
+		if p.B3G_LEFT_ARROW in keys:
+			EEPos_new[1] -= dist_step[1]
+		if p.B3G_RIGHT_ARROW in keys:
+			EEPos_new[1] += dist_step[1]
+		if p.B3G_UP_ARROW in keys:
+			EEPos_new[0] -= dist_step[0]
+		if p.B3G_DOWN_ARROW in keys:
+			EEPos_new[0] += dist_step[0]
+		if ord('i') in keys:
+			EEPos_new[2] += dist_step[2]
+		if ord('k') in keys:
+			EEPos_new[2] -= dist_step[2]
 
-        # Get new velocity.
-        if len(keys.keys()) > 0:
-            newPoses = (0.0,) + p.calculateInverseKinematics(self.bullet_environment["robot"], EElink, EEPos)
-            jointVelocities = (np.asarray(newPoses) - np.asarray(jointPoses)) / time_step
-        if ord('j') in keys:
-            jointVelocities[EElink] += turn_step / time_step
-        if ord('l') in keys:
-            jointVelocities[EElink] -= turn_step / time_step
+		# Get new velocity.
+		if not np.array_equal(EEPos_new, EEPos):
+			newPoses = np.asarray((0.0,) + p.calculateInverseKinematics(self.bullet_environment["robot"], EElink, EEPos_new))
+			jointVelocities = (newPoses - jointPoses) / time_step
+		if ord('j') in keys:
+			jointVelocities[EElink] += turn_step / time_step
+		if ord('l') in keys:
+			jointVelocities[EElink] -= turn_step / time_step
 
-		return jointVelocities
+		# Update joystick command.
+		self.joy_cmd = np.diag(jointVelocities[1:8])
+
+		# Move arm in openrave as well.
+		joint_angles = np.diag(jointPoses[1:8] * (180/np.pi))
+		self.joint_angles_callback(ros_utils.cmd_to_JointAnglesMsg(joint_angles))
 
 	def joystick_input_callback(self, msg):
 		"""
