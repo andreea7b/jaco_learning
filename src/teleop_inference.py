@@ -276,7 +276,7 @@ class TeleopInference():
 
 		if mode == "pybullet":
 			# Connect to a physics simulator.
-			physicsClient = p.connect(p.GUI, options="--opengl2")
+			physicsClient = p.connect(p.GUI)#, options="--opengl2")
 
 			# Add path to data resources for the environment.
 			p.setAdditionalSearchPath("/home/anca/catkin_ws/src/jaco_learning/data/resources")
