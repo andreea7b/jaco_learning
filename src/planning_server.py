@@ -26,37 +26,37 @@ import socket
 PORT_NUM = 10000
 
 class PlanningServer():
-    def __init__():
-        setup_planner()
+	def __init__():
+		setup_planner()
 
-        # setup socket
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(('localhost', PORT_NUM))
+		# setup socket
+		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		sock.bind(('localhost', PORT_NUM))
 
-        # wait for planning queries
-        while True:
-            connection, client_address = sock.accept()
-            try:
-                trajopt_query_bytes = bytearray()
-                while True:
-                    data = connection.recv()
-                    if data:
-                        trajopt_query_bytes.extend(data)
-                    else:
-                        break
-                trajopt_query = json.loads(trajopt_query_bytes)
-                print trajopt_query
-                # plan here
-                #connection.sendall(...plan...)
-            finally:
-                connection.close()
+		# wait for planning queries
+		while True:
+			connection, client_address = sock.accept()
+			try:
+				trajopt_query_bytes = bytearray()
+				while True:
+					data = connection.recv()
+					if data:
+						trajopt_query_bytes.extend(data)
+					else:
+						break
+				trajopt_query = json.loads(trajopt_query_bytes)
+				print trajopt_query
+				# plan here
+				#connection.sendall(...plan...)
+			finally:
+				connection.close()
 
 
-    def setup_planner():
-        with open('../config/teleop_inference.yaml') as f:
-            config = yaml.load(f)
+	def setup_planner():
+		with open('../config/teleop_inference.yaml') as f:
+			config = yaml.load(f)
 
-        # Openrave parameters for the environment.
+		# Openrave parameters for the environment.
 		model_filename = config["setup"]["model_filename"]
 		object_centers = config["setup"]["object_centers"]
 		self.environment = Environment(model_filename,
@@ -64,7 +64,7 @@ class PlanningServer():
 									   self.feat_list,
 									   feat_range,
 									   goals=self.goals,
-		                               use_viewer=False,
+									   use_viewer=False,
 									   plot_objects=False)
 		self.goal_locs = self.environment.goal_locs
 
@@ -86,4 +86,4 @@ class PlanningServer():
 		#self.traj, self.traj_plan = self.planner.replan(self.start, self.goals[0], None, self.goal_weights[0], self.T, self.timestep, return_both=True)
 
 if __name__ == "__main__":
-    PlanningServer()
+	PlanningServer()
