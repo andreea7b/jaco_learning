@@ -22,7 +22,7 @@ import yaml
 import json
 import socket
 
-PORT_NUM = 10000
+PORT_NUM = 10001
 
 class PlanningServer():
 	def __init__(self):
