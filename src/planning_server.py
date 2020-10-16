@@ -31,7 +31,7 @@ class PlanningServer():
 		# setup socket
 		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-		sock.bind(('localhost', PORT_NUM))
+		sock.bind(('0.0.0.0', PORT_NUM))
 
 		# wait for planning queries
 		sock.listen(1)
@@ -40,7 +40,7 @@ class PlanningServer():
 			try:
 				trajopt_query_bytes = bytearray()
 				while True:
-					data = connection.recv()
+					data = connection.recv(4096)
 					if data:
 						trajopt_query_bytes.extend(data)
 					else:
