@@ -97,7 +97,7 @@ class TeleopInference():
 
 		elif mode == "pybullet":
 			print("Simulating robot, press ENTER to quit:")
-			bullet_start = np.append(self.start.reshape(7), np.array([0,0,0]))
+			bullet_start = np.append(self.start.reshape(7), np.array([0.0, 0.0, 0.0]))
 			move_robot(self.bullet_environment["robot"], bullet_start)
 			# Start simulation.
 			while not rospy.is_shutdown():
@@ -276,17 +276,21 @@ class TeleopInference():
 
 		if mode == "pybullet":
 			# Connect to a physics simulator.
-			physicsClient = p.connect(p.GUI)#, options="--opengl2")
+			physicsClient = p.connect(p.GUI, options="--opengl2")
+
+			# Set camera angle.
+			p.resetDebugVisualizerCamera(cameraDistance=2.50, cameraYaw=-85.6, cameraPitch=-17.6, cameraTargetPosition=[0.33,0.05,0.02])
 
 			# Add path to data resources for the environment.
 			p.setAdditionalSearchPath("/home/anca/catkin_ws/src/jaco_learning/data/resources")
 
 			# Setup the environment.
-			self.bullet_environment = setup_environment()
+			self.bullet_environment = setup_environment(self.goals)
 
 			# Get rid of gravity and make simulation happen in real time.
 			p.setGravity(0, 0, 0)
 			p.setRealTimeSimulation(1)
+			
 		else:
 			# ----- Input Device Setup ----- #
 			self.joy_environment = Environment(model_filename,

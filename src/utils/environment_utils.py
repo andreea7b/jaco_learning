@@ -3,7 +3,7 @@ import numpy as np
 import random
 
 
-def setup_environment():
+def setup_environment(goals):
     objectID = {}
 
     # Add a table.
@@ -25,6 +25,24 @@ def setup_environment():
     pos = [0, 0, 0]
     orientation = p.getQuaternionFromEuler([0, 0, 0])
     objectID["robot"] = p.loadURDF("jaco.urdf", pos, orientation, useFixedBase=True)
+
+    # Add goal visuals.
+    for i,goal in enumerate(goals):
+        move_robot(objectID["robot"], np.append(goal.reshape(7), np.array([0, 0, 0])))
+        pos = robot_coords(objectID["robot"])[-1]
+        p.loadURDF("sphere_transparent.urdf", pos, useFixedBase=True, globalScaling=0.02)
+        #p.addUserDebugLine(pos, pos+0.01, [0, 0, 1], 10)
+        #p.addUserDebugText("Goal {}".format(i), pos, [0, 0, 0], 10)
+
+    # Add a mug in Jaco's hand.
+    targetPos = [-0.7, 0.0, 0.6]
+    targetOr = p.getQuaternionFromEuler([0, -1.5, 0])
+    jointPoses = p.calculateInverseKinematics(objectID["robot"], 7, targetPos, targetOr)
+    move_robot(objectID["robot"], jointPoses)
+    objectID["mug"] = p.loadURDF("dinnerware/cup/cup_small.urdf", globalScaling=1.0)
+    cid = p.createConstraint(objectID["robot"], 7, objectID["mug"], -1, p.JOINT_FIXED, [0, 0, 0], [0.0, 0.0, -0.13], 
+                             [0, 0, 0], childFrameOrientation=p.getQuaternionFromEuler([0, -np.pi/2, 0]))
+
     return objectID
 
 

@@ -44,8 +44,8 @@ learner:
     #goal_beliefs: [0., 0., 1.]
     inference_method: "dragan"
     #inference_method: "none"
-    assistance_method: "blend"
-    #assistance_method: "none"
+    #assistance_method: "blend"
+    assistance_method: "none"
     beta_method: "estimate"
     #beta_priors: [0.4, 0.4, 0.2] # if "joint" these are probabilities
     #beta_priors: [2, 2, 2] #if "estimate" these are exponential rate parameters
