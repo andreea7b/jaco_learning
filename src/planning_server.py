@@ -25,8 +25,8 @@ import socket
 PORT_NUM = 10000
 
 class PlanningServer():
-	def __init__():
-		setup_planner()
+	def __init__(self):
+		self.setup_planner()
 
 		# setup socket
 		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -51,7 +51,7 @@ class PlanningServer():
 				connection.close()
 
 
-	def setup_planner():
+	def setup_planner(self):
 		with open('../config/teleop_inference.yaml') as f:
 			config = yaml.load(f)
 
