@@ -14,7 +14,6 @@ from planners.trajopt_planner import TrajoptPlanner
 from learners.teleop_learner import TeleopLearner
 from utils.environment import Environment
 from utils.openrave_utils import robotToCartesian
-from utils.environment_utils import *
 
 import numpy as np
 import pickle
