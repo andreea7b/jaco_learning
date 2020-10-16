@@ -55,6 +55,44 @@ class PlanningServer():
 		with open('../config/teleop_inference.yaml') as f:
 			config = yaml.load(f)
 
+		self.save_dir = config["setup"]["save_dir")
+
+		# ----- Goals and goal weights setup ----- #
+		# TODO: remove one of these
+		#self.goal_poses = np.array(config[""]["setup/goal_poses"))
+		fixed_goals = [np.array(goal)*(math.pi/180.0) for goal in config["setup"]["goals")]
+		try:
+			learned_goals = np.load('learned_goals.npy')
+			self.goals = fixed_goals + learned_goals
+		except IOError:
+			self.goals = fixed_goals
+
+		self.feat_list = config["setup"]["common_feat_list")
+		feat_range = {'table': 0.98,
+					  'coffee': 1.0,
+					  'laptop': 0.3,
+					  'human': 0.3,
+					  'efficiency': 0.22,
+					  'proxemics': 0.3,
+					  'betweenobjects': 0.2}
+		common_weights = config["setup"]["common_feat_weights")
+		goals_weights = []
+		goal_dist_feat_weight = config["setup"]["goal_dist_feat_weight")
+		if goal_dist_feat_weight != 0.0:
+			# add features for distance from each of the goals
+			common_weights = common_weights + ([0.] * len(self.goals))
+			num_feats = len(self.feat_list)
+			for goal_num in range(len(self.goals)):
+				self.feat_list.append("goal"+str(goal_num)+"_dist")
+				goal_weights = np.array(common_weights)
+				goal_weights[num_feats + goal_num] = goal_dist_feat_weight
+				goals_weights.append(goal_weights)
+		else:
+			# make copies of the common weights
+			for goal_num in range(len(self.goals)):
+				goals_weights.append(np.array(common_weights))
+		self.goal_weights = goals_weights
+
 		# Openrave parameters for the environment.
 		model_filename = config["setup"]["model_filename"]
 		object_centers = config["setup"]["object_centers"]
@@ -83,6 +121,24 @@ class PlanningServer():
 			raise Exception('Planner {} not implemented.'.format(planner_type))
 		# TODO: do something better than goals[0]?
 		#self.traj, self.traj_plan = self.planner.replan(self.start, self.goals[0], None, self.goal_weights[0], self.T, self.timestep, return_both=True)
+
+		# ----- Add in learned cost function goals -----
+		for learned_goal_save_path in config["setup"]["learned_goals"]:
+			# 1. create new weight vectors
+			common_weights = common_weights + [0]
+			for i in range(len(self.goal_weights)):
+				self.goal_weights[i] = np.hstack((self.goal_weights[i], 0))
+			learned_goal_weight = np.array(common_weights)
+			learned_goal_weight[len(self.feat_list)] = 1.
+			self.goal_weights.append(learned_goal_weight)
+
+			# 2. add cost to environment
+			#meirl_goal_save_path = "/root/catkin_ws/src/jaco_learning/data/pour_red_meirl.pt"
+			# this reuses the first goal for the learned feature
+			#self.environment.load_meirl_learned_feature(self.planner, learned_goal_weight, meirl_goal_save_path, goal=self.goals[0])
+			# this uses the average demonstration final position
+			self.environment.load_meirl_learned_feature(self.planner, learned_goal_weight, learned_goal_save_path)
+
 
 if __name__ == "__main__":
 	PlanningServer()
