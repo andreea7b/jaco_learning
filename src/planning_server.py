@@ -34,6 +34,7 @@ class PlanningServer():
 		sock.bind(('localhost', PORT_NUM))
 
 		# wait for planning queries
+		sock.listen(1)
 		while True:
 			connection, client_address = sock.accept()
 			try:
