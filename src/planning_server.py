@@ -55,7 +55,7 @@ class PlanningServer():
 		with open('../config/teleop_inference.yaml') as f:
 			config = yaml.load(f)
 
-		self.save_dir = config["setup"]["save_dir")
+		self.save_dir = config["setup"]["save_dir"]
 
 		# ----- Goals and goal weights setup ----- #
 		# TODO: remove one of these
@@ -67,7 +67,7 @@ class PlanningServer():
 		except IOError:
 			self.goals = fixed_goals
 
-		self.feat_list = config["setup"]["common_feat_list")
+		self.feat_list = config["setup"]["common_feat_list"]
 		feat_range = {'table': 0.98,
 					  'coffee': 1.0,
 					  'laptop': 0.3,
@@ -75,9 +75,9 @@ class PlanningServer():
 					  'efficiency': 0.22,
 					  'proxemics': 0.3,
 					  'betweenobjects': 0.2}
-		common_weights = config["setup"]["common_feat_weights")
+		common_weights = config["setup"]["common_feat_weights"]
 		goals_weights = []
-		goal_dist_feat_weight = config["setup"]["goal_dist_feat_weight")
+		goal_dist_feat_weight = config["setup"]["goal_dist_feat_weight"]
 		if goal_dist_feat_weight != 0.0:
 			# add features for distance from each of the goals
 			common_weights = common_weights + ([0.] * len(self.goals))
