@@ -60,7 +60,7 @@ class PlanningServer():
 		# ----- Goals and goal weights setup ----- #
 		# TODO: remove one of these
 		#self.goal_poses = np.array(config[""]["setup/goal_poses"))
-		fixed_goals = [np.array(goal)*(math.pi/180.0) for goal in config["setup"]["goals")]
+		fixed_goals = [np.array(goal)*(math.pi/180.0) for goal in config["setup"]["goals"]]
 		try:
 			learned_goals = np.load('learned_goals.npy')
 			self.goals = fixed_goals + learned_goals
