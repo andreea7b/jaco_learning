@@ -16,7 +16,7 @@ from utils.environment import Environment
 from utils.openrave_utils import robotToCartesian
 
 import numpy as np
-import pickle
+import cPickle as pickle
 
 import yaml
 import json
@@ -45,10 +45,20 @@ class PlanningServer():
 						trajopt_query_bytes.extend(data)
 					else:
 						break
-				trajopt_query = json.loads(trajopt_query_bytes)
+				trajopt_query = pickle.loads(trajopt_query_bytes)
+				print 'received planning query'
 				print trajopt_query
-				# plan here
-				#connection.sendall(...plan...)
+				p_out = self.planner.replan(trajopt_query[0],
+											trajopt_query[1],
+											trajopt_query[2],
+											trajopt_query[3],
+											trajopt_query[4],
+											trajopt_query[5],
+											trajopt_query[6],
+											trajopt_query[7],
+											trajopt_query[8],
+											trajopt_query[9])
+				connection.sendall(pickle.dumps(p_out))
 			finally:
 				connection.close()
 
