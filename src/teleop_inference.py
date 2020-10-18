@@ -23,11 +23,13 @@ from learners.teleop_learner import TeleopLearner
 from utils import ros_utils
 from utils.environment import Environment
 from utils.openrave_utils import robotToCartesian
+from utils.environment_utils import *
 
 import numpy as np
 import pickle
 
 from openravepy import RaveCreatePhysicsEngine, RaveCreateModule
+import pybullet as p
 
 
 class TeleopInference():
@@ -70,6 +72,7 @@ class TeleopInference():
 					break
 				self.vel_pub.publish(ros_utils.cmd_to_JointVelocityMsg((180/np.pi)*self.cmd))
 				r.sleep()
+			ros_utils.stop_admittance_mode(self.prefix)
 
 		elif mode == "sim":
 			print "Simulating robot, press ENTER to quit:"
@@ -92,10 +95,32 @@ class TeleopInference():
 				loop_iter += 1
 				r.sleep()
 
-		print "----------------------------------"
+		elif mode == "pybullet":
+			print("Simulating robot, press ENTER to quit:")
+			bullet_start = np.append(self.start.reshape(7), np.array([0,0,0]))
+			move_robot(self.bullet_environment["robot"], bullet_start)
+			# Start simulation.
+			while not rospy.is_shutdown():
+				if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+					line = raw_input()
+					break
 
-		if mode == "real":
-			ros_utils.stop_admittance_mode(self.prefix)
+				# Update position.
+				self.keyboard_input_callback()
+
+				# Update sim position with new velocity command.
+				for i in range(len(self.cmd)):
+					p.setJointMotorControl2(self.bullet_environment["robot"], i+1, p.VELOCITY_CONTROL, targetVelocity=self.cmd[i][i])
+
+				time.sleep(0.05)
+
+			# Disconnect once the session is over.
+			p.disconnect()
+
+		print "----------------------------------"
+		self.joy_subscriber.unregister()
+		del self.joy_environment
+		del self.environment
 
 	def load_parameters(self, mode):
 		"""
@@ -154,7 +179,7 @@ class TeleopInference():
 									   self.feat_list,
 									   feat_range,
 									   goals=self.goals,
-		                               use_viewer=False,
+									   use_viewer=False,
 									   plot_objects=False)
 		self.goal_locs = self.environment.goal_locs
 
@@ -247,28 +272,43 @@ class TeleopInference():
 		self.running_final_inference = False
 		self.final_inference_done = False
 
-		# ----- Input Device Setup ----- #
-		self.joy_environment = Environment(model_filename,
-										   object_centers,
-										   list(), # doesn't need to know about features
-										   dict(),
-										   #goals=self.goals,
-										   use_viewer=False,
-										   plot_objects=False)
-		self.joy_cmd = np.zeros((7,7))
 		self.assistance_method = rospy.get_param("learner/assistance_method")
 		self.alpha = 1. # in [0, 1]; higher numbers give more control to human
 		self.zero_input_assist = rospy.get_param("learner/zero_input_assist")
+		self.joy_cmd = np.zeros((7,7))
 
-		# ----- Simulation Setup ----- #
-		if mode == "sim":
-			self.sim_environment = Environment(model_filename,
+		if mode == "pybullet":
+			# Connect to a physics simulator.
+			physicsClient = p.connect(p.GUI)#, options="--opengl2")
+
+			# Add path to data resources for the environment.
+			p.setAdditionalSearchPath("/home/anca/catkin_ws/src/jaco_learning/data/resources")
+
+			# Setup the environment.
+			self.bullet_environment = setup_environment()
+
+			# Get rid of gravity and make simulation happen in real time.
+			p.setGravity(0, 0, 0)
+			p.setRealTimeSimulation(1)
+		else:
+			# ----- Input Device Setup ----- #
+			self.joy_environment = Environment(model_filename,
 											   object_centers,
-											   list(),
+											   list(), # doesn't need to know about features
 											   dict(),
-											   goals=self.goals,
-			                                   use_viewer=True,
+											   #goals=self.goals,
+											   use_viewer=False,
 											   plot_objects=False)
+
+			# ----- Simulation Setup ----- #
+			if mode == "sim":
+				self.sim_environment = Environment(model_filename,
+												   object_centers,
+												   list(),
+												   dict(),
+												   goals=self.goals,
+												   use_viewer=True,
+												   plot_objects=False)
 
 		self.exp_data = {
 			'joint6_assist': []
@@ -278,13 +318,14 @@ class TeleopInference():
 		"""
 		Sets up all the publishers/subscribers needed.
 		"""
-		if mode == "real":
+		if mode == "pybullet":
+			return
+		elif mode == "real":
 			# Create joint-velocity publisher.
 			self.vel_pub = rospy.Publisher(self.prefix + '/in/joint_velocity', kinova_msgs.msg.JointVelocity, queue_size=1)
 			# Create subscriber to joint_angles.
 			self.joint_subscriber = rospy.Subscriber(self.prefix + '/out/joint_angles', kinova_msgs.msg.JointAngles, self.joint_angles_callback, queue_size=1)
-		elif mode == "sim":
-			pass
+
 		# Create subscriber to input joystick.
 		self.joy_subscriber = rospy.Subscriber('joy', Joy, self.joystick_input_callback, queue_size=1)
 
@@ -317,10 +358,6 @@ class TeleopInference():
 				self.inference_thread.start()
 			elif self.final_inference_done:
 				pass
-				#self.joy_subscriber.unregister()
-				#del self.joy_environment
-				#del self.environment
-				
 
 		ctl_cmd = self.controller.get_command(self.curr_pos)
 		#print "joint 6 unblended assistance:", ctl_cmd[6,6]
@@ -356,6 +393,51 @@ class TeleopInference():
 			raise ValueError
 		# Update cmd from PID based on current position.
 		#self.cmd = self.controller.get_command(self.curr_pos)
+
+	def keyboard_input_callback(self):
+		# Reset variables.
+		jointVelocities = [0.0] * p.getNumJoints(self.bullet_environment["robot"])
+		dist_step = [0.01, 0.01, 0.01]
+		time_step = 0.05
+		turn_step = 0.05
+		EElink = 7
+
+		# Get current EE position.
+		EEPos = robot_coords(self.bullet_environment["robot"])[EElink-1]
+		state = p.getJointStates(self.bullet_environment["robot"], range(p.getNumJoints(self.bullet_environment["robot"])))
+		jointPoses = np.array([s[0] for s in state])
+
+		# Parse keyboard commands.
+		EEPos_new = np.copy(EEPos)
+		keys = p.getKeyboardEvents()
+		if p.B3G_LEFT_ARROW in keys:
+			EEPos_new[1] -= dist_step[1]
+		if p.B3G_RIGHT_ARROW in keys:
+			EEPos_new[1] += dist_step[1]
+		if p.B3G_UP_ARROW in keys:
+			EEPos_new[0] -= dist_step[0]
+		if p.B3G_DOWN_ARROW in keys:
+			EEPos_new[0] += dist_step[0]
+		if ord('i') in keys:
+			EEPos_new[2] += dist_step[2]
+		if ord('k') in keys:
+			EEPos_new[2] -= dist_step[2]
+
+		# Get new velocity.
+		if not np.array_equal(EEPos_new, EEPos):
+			newPoses = np.asarray((0.0,) + p.calculateInverseKinematics(self.bullet_environment["robot"], EElink, EEPos_new))
+			jointVelocities = (newPoses - jointPoses) / time_step
+		if ord('j') in keys:
+			jointVelocities[EElink] += turn_step / time_step
+		if ord('l') in keys:
+			jointVelocities[EElink] -= turn_step / time_step
+
+		# Update joystick command.
+		self.joy_cmd = np.diag(jointVelocities[1:8])
+
+		# Move arm in openrave as well.
+		joint_angles = np.diag(jointPoses[1:8] * (180/np.pi))
+		self.joint_angles_callback(ros_utils.cmd_to_JointAnglesMsg(joint_angles))
 
 	def joystick_input_callback(self, msg):
 		"""
@@ -416,7 +498,6 @@ class TeleopInference():
 		self.joy_cmd = np.diag(cmd[:7])
 		#end = time.time()
 		#print 'command time', end - start
-
 
 	def _joystick_input_callback(self, msg):
 		"""
