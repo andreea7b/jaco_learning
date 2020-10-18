@@ -20,7 +20,6 @@ class TeleopLearner(object):
 		self.goal_priors = goal_priors
 		self.goal_beliefs = goal_priors
 		self.beta_priors = beta_priors
-		assert(len(main.goals) == len(goal_priors))
 		self.betas = betas
 
 		self.last_inf_idx = 0 # holds the index of the last time from which inference was run

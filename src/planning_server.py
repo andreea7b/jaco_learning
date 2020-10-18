@@ -11,20 +11,83 @@ from sensor_msgs.msg import Joy
 
 from controllers.pid_controller import PIDController
 from planners.trajopt_planner import TrajoptPlanner
-from learners.teleop_learner import TeleopLearner
 from utils.environment import Environment
-from utils.openrave_utils import robotToCartesian
+from teleop_inference_base import TeleopInferenceBase
 
 import numpy as np
 import cPickle as pickle
-
 import yaml
-import json
 import socket
 
 PORT_NUM = 10001
 
-class PlanningServer():
+class PlanningServer(TeleopInferenceBase):
+	def __init__(self):
+		super(PlanningServer, self).__init__(True)
+
+		# setup socket
+		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+		sock.bind(('0.0.0.0', PORT_NUM))
+
+		# wait for planning queries
+		sock.listen(1)
+		while True:
+			connection, client_address = sock.accept()
+			try:
+				query_bytes = bytearray()
+				while True:
+					data = connection.recv(4096)
+					if data:
+						query_bytes.extend(data)
+					else:
+						break
+				query = pickle.loads(str(query_bytes))
+				#query = pickle.loads(str(query_bytes.decode('utf-8')))
+				print 'query:'
+				print query
+				type, params = query
+				out = [] # what to return
+				if type == 0 or type == 2:
+					# checking if indices were used instead of angles/poses
+					if isinstance(params[1], int):
+						params[1] = self.goals[params[1]]
+					if isinstance(params[2], int):
+						params[2] = self.goal_locs[params[2]]
+					traj, plan = self.planner.replan(params[0],
+													 params[1],
+													 list(params[2]),
+													 self.goal_weights[params[3]],
+													 params[4],
+													 params[5],
+													 params[6],
+													 params[7],
+													 False,
+													 True)
+					# always plan and get both, then send the desired plan/traj/both back
+					if not params[9]:
+						if params[8]:
+							p_out = plan
+						else:
+							p_out = traj
+					else:
+						p_out = [traj, plan]
+					out.append(p_out)
+				if type == 2:
+					# change params to replicate a cost query
+					params[0] = traj.waypts
+					params[1] = params[3] # weight vector index
+					params[2] = params[10] # add_pose_penalty
+				if type == 1 or type == 2:
+					support = np.arange(self.num_goals)[self.goal_weights[params[1]] != 0.0]
+					c_out = np.sum(self.goal_weights[params[1]][support] * np.sum(self.environment.featurize(params[0], support), axis=1))
+					out.append(c_out)
+				connection.sendall(pickle.dumps(out, 2))
+				connection.shutdown(2)
+			finally:
+				connection.close()
+
+class PlanningServer1():
 	def __init__(self):
 		self.setup_planner()
 
