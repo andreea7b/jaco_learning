@@ -10,11 +10,14 @@ import sys, select, os
 import time
 from threading import Thread
 
+
 #from utils.environment_utils import *
+from utils.trajectory import Trajectory
 
 import numpy as np
 import yaml
 import cPickle as pickle
+
 
 PORT_NUM = 10001
 
@@ -145,8 +148,11 @@ class TeleopInferenceBase(object):
 			# ----- Planner Setup ----- #
 			self.planner = self.client
 
-			# Initialize planner and compute trajectory to track.
-			self.traj, self.traj_plan = self.planner.replan(self.start, 0, 0, 0, self.T, self.timestep, return_both=True)
+			# # Initialize planner and compute trajectory to track.
+			# self.traj, self.traj_plan = self.planner.replan(self.start, 0, 0, 0, self.T, self.timestep, return_both=True)
+			# Initialize with stationary trajectory
+			traj = Trajectory([self.start, self.start], [0, self.T]).resample(int(self.T/self.timestep) + 1)
+			self.traj, self.traj_plan = traj, traj.resample(config["planner"]["num_waypts"])
 
 			# Track if you have reached the goal of the path and the episode start time
 			self.start_T = None

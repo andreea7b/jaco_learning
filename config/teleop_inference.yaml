@@ -61,10 +61,10 @@ learner:
     #goal_beliefs: [0., 0., 0., 1.]
     #goal_beliefs: [0., 0., 1.]
     # inference method is "dragan", "collect", or "none"
-    inference_method: "dragan"
+    inference_method: "collect"
     #inference_method: "none"
-    assistance_method: "blend"
-    #assistance_method: "none"
+    #assistance_method: "blend"
+    assistance_method: "none"
     #beta_method: "joint"
     beta_method: "estimate"
     #beta_priors: [1] # if "joint" these are probabilities
@@ -73,6 +73,6 @@ learner:
     #beta_priors: [0, 0, 0, -10000]
     beta_priors: [0, 0]
     #beta_priors: [2, 2, -10000]
-    zero_input_assist: True
+    zero_input_assist: False
     alpha_method: "beta"
     demonstration_save_path: ""
