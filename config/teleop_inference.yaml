@@ -13,10 +13,11 @@ setup:
         [210.0, 130.0, 200.0, 240.0, 180.0, 172.0, 280.0]
     ]
     # for generating goal-specific feature weights
-    goal_dist_feat_weight: 0.0
+    goal_dist_feat_weight: 0.0 #currently not implemented
     learned_goals: [
-        "/root/catkin_ws/src/jaco_learning/data/pour_red_pose_uc.pt",
-        "/root/catkin_ws/src/jaco_learning/data/goto_green_pose_uc.pt"
+    #    "/root/catkin_ws/src/jaco_learning/data/pour_red_new_meirl_test2.pt",
+    #    "/root/catkin_ws/src/jaco_learning/data/pour_red_pose_uc.pt",
+    #    "/root/catkin_ws/src/jaco_learning/data/goto_green_pose_uc.pt"
     #    "/root/catkin_ws/src/jaco_learning/data/pour_red_meirl.pt",
     #    "/root/catkin_ws/src/jaco_learning/data/pour_red_meirl2.pt",
     #    "/root/catkin_ws/src/jaco_learning/data/goto_green_meirl.pt"
@@ -30,7 +31,7 @@ planner:
     type: "trajopt"
     max_iter: 50
     num_waypts: 5
-    prefer_angles: False #whether to use goal angles over goal poses
+    prefer_angles: True #whether to use goal angles over goal poses
     use_constraint_learned: True
 
 controller:
@@ -43,18 +44,35 @@ controller:
     max_cmd: 40.0
 
 learner:
+    # # for baseline
+    # betas: [1]
+    # goal_beliefs: "none"
+    # inference_method: "dragan"
+    # assistance_method: "blend"
+    # beta_method: "joint"
+    # beta_priors: [1]
+    # zero_input_assist: True
+    # alpha_method: "prob"
+
+
+
     betas: [0.1, 1, 10.]
     goal_beliefs: "none" #if 'none' then uniform gets used
     #goal_beliefs: [0., 0., 0., 1.]
-    #inference_method: "dragan"
-    inference_method: "none"
-    #assistance_method: "blend"
-    assistance_method: "none"
+    #goal_beliefs: [0., 0., 1.]
+    # inference method is "dragan", "collect", or "none"
+    inference_method: "dragan"
+    #inference_method: "none"
+    assistance_method: "blend"
+    #assistance_method: "none"
+    #beta_method: "joint"
     beta_method: "estimate"
-    #beta_priors: [0.4, 0.4, 0.2] # if "joint" these are probabilities
+    #beta_priors: [1] # if "joint" these are probabilities
     #beta_priors: [2, 2, 2] #if "estimate" these are exponential rate parameters
-    beta_priors: "none" #if 'none' then 0's are used
+    #beta_priors: "none" #if 'none' then 0's are used
     #beta_priors: [0, 0, 0, -10000]
-    #beta_priors: [0, 0, 0, 0, 0]
+    beta_priors: [0, 0]
     #beta_priors: [2, 2, -10000]
-    zero_input_assist: False
+    zero_input_assist: True
+    alpha_method: "beta"
+    demonstration_save_path: ""

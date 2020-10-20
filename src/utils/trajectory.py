@@ -59,6 +59,10 @@ class Trajectory(object):
 		assert num_waypts <= len(self.waypts), "Downsampling requires a smaller number of waypoints to downsample to. Your number is larger."
 		assert len(self.waypts) > 1, "Cannot downsample a one-waypoint trajectory."
 
+		if num_waypts == 1:
+			print 'WARNING: Downsampling to one waypoint'
+			return Trajectory([self.waypts[-1]], [self.waypts_time[-1]])
+
 		timestep = (self.waypts_time[-1] - self.waypts_time[0]) / (num_waypts - 1)
 		waypts = np.zeros((num_waypts,7))
 		waypts_time = [None]*num_waypts

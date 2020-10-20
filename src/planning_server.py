@@ -79,7 +79,7 @@ class PlanningServer(TeleopInferenceBase):
 					params[1] = params[3] # weight vector index
 					params[2] = params[10] # add_pose_penalty
 				if type == 1 or type == 2:
-					support = np.arange(self.num_goals)[self.goal_weights[params[1]] != 0.0]
+					support = np.arange(len(self.goal_weights[params[1]]))[self.goal_weights[params[1]] != 0.0]
 					c_out = np.sum(self.goal_weights[params[1]][support] * np.sum(self.environment.featurize(params[0], support), axis=1))
 					out.append(c_out)
 				connection.sendall(pickle.dumps(out, 2))

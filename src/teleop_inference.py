@@ -30,23 +30,19 @@ class TeleopInference(TeleopInferenceBase):
 	def __init__(self):
 		super(TeleopInference, self).__init__(False)
 
-		print 'got here 0'
 		# ------- setup pybullet -------
 		physicsClient = p.connect(p.GUI)
 		#physicsClient = p.connect(p.GUI, options="--opengl2")
-		print 'got here 1'
 
 		# Set camera angle.
-		p.resetDebugVisualizerCamera(cameraDistance=2.50, cameraYaw=-85.6, cameraPitch=-17.6, cameraTargetPosition=[0.33,0.05,0.02])
-		print 'got here 2'
+		#p.resetDebugVisualizerCamera(cameraDistance=2.50, cameraYaw=-85.6, cameraPitch=-17.6, cameraTargetPosition=[0.33,0.05,0.02])
+		p.resetDebugVisualizerCamera(cameraDistance=2.50, cameraYaw=90, cameraPitch=-30, cameraTargetPosition=[-0.8,0.05,0.02])
 
 		# Add path to data resources for the environment.
 		p.setAdditionalSearchPath("../data/resources")
-		print 'got here 3'
 
 		# Setup the environment.
 		self.bullet_environment = setup_environment(self.goals)
-		print 'got here 4'
 
 		# Get rid of gravity and make simulation happen in real time.
 		p.setGravity(0, 0, 0)
@@ -81,7 +77,6 @@ class TeleopInference(TeleopInferenceBase):
 		Reads the latest position of the robot and publishes an
 		appropriate velocity command to move the robot to the target.
 		"""
-
 		# Convert to radians.
 		self.curr_pos = curr_pos*(math.pi/180.0)
 
@@ -103,26 +98,32 @@ class TeleopInference(TeleopInferenceBase):
 			elif self.final_inference_done:
 				pass
 
-		ctl_cmd = self.controller.get_command(self.curr_pos)
+		ctl_cmd = self.controller.get_command(self.curr_pos.reshape(7,1))
 		#print "joint 6 unblended assistance:", ctl_cmd[6,6]
-		self.exp_data['joint6_assist'].append(ctl_cmd[6,6])
+		#TODO: decide what to log
+		#self.exp_data['joint6_assist'].append(ctl_cmd[6,6])
 		if self.assistance_method == "blend":
 			if self.learner.last_inf_idx > self.last_inf_idx: # new inference step complete
 				self.last_inf_idx = self.learner.last_inf_idx
 				if self.beta_method == "joint":
 					goal, beta = self.learner.argmax_joint_beliefs
 					#print 'goal:', goal, 'beta:', beta
-					#print 'joint beliefs:', self.learner.joint_beliefs
+					print 'joint beliefs:', self.learner.joint_beliefs
+					belief = np.max(self.learner.joint_beliefs[goal])
 				elif self.beta_method == "estimate":
 					goal, beta = self.learner.argmax_estimate
+					belief = self.learner.goal_beliefs[goal]
 					#print 'goal:', goal, 'beta:', beta
 					#print 'beta estimates:', self.learner.beta_estimates
 					#print 'goal beliefs:', self.learner.goal_beliefs
-				self.alpha = beta_arbitration(beta)
-				self.traj = self.learner.cache['goal_traj_by_idx'][self.last_inf_idx][goal]
-				self.traj_plan = self.learner.cache['goal_traj_plan_by_idx'][self.last_inf_idx][goal]
-				self.controller.set_trajectory(self.traj,
-											   path_start_T=self.idx_to_time(self.last_inf_idx))
+				self.alpha = self.beta_arbitration(beta, belief)
+				if goal != self.curr_goal:
+					print 'new assistance trajectory, goal:', goal
+					self.curr_goal = goal
+					self.traj = self.learner.cache['goal_traj_by_idx'][self.last_inf_idx][goal]
+					self.traj_plan = self.learner.cache['goal_traj_plan_by_idx'][self.last_inf_idx][goal]
+					self.controller.set_trajectory(self.traj,
+												   path_start_T=self.idx_to_time(self.last_inf_idx))
 			if np.allclose(self.joy_cmd, np.zeros((7,7))) and not self.zero_input_assist:
 				self.cmd = self.joy_cmd
 			else:
@@ -180,19 +181,23 @@ class TeleopInference(TeleopInferenceBase):
 		self.joy_cmd = np.diag(jointVelocities[1:8])
 
 		# Move arm in openrave as well.
-		joint_angles = np.diag(jointPoses[1:8] * (180/np.pi))
+		joint_angles = jointPoses[1:8] * (180/np.pi)
+		#joint_angles = np.diag(jointPoses[1:8] * (180/np.pi))
 		self.joint_angles_callback(joint_angles)
 
 
 	def idx_to_time(self, idx):
 		return self.start_T + idx * self.timestep
 
-def beta_arbitration(beta):
-	#return 1 #all joystick
-	return 0
-	#return np.clip(1 / beta, 0, 1)
-	#return np.clip(0.5 / beta, 0, 1)
-	#return np.clip(np.exp(-beta + 0.1), 0, 1)
+	def beta_arbitration(self, beta, belief):
+		if self.alpha_method == 'prob':
+			return belief
+		elif self.alpha_method == 'beta':
+			return 1 #all joystick
+			return 0
+			#return np.clip(1 / beta, 0, 1)
+			#return np.clip(0.5 / beta, 0, 1)
+			#return np.clip(np.exp(-beta + 0.1), 0, 1)
 
 if __name__ == '__main__':
 	TeleopInference()

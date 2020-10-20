@@ -156,7 +156,7 @@ class TrajoptPlanner(object):
 			if self.weights[feat_idx] == 0.0:
 				J.append(np.zeros(len(waypt)))
 				continue
-			
+
 			# Setup for computing Jacobian.
 			x = torch.tensor(waypt, requires_grad=True)
 
@@ -263,7 +263,7 @@ class TrajoptPlanner(object):
 				"costs": [
 				#{
 				#	"type": "joint_vel",
-				#	"params": {"coeffs": [0.0]}
+				#	"params": {"coeffs": [0.22]}
 				#}
 				],
 				"constraints": constraint,

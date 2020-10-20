@@ -203,7 +203,8 @@ class DeepMaxEntIRL:
 					g_poses = self.goal_poses
 
 				for start, goal, goal_pose, dem_num in zip(self.starts, self.goals, g_poses, range(len(self.starts))):
-					seed = cur_rew_traj_cache[dem_num]
+					#seed = cur_rew_traj_cache[dem_num] # uncomment to use last computed path as seed
+					seed = None
 					cur_rew_traj, cur_rew_traj_plan = self.get_trajs_with_cur_reward(n_cur_rew_traj, std,
 																					 start, goal, goal_pose,
 																					 seed=seed, return_opt_plan=True)

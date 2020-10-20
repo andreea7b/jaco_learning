@@ -107,7 +107,7 @@ class TeleopInferenceBase(object):
 				prefer_angles = config["planner"]["prefer_angles"]
 				use_constraint_learned = config["planner"]["use_constraint_learned"]
 
-				# Initialize planner and compute trajectory to track.
+				# Initialize planner.
 				self.planner = TrajoptPlanner(max_iter, num_waypts, self.environment,
 											  prefer_angles=prefer_angles, use_constraint_learned=use_constraint_learned)
 			else:
@@ -129,6 +129,8 @@ class TeleopInferenceBase(object):
 				#self.environment.load_meirl_learned_feature(self.planner, learned_goal_weight, meirl_goal_save_path, goal=self.goals[0])
 				# this uses the average demonstration final position
 				self.environment.load_meirl_learned_feature(self.planner, learned_goal_weight, learned_goal_save_path)
+
+			self.common_weights = common_weights
 
 		else: #client mode
 			from controllers.pid_controller import PIDController
@@ -180,6 +182,9 @@ class TeleopInferenceBase(object):
 			# Planner tells controller what plan to follow.
 			self.controller.set_trajectory(self.traj)
 
+			# Set the current goal for which we are assisting
+			self.curr_goal = -1
+
 			# Stores current COMMANDED joint velocities.
 			self.cmd = np.zeros((7,7))
 
@@ -204,6 +209,9 @@ class TeleopInferenceBase(object):
 			self.final_inference_done = False
 
 			self.assistance_method = config["learner"]["assistance_method"]
+			self.alpha_method = config["learner"]["alpha_method"]
 			self.alpha = 1. # in [0, 1]; higher numbers give more control to human
 			self.zero_input_assist = config["learner"]["zero_input_assist"]
 			self.joy_cmd = np.zeros((7,7))
+
+			self.exp_data = {}

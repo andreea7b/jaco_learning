@@ -1,0 +1,34 @@
+demonstration_paths: [
+    "/root/catkin_ws/src/jaco_learning/data/pour_red0.npy",
+    "/root/catkin_ws/src/jaco_learning/data/pour_red1.npy",
+    "/root/catkin_ws/src/jaco_learning/data/pour_red2.npy",
+    "/root/catkin_ws/src/jaco_learning/data/pour_red3.npy",
+    "/root/catkin_ws/src/jaco_learning/data/pour_red4.npy"
+]
+
+save_path: "/root/catkin_ws/src/jaco_learning/data/pour_red_new_meirl_test2.pt"
+
+NN_dict:
+    n_layers: 2
+    n_units: 128
+    sin: False
+    cos: False
+    noangles: True
+    norot: True
+    rpy: False
+    lowdim: False
+    noxyz: False
+    EErot: False
+    6D_laptop: True
+    6D_human: False
+    9D_coffee: False
+
+IRL_dict:
+    n_iters: 50
+    n_cur_rew_traj: 1
+    #lr: 1.0e-3
+    lr: 0.001
+    weight_decay: 0.001
+    std: 0.01
+
+#docker run -it --rm -p 10001:10001 -v /Users/matthewzurek/Desktop/interact/jaco_learning:/root/catkin_ws/src/jaco_learning mariuswi/trajopt_ws:1.0

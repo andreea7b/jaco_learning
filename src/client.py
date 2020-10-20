@@ -22,7 +22,7 @@ class Client():
         query = [0, query]
         return self.query_server(query)[0]
 
-    def replan_and_get_cost(self, start, goal, goal_pose, weights, T, timestep, start_time=0.0,
+    def replan_and_get_cost(self, start, goal, goal_pose, weight_idx, T, timestep, start_time=0.0,
                             seed=None, return_plan=False, return_both=False, add_pose_penalty=False):
         query = [
             start,
