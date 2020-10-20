@@ -208,7 +208,7 @@ class TeleopInferenceBase(object):
 			assert(len(goal_beliefs) == self.num_goals)
 			self.inference_method = config["learner"]["inference_method"]
 			self.beta_method = config["learner"]["beta_method"]
-			self.learner = TeleopLearner(self, goal_beliefs, beta_priors, betas, inference_method, self.beta_method)
+			self.learner = TeleopLearner(self, goal_beliefs, beta_priors, betas, self.inference_method, self.beta_method)
 			self.running_inference = False
 			self.last_inf_idx = 0
 			self.running_final_inference = False

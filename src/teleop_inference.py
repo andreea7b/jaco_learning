@@ -31,8 +31,8 @@ class TeleopInference(TeleopInferenceBase):
 		super(TeleopInference, self).__init__(False)
 
 		# ------- setup pybullet -------
-		physicsClient = p.connect(p.GUI)
-		#physicsClient = p.connect(p.GUI, options="--opengl2")
+		#physicsClient = p.connect(p.GUI)
+		physicsClient = p.connect(p.GUI, options="--opengl2")
 
 		# Set camera angle.
 		p.resetDebugVisualizerCamera(cameraDistance=2.50, cameraYaw=90, cameraPitch=-30, cameraTargetPosition=[-0.8,0.05,0.02])
@@ -47,47 +47,47 @@ class TeleopInference(TeleopInferenceBase):
 		p.setGravity(0, 0, 0)
 		p.setRealTimeSimulation(1)
 
-        # Start simulation.
-        if self.inference_method == "collect":
-            N = 5
+		# Start simulation.
+		if self.inference_method == "collect":
+			N = 5
 
-            # Add demonstration recording buttons.
-            self.buttons = [p.addUserDebugParameter("Stop Recording", 1, 0, 0),
-                            p.addUserDebugParameter("Next Demo", 1, 0, 0),
-                            p.addUserDebugParameter("Save Demo", 1, 0, 0)]
-            self.numPush = [0, 0, 0]
-        else:
-            N = 1
-        self.queries = 0
+			# Add demonstration recording buttons.
+			self.buttons = [p.addUserDebugParameter("Stop Recording", 1, 0, 0),
+							p.addUserDebugParameter("Next Demo", 1, 0, 0),
+							p.addUserDebugParameter("Save Demo", 1, 0, 0)]
+			self.numPush = [0, 0, 0]
+		else:
+			N = 1
+		self.queries = 0
 
-        while self.queries < N:
-            print("Attempting round {}.".format(self.queries+1))
-            bullet_start = np.append(self.start.reshape(7), np.array([0.0, 0.0, 0.0]))
-            move_robot(self.bullet_environment["robot"], bullet_start)
-            self.demo = [bullet_start[:7]]
-            self.running = True
-            self.record = True
+		while self.queries < N:
+			print "Attempting round {}.".format(self.queries+1)
+			bullet_start = np.append(self.start.reshape(7), np.array([0.0, 0.0, 0.0]))
+			move_robot(self.bullet_environment["robot"], bullet_start)
+			self.demo = [np.append(np.array([0.0]), bullet_start)]
+			self.running = True
+			self.record = True
 
-            # Start simulation.
-            while self.running:
-                if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
-                    line = raw_input()
-                    break
+			# Start simulation.
+			while self.running:
+				if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+					line = raw_input()
+					break
 
-                # Update position.
-                self.keyboard_input_callback()
+				# Update position.
+				self.keyboard_input_callback()
 
-                # Look after button presses.
-                if self.inference_method == "collect":
-                    self.update_buttons()
-                else:
-                    self.queries = 1
+				# Look after button presses.
+				if self.inference_method == "collect":
+					self.update_buttons()
+				else:
+					self.queries = 1
 
-                # Update sim position with new velocity command.
-                for i in range(len(self.cmd)):
-                    p.setJointMotorControl2(self.bullet_environment["robot"], i+1, p.VELOCITY_CONTROL, targetVelocity=self.cmd[i][i])
+				# Update sim position with new velocity command.
+				for i in range(len(self.cmd)):
+					p.setJointMotorControl2(self.bullet_environment["robot"], i+1, p.VELOCITY_CONTROL, targetVelocity=self.cmd[i][i])
 
-                time.sleep(0.05)
+				time.sleep(0.05)
 
 		# Disconnect once the session is over.
 		p.disconnect()
@@ -161,61 +161,56 @@ class TeleopInference(TeleopInferenceBase):
 		# Update cmd from PID based on current position.
 		#self.cmd = self.controller.get_command(self.curr_pos)
 
-    def replay_trace(self, trace):
-        for waypt in trace:
-            for jointIndex in range(p.getNumJoints(self.bullet_environment["robot"])):
-                p.resetJointState(self.bullet_environment["robot"], jointIndex, waypt[jointIndex])
-            time.sleep(0.01)
+	def replay_trace(self, trace):
+		for waypt in trace:
+			for jointIndex in range(p.getNumJoints(self.bullet_environment["robot"])):
+				p.resetJointState(self.bullet_environment["robot"], jointIndex, waypt[jointIndex])
+			time.sleep(0.01)
 
-    def update_buttons(self):
-        stopPushes = p.readUserDebugParameter(self.buttons[0])
-        nextPushes = p.readUserDebugParameter(self.buttons[1])
-        savePushes = p.readUserDebugParameter(self.buttons[2])
+	def update_buttons(self):
+		stopPushes = p.readUserDebugParameter(self.buttons[0])
+		nextPushes = p.readUserDebugParameter(self.buttons[1])
+		savePushes = p.readUserDebugParameter(self.buttons[2])
 
-        if stopPushes > self.buttons[0]:
-            print("Stopping recording. If happy with the recording, press Save Demo; otherwise press Next Demo.")
-            self.numPush[0] = stopPushes
-            if self.record == True:
-                self.record = False
+		if stopPushes > self.numPush[0]:
+			print "Stopping recording. If happy with the recording, press Save Demo; otherwise press Next Demo."
+			self.numPush[0] = stopPushes
+			if self.record == True:
+				self.record = False
+				# Pre-process the recorded data.
+				trace = np.squeeze(np.array(self.demo))
+				lo = 0
+				hi = trace.shape[0] - 1
+				while lo < hi and np.linalg.norm(trace[lo] - trace[lo + 1]) < 0.01:
+					lo += 1
+				while hi > 0 and np.linalg.norm(trace[hi] - trace[hi - 1]) < 0.01:
+					hi -= 1
+				trace = trace[lo:hi+1, :]
+				self.replay_trace(trace)
+				self.trace = trace
+			else:
+				print "Can't stop a recording that hasn't started yet."
 
-                if self.demo[0] == self.demo[-1]:
-                    print("Didn't record any data!")
-                    continue
+		if nextPushes > self.numPush[1]:
+			self.numPush[1] = nextPushes
+			self.running = False
 
-                # Pre-process the recorded data.
-                trace = np.squeeze(np.array(self.demo))
-                lo = 0
-                hi = trace.shape[0] - 1
-                while np.linalg.norm(trace[lo] - trace[lo + 1]) < 0.01 and lo < hi:
-                    lo += 1
-                while np.linalg.norm(trace[hi] - trace[hi - 1]) < 0.01 and hi > 0:
-                    hi -= 1
-                trace = trace[lo:hi+1, :]
-                self.replay_trace(trace)
-                self.trace = trace
-            else:
-                print("Can't stop a recording that hasn't started yet.")
+		if savePushes > self.numPush[2]:
+			self.numPush[2] = savePushes
+			if self.record == False:
+				traj = np.array(self.trace)[:,1:8]
+				np.save('data/demo{}.npy'.format(self.queries), traj)
+				print 'Saved trajectory {}.'.format(self.queries+1)
+				self.queries += 1
+				self.running = False
+			else:
+				print "Can't save while recording! Please stop the recording first."
 
-        if nextPushes > self.numPush[1]:
-            self.numPush[1] = nextPushes
-            self.running = False
-
-        if savePushes > self.numPush[2]:
-            self.numPush[2] = savePushes
-            if self.record == False:
-                traj = np.array(self.trace)[:,1:8]
-                np.save('placeholder', traj)
-                print 'Saved trajectory {}.'.format(self.queries+1)
-                self.queries += 1
-                self.running = False
-            else:
-                print("Can't save while recording! Please stop the recording first.")
-
-        if self.record:
-            state = p.getJointStates(self.bullet_environment["robot"],
-                                     range(p.getNumJoints(self.bullet_environment["robot"])))
-            waypt = [s[0] for s in state]
-            self.demo.append(waypt)
+		if self.record:
+			state = p.getJointStates(self.bullet_environment["robot"],
+									 range(p.getNumJoints(self.bullet_environment["robot"])))
+			waypt = [s[0] for s in state]
+			self.demo.append(np.array(waypt))
 
 
 	def keyboard_input_callback(self):
@@ -259,11 +254,13 @@ class TeleopInference(TeleopInferenceBase):
 		# Update joystick command.
 		self.joy_cmd = np.diag(jointVelocities[1:8])
 
-        if not (self.inference_method == "collect"):
-            # Move arm in openrave as well.
-            joint_angles = jointPoses[1:8] * (180/np.pi)
-            #joint_angles = np.diag(jointPoses[1:8] * (180/np.pi))
-            self.joint_angles_callback(joint_angles)
+		if not (self.inference_method == "collect"):
+			# Move arm in openrave as well.
+			joint_angles = jointPoses[1:8] * (180/np.pi)
+			#joint_angles = np.diag(jointPoses[1:8] * (180/np.pi))
+			self.joint_angles_callback(joint_angles)
+		else:
+			self.cmd = self.joy_cmd
 
 
 	def idx_to_time(self, idx):
