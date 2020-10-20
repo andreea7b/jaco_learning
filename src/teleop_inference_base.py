@@ -206,7 +206,7 @@ class TeleopInferenceBase(object):
 			if beta_priors == "none":
 				beta_priors = np.zeros(self.num_goals)
 			assert(len(goal_beliefs) == self.num_goals)
-			inference_method = config["learner"]["inference_method"]
+			self.inference_method = config["learner"]["inference_method"]
 			self.beta_method = config["learner"]["beta_method"]
 			self.learner = TeleopLearner(self, goal_beliefs, beta_priors, betas, inference_method, self.beta_method)
 			self.running_inference = False
