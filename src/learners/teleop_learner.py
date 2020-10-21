@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import time
+import pybullet as p
 
 class TeleopLearner(object):
 	"""
@@ -33,13 +34,26 @@ class TeleopLearner(object):
 		self.optimal_costs = np.zeros(len(goal_priors))
 		self.cache['goal_traj_by_idx'] = {0: []} # these can be reused elsewhere
 		self.cache['goal_traj_plan_by_idx'] = {0: []}
+
+
+		self.goal_waypts = []
+
 		for i in range(main.num_goals):
 			#traj, traj_plan = main.planner.replan(main.start, main.goals[i], list(main.goal_locs[i]), main.goal_weights[i],
 			#									  main.T, main.timestep, return_both=True)
 			#support = np.arange(len(main.goal_weights[i]))[main.goal_weights[i] != 0.0]
 			#traj_cost = np.sum(main.goal_weights[i][support] * np.sum(main.environment.featurize(traj.waypts, support), axis=1))
-			(traj, traj_plan), traj_cost = main.planner.replan_and_get_cost(main.start, i, i, i,
+
+			# Server versions:
+			# Using IK from goal loc as seed:
+			goal_waypt = p.calculateInverseKinematics(main.bullet_environment["robot"], 7, main.goal_locs[i])[:7]
+			(traj, traj_plan), traj_cost = main.planner.replan_and_get_cost(main.start, goal_waypt, i, i,
 																			main.T, main.timestep, return_both=True)
+			self.goal_waypts.append(goal_waypt)
+			# # Using server's goal position seed:
+			# (traj, traj_plan), traj_cost = main.planner.replan_and_get_cost(main.start, i, i, i,
+			# 																main.T, main.timestep, return_both=True)
+
 			self.optimal_costs[i] = traj_cost
 			self.cache['goal_traj_by_idx'][0].append(traj)
 			self.cache['goal_traj_plan_by_idx'][0].append(traj_plan)
@@ -105,12 +119,33 @@ class TeleopLearner(object):
 			# goal_traj_costs[i] = np.sum(main.goal_weights[i][support] * np.sum(main.environment.featurize(goal_traj.waypts, support), axis=1))
 			# print 'planned goal traj len', len(goal_traj.waypts)
 
-			(goal_traj, goal_traj_plan), goal_traj_costs[i] = main.planner.replan_and_get_cost(curr_pos, i, i, i,
+			# ----- Server versions: -----
+
+			# TODO: this segfaults, since TeleopLearner is in different thread than main (which is using pybullet)
+			# # Using IK from goal loc as seed:
+			# goal_waypt = p.calculateInverseKinematics(main.bullet_environment["robot"], 7, main.goal_locs[i])[:7]
+			# (goal_traj, goal_traj_plan), goal_traj_costs[i] = main.planner.replan_and_get_cost(curr_pos, goal_waypt, i, i,
+			# 																				   main.T - curr_time,
+			# 																				   main.timestep,
+			# 																				   return_both=True)
+			# print 'cost', goal_traj_costs[i]
+			# Using stored goal_waypt
+			(goal_traj, goal_traj_plan), goal_traj_costs[i] = main.planner.replan_and_get_cost(curr_pos, self.goal_waypts[i], i, i,
 																							   main.T - curr_time,
 																							   main.timestep,
 																							   return_both=True)
+			print 'cost', goal_traj_costs[i]
+
+			# # Using server's goal position seed:
+			#(goal_traj, goal_traj_plan), goal_traj_costs[i] = main.planner.replan_and_get_cost(curr_pos, i, i, i,
+			#																				   main.T - curr_time,
+			#																				   main.timestep,
+			#																				   return_both=True)
+			#print 'cost', goal_traj_costs[i]
+
 			self.cache['goal_traj_by_idx'][this_idx].append(goal_traj)
 			self.cache['goal_traj_plan_by_idx'][this_idx].append(goal_traj_plan)
+		print 'goal traj costs', goal_traj_costs
 		suboptimality = curr_traj_costs + goal_traj_costs - self.optimal_costs
 		suboptimality *= (1. / self.optimal_costs)
 		#print 'suboptimality:', suboptimality

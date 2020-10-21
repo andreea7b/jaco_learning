@@ -4,7 +4,7 @@ setup:
     object_centers: {'HUMAN_CENTER': [-0.6,-0.55,0.0], 'LAPTOP_CENTER': [-0.7,-0.1,0.0]}
     # for the features and weights that are shared between all goals
     common_feat_list: ['efficiency']
-    common_feat_weights: [1.0]
+    common_feat_weights: [10.0]
     start: [180.0, 150.0, 180.0, 270.0, 180.0, 180.0, 190.0]
     goals: [
         #[140.0, 90.0, 180.0, 160.0, 270.0, 180.0, 280.0],
@@ -31,7 +31,8 @@ planner:
     type: "trajopt"
     max_iter: 50
     num_waypts: 5
-    prefer_angles: True #whether to use goal angles over goal poses
+    # prefer_angles should be False for preprogrammed goals to work
+    prefer_angles: False #whether to use goal angles over goal poses
     use_constraint_learned: True
 
 controller:
@@ -61,7 +62,7 @@ learner:
     #goal_beliefs: [0., 0., 0., 1.]
     #goal_beliefs: [0., 0., 1.]
     # inference method is "dragan", "collect", or "none"
-    inference_method: "collect"
+    inference_method: "dragan"
     #inference_method: "none"
     #assistance_method: "blend"
     assistance_method: "none"

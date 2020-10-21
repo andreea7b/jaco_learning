@@ -247,7 +247,8 @@ class TrajoptPlanner(object):
 				constraint = [
 					{
 						"type": "joint",
-						"params": {"vals": goal.tolist()}
+						#"params": {"vals": goal.tolist()}
+						"params": {"vals": list(goal)}
 					}
 				]
 			else:

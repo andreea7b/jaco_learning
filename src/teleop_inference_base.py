@@ -37,6 +37,7 @@ class TeleopInferenceBase(object):
 		"""
 		with open('config/teleop_inference.yaml') as f:
 			config = yaml.load(f)
+		self.config = config
 
 		# ----- General Setup ----- #
 		self.prefix = config["setup"]["prefix"]
@@ -193,26 +194,6 @@ class TeleopInferenceBase(object):
 
 			# Stores current COMMANDED joint velocities.
 			self.cmd = np.zeros((7,7))
-
-			# ----- Learner Setup ----- #
-			betas = np.array(config["learner"]["betas"])
-			goal_beliefs = config["learner"]["goal_beliefs"]
-			if goal_beliefs != "none":
-				goal_beliefs = goal_beliefs / np.linalg.norm(goal_beliefs)
-			else:
-				goal_beliefs = np.ones(self.num_goals)/self.num_goals
-			assert(len(goal_beliefs) == self.num_goals)
-			beta_priors = config["learner"]["beta_priors"]
-			if beta_priors == "none":
-				beta_priors = np.zeros(self.num_goals)
-			assert(len(goal_beliefs) == self.num_goals)
-			inference_method = config["learner"]["inference_method"]
-			self.beta_method = config["learner"]["beta_method"]
-			self.learner = TeleopLearner(self, goal_beliefs, beta_priors, betas, inference_method, self.beta_method)
-			self.running_inference = False
-			self.last_inf_idx = 0
-			self.running_final_inference = False
-			self.final_inference_done = False
 
 			self.assistance_method = config["learner"]["assistance_method"]
 			self.alpha_method = config["learner"]["alpha_method"]

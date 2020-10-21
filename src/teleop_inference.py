@@ -44,9 +44,36 @@ class TeleopInference(TeleopInferenceBase):
 		# Setup the environment.
 		self.bullet_environment = setup_environment(self.goals)
 
+		# Calculate goal locations in xyz
+		self.goal_locs = []
+		for goal in self.goals:
+			move_robot(self.bullet_environment["robot"], np.append(goal.reshape(7), np.array([0, 0, 0])))
+			self.goal_locs.append(robot_coords(self.bullet_environment["robot"])[-1])
+
 		# Get rid of gravity and make simulation happen in real time.
 		p.setGravity(0, 0, 0)
 		p.setRealTimeSimulation(1)
+
+		# ----- Learner Setup ----- #
+		config = self.config
+		betas = np.array(config["learner"]["betas"])
+		goal_beliefs = config["learner"]["goal_beliefs"]
+		if goal_beliefs != "none":
+			goal_beliefs = goal_beliefs / np.linalg.norm(goal_beliefs)
+		else:
+			goal_beliefs = np.ones(self.num_goals)/self.num_goals
+		assert(len(goal_beliefs) == self.num_goals)
+		beta_priors = config["learner"]["beta_priors"]
+		if beta_priors == "none":
+			beta_priors = np.zeros(self.num_goals)
+		assert(len(goal_beliefs) == self.num_goals)
+		inference_method = config["learner"]["inference_method"]
+		self.beta_method = config["learner"]["beta_method"]
+		self.learner = TeleopLearner(self, goal_beliefs, beta_priors, betas, inference_method, self.beta_method)
+		self.running_inference = False
+		self.last_inf_idx = 0
+		self.running_final_inference = False
+		self.final_inference_done = False
 
 		print "----------------------------------"
 		print("Simulating robot, press ENTER to quit:")
@@ -87,6 +114,9 @@ class TeleopInference(TeleopInferenceBase):
 				#print "timestep:", self.next_waypt_idx
 				if not self.running_inference:
 					#print 'calling inference from', self.next_waypt_idx - 1
+
+					# TODO: Use IK on goals for seed
+
 					self.running_inference = True
 					self.inference_thread = Thread(target=self.learner.inference_step)
 					self.inference_thread.start()
