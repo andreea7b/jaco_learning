@@ -49,7 +49,7 @@ class TeleopInference(TeleopInferenceBase):
 
 		# Start simulation.
 		if self.inference_method == "collect":
-			N = 5
+			N = 2
 
 			# Add demonstration recording buttons.
 			self.buttons = [p.addUserDebugParameter("Stop Recording", 1, 0, 0),
@@ -59,6 +59,7 @@ class TeleopInference(TeleopInferenceBase):
 		else:
 			N = 1
 		self.queries = 0
+		self.recorded_demos = []
 
 		while self.queries < N:
 			print "Attempting round {}.".format(self.queries+1)
@@ -88,6 +89,16 @@ class TeleopInference(TeleopInferenceBase):
 					p.setJointMotorControl2(self.bullet_environment["robot"], i+1, p.VELOCITY_CONTROL, targetVelocity=self.cmd[i][i])
 
 				time.sleep(0.05)
+		if self.inference_method == "collect":
+			# Save FK and IK.
+			FKs = []
+			for demo in self.recorded_demos:
+				goal = np.append(demo[-1].reshape(7), np.array([0.0, 0.0, 0.0]))
+				move_robot(self.bullet_environment["robot"], goal)
+				FKs.append(robot_coords(self.bullet_environment["robot"])[-1])
+			avg_goal = np.mean(np.array(FKs), axis=0)
+			avg_angles = p.calculateInverseKinematics(self.bullet_environment["robot"], 7, avg_goal)
+		np.savez('data/demo_user.npz'.format(self.queries), demos=self.recorded_demos, FK_goal=avg_goal, IK_goal=avg_angles[:7])
 
 		# Disconnect once the session is over.
 		p.disconnect()
@@ -198,8 +209,9 @@ class TeleopInference(TeleopInferenceBase):
 		if savePushes > self.numPush[2]:
 			self.numPush[2] = savePushes
 			if self.record == False:
+				# Save trajectory.
 				traj = np.array(self.trace)[:,1:8]
-				np.save('data/demo{}.npy'.format(self.queries), traj)
+				self.recorded_demos.append(traj)
 				print 'Saved trajectory {}.'.format(self.queries+1)
 				self.queries += 1
 				self.running = False
