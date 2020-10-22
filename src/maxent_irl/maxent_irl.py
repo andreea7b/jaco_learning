@@ -37,7 +37,7 @@ class DeepMaxEntIRL:
 
 	"""
 
-	def __init__(self, env, planner, weight, s_g_exp_trajs, goal_poses, known_feat_list, NN_dict, gen, T=20., timestep=0.5):
+	def __init__(self, env, planner, weight, s_g_exp_trajs, goal_poses, goal, goal_pose, known_feat_list, NN_dict, gen, T=15., timestep=0.5):
 		self.planner = planner
 		self.weight = weight # weight to use in planner for this feature
 		# planner settings
@@ -74,6 +74,10 @@ class DeepMaxEntIRL:
 		# get the input dim & instantiate cost NN
 		self.raw_input_dim = transform_input(torch.ones(97), NN_dict).shape[1]
 		self.cost_nn = ReLuNet(NN_dict['n_layers'], NN_dict['n_units'], self.raw_input_dim, input_residuals=len(known_feat_list))
+
+		# To use for inference and assistance with this feature
+		self.goal = goal
+		self.goal_pose = goal_pose
 
 	def function(self, x, torchify=False, norm=False):
 		"""
@@ -206,7 +210,7 @@ class DeepMaxEntIRL:
 					#seed = cur_rew_traj_cache[dem_num] # uncomment to use last computed path as seed
 					seed = None
 					cur_rew_traj, cur_rew_traj_plan = self.get_trajs_with_cur_reward(n_cur_rew_traj, std,
-																					 start, goal, goal_pose,
+																					 start, goal, list(goal_pose),
 																					 seed=seed, return_opt_plan=True)
 					cur_rew_traj_cache[dem_num] = cur_rew_traj_plan.waypts
 					s_g_specific_trajs.append(cur_rew_traj)
@@ -245,7 +249,7 @@ class DeepMaxEntIRL:
 				print 'iteration', it, 'time:', time.time() - it_start_time
 
 		# update normalizer once in the end
-		self.update_normalizer()
+		#self.update_normalizer()
 
 	def save(self, path):
 	    torch.save({
@@ -256,7 +260,9 @@ class DeepMaxEntIRL:
 	        "gen": self.gen,
 	        "cost_nn_state_dict": self.cost_nn.state_dict(),
 	        "max_label": self.max_label,
-	        "min_label": self.min_label
+	        "min_label": self.min_label,
+			"goal": self.goal,
+			"goal_pose": self.goal_pose
 	    }, path)
 
 	def load_cost_nn_state_dict(self, state_dict):

@@ -1,7 +1,7 @@
 setup:
     prefix: 'j2s7s300_driver'
     model_filename: "jaco_dynamics"
-    object_centers: {'HUMAN_CENTER': [-0.6,-0.55,0.0], 'LAPTOP_CENTER': [-0.7, 0.0, -0.05]}
+    object_centers: {'HUMAN_CENTER': [-0.6,-0.55,0.0], 'LAPTOP_CENTER': [-0.7,-0.1,0.0]}
     # for the features and weights that are shared between all goals
     common_feat_list: ['world_efficiency']
     #common_feat_list: ['efficiency_clip']
@@ -27,7 +27,7 @@ setup:
     ]
     T: 15.0
     timestep: 0.5
-    demonstrations_save_path: "data/demo_user.npz"
+    save_dir: "/data/teleoperation/"
 
 planner:
     # These settings have been tuned for trajopt planner.

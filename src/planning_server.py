@@ -21,9 +21,38 @@ import socket
 
 PORT_NUM = 10001
 
+CONFIG_FILE_DICT = {
+	1: {
+		'a': "",
+		'b': "",
+		'c': ""
+	},
+	2: {
+		'a': "",
+		'b': "",
+		'c': "",
+		'd': "config/task2_methodd_inference_config.yaml",
+		'e': "config/task2_methode_inference_config.yaml"
+	},
+	3: {
+		'a': "",
+		'b': "",
+		'c': "",
+		'd': "",
+		'e': ""
+	},
+	4: {
+		'a': "",
+		'b': "",
+		'c': "",
+		'd': "",
+		'e': ""
+	}
+}
+
 class PlanningServer(TeleopInferenceBase):
-	def __init__(self):
-		super(PlanningServer, self).__init__(True)
+	def __init__(self, config_file):
+		super(PlanningServer, self).__init__(True, config_file)
 
 		# setup socket
 		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -216,4 +245,6 @@ class PlanningServer1():
 
 
 if __name__ == "__main__":
-	PlanningServer()
+	task = int(sys.argv[1])
+	method = sys.argv[2]
+	PlanningServer(CONFIG_FILE_DICT[task][method])

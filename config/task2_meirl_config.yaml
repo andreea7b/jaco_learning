@@ -1,12 +1,6 @@
-demonstration_paths: [
-    "/root/catkin_ws/src/jaco_learning/data/pour_red0.npy",
-    "/root/catkin_ws/src/jaco_learning/data/pour_red1.npy",
-    "/root/catkin_ws/src/jaco_learning/data/pour_red2.npy",
-    "/root/catkin_ws/src/jaco_learning/data/pour_red3.npy",
-    "/root/catkin_ws/src/jaco_learning/data/pour_red4.npy"
-]
+demonstrations_path: "/root/catkin_ws/src/jaco_learning/data/task2_demonstrations.npz"
 
-save_path: "/root/catkin_ws/src/jaco_learning/data/pour_red_new_meirl_test2.pt"
+save_path: "/root/catkin_ws/src/jaco_learning/data/task2_learned_goal.pt"
 
 NN_dict:
     n_layers: 2
@@ -16,10 +10,10 @@ NN_dict:
     noangles: True
     norot: True
     rpy: False
-    lowdim: False
+    lowdim: True
     noxyz: False
     EErot: False
-    6D_laptop: True
+    6D_laptop: False
     6D_human: False
     9D_coffee: False
 

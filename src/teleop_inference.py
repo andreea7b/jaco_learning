@@ -14,6 +14,7 @@ from threading import Thread
 
 import pybullet as p
 import numpy as np
+import torch
 from controllers.pid_controller import PIDController
 from learners.teleop_learner import TeleopLearner
 from utils.environment_utils import *
@@ -22,17 +23,48 @@ from utils.environment_utils import *
 from teleop_inference_base import TeleopInferenceBase
 
 
+CONFIG_FILE_DICT = {
+	1: {
+		'a': "",
+		'b': "",
+		'c': ""
+	},
+	2: {
+		'a': "",
+		'b': "",
+		'c': "",
+		'd': "config/task2_methodd_inference_config.yaml",
+		'e': "config/task2_methode_inference_config.yaml"
+	},
+	3: {
+		'a': "",
+		'b': "",
+		'c': "",
+		'd': "",
+		'e': ""
+	},
+	4: {
+		'a': "",
+		'b': "",
+		'c': "",
+		'd': "",
+		'e': ""
+	}
+}
+
+
 class TeleopInference(TeleopInferenceBase):
 	"""
 	This class represents a node that moves the Jaco with PID control AND supports receiving human corrections online.
 	"""
 
-	def __init__(self):
-		super(TeleopInference, self).__init__(False)
+	def __init__(self, config_file):
+		super(TeleopInference, self).__init__(False, config_file)
+		config = self.config
 
 		# ------- setup pybullet -------
-		#physicsClient = p.connect(p.GUI)
-		physicsClient = p.connect(p.GUI, options="--opengl2")
+		physicsClient = p.connect(p.GUI)
+		#physicsClient = p.connect(p.GUI, options="--opengl2")
 
 		# Set camera angle.
 		p.resetDebugVisualizerCamera(cameraDistance=2.50, cameraYaw=90, cameraPitch=-30, cameraTargetPosition=[-0.8,0.05,0.02])
@@ -41,7 +73,12 @@ class TeleopInference(TeleopInferenceBase):
 		p.setAdditionalSearchPath("../data/resources")
 
 		# Setup the environment.
-		self.bullet_environment = setup_environment(self.goals)
+		self.bullet_environment = setup_environment(self.visual_goals)
+		#self.bullet_environment = setup_environment(self.goals)
+
+		# load learned goals
+		for learned_goal_save_path in config["setup"]["learned_goals"]:
+			self.goals.append(torch.load(learned_goal_save_path)['goal'])
 
 		# Calculate goal locations in xyz
 		self.goal_locs = []
@@ -49,12 +86,16 @@ class TeleopInference(TeleopInferenceBase):
 			move_robot(self.bullet_environment["robot"], np.append(goal.reshape(7), np.array([0, 0, 0])))
 			self.goal_locs.append(robot_coords(self.bullet_environment["robot"])[-1])
 
+		# update IK of goals
+		bullet_start = np.append(self.start.reshape(7), np.array([0.0, 0.0, 0.0]))
+		move_robot(self.bullet_environment["robot"], bullet_start)
+		self.update_IK_goals()
+
 		# Get rid of gravity and make simulation happen in real time.
 		p.setGravity(0, 0, 0)
 		p.setRealTimeSimulation(1)
 
 		# ----- Learner Setup ----- #
-		config = self.config
 		betas = np.array(config["learner"]["betas"])
 		goal_beliefs = config["learner"]["goal_beliefs"]
 		if goal_beliefs != "none":
@@ -66,9 +107,9 @@ class TeleopInference(TeleopInferenceBase):
 		if beta_priors == "none":
 			beta_priors = np.zeros(self.num_goals)
 		assert(len(goal_beliefs) == self.num_goals)
-		inference_method = config["learner"]["inference_method"]
+		self.inference_method = config["learner"]["inference_method"]
 		self.beta_method = config["learner"]["beta_method"]
-		self.learner = TeleopLearner(self, goal_beliefs, beta_priors, betas, inference_method, self.beta_method)
+		self.learner = TeleopLearner(self, goal_beliefs, beta_priors, betas, self.inference_method, self.beta_method)
 		self.running_inference = False
 		self.last_inf_idx = 0
 		self.running_final_inference = False
@@ -78,7 +119,7 @@ class TeleopInference(TeleopInferenceBase):
 		print("Simulating robot, press ENTER to quit:")
 		# Start simulation.
 		if self.inference_method == "collect":
-			N = 2
+			N = 5
 
 			# Add demonstration recording buttons.
 			self.buttons = [p.addUserDebugParameter("Stop Recording", 1, 0, 0),
@@ -92,7 +133,6 @@ class TeleopInference(TeleopInferenceBase):
 
 		while self.queries < N:
 			print "Attempting round {}.".format(self.queries+1)
-			bullet_start = np.append(self.start.reshape(7), np.array([0.0, 0.0, 0.0]))
 			move_robot(self.bullet_environment["robot"], bullet_start)
 			self.demo = [np.append(np.array([0.0]), bullet_start)]
 			self.running = True
@@ -127,7 +167,7 @@ class TeleopInference(TeleopInferenceBase):
 				FKs.append(robot_coords(self.bullet_environment["robot"])[-1])
 			avg_goal = np.mean(np.array(FKs), axis=0)
 			avg_angles = p.calculateInverseKinematics(self.bullet_environment["robot"], 7, avg_goal)
-		np.savez('data/demo_user.npz'.format(self.queries), demos=self.recorded_demos, FK_goal=avg_goal, IK_goal=avg_angles[:7])
+			np.savez(config['setup']['demonstrations_save_path'], demos=self.recorded_demos, FK_goal=avg_goal, IK_goal=avg_angles[:7], FKs=FKs)
 
 		# Disconnect once the session is over.
 		p.disconnect()
@@ -141,6 +181,7 @@ class TeleopInference(TeleopInferenceBase):
 		"""
 		# Convert to radians.
 		self.curr_pos = curr_pos*(math.pi/180.0)
+		#print 'curr_pos', curr_pos
 
 		if self.start_T is not None and (time.time() - self.start_T >= self.timestep * self.next_waypt_idx):
 			if not self.next_waypt_idx >= len(self.traj_hist):
@@ -151,6 +192,9 @@ class TeleopInference(TeleopInferenceBase):
 					#print 'calling inference from', self.next_waypt_idx - 1
 
 					# TODO: Use IK on goals for seed
+					self.update_IK_goals()
+					#print 'original goal distance:', np.linalg.norm(self.goals - self.curr_pos, axis=1)
+					#print 'IK goal distance:', np.linalg.norm(self.IK_goals - self.curr_pos, axis=1)
 
 					self.running_inference = True
 					self.inference_thread = Thread(target=self.learner.inference_step)
@@ -182,7 +226,8 @@ class TeleopInference(TeleopInferenceBase):
 					#print 'beta estimates:', self.learner.beta_estimates
 					#print 'goal beliefs:', self.learner.goal_beliefs
 				self.alpha = self.beta_arbitration(beta, belief)
-				if goal != self.curr_goal:
+				print 'alpha:', self.alpha
+				if goal != self.curr_goal or True:
 					print 'new assistance trajectory, goal:', goal
 					self.curr_goal = goal
 					self.traj = self.learner.cache['goal_traj_by_idx'][self.last_inf_idx][goal]
@@ -260,7 +305,8 @@ class TeleopInference(TeleopInferenceBase):
 	def keyboard_input_callback(self):
 		# Reset variables.
 		jointVelocities = [0.0] * p.getNumJoints(self.bullet_environment["robot"])
-		dist_step = [0.01, 0.01, 0.01]
+		#dist_step = [0.01, 0.01, 0.01]
+		dist_step = [0.005, 0.005, 0.005]
 		time_step = 0.05
 		turn_step = 0.05
 		EElink = 7
@@ -297,6 +343,9 @@ class TeleopInference(TeleopInferenceBase):
 
 		# Update joystick command.
 		self.joy_cmd = np.diag(jointVelocities[1:8])
+		#print 'norm(velocity * timestep) ** 2:', np.linalg.norm(np.array(jointVelocities[1:8]) * self.timestep) ** 2
+
+		#print 'current angles:', jointPoses[1:8] * (180/np.pi)
 
 		if not (self.inference_method == "collect"):
 			# Move arm in openrave as well.
@@ -314,11 +363,17 @@ class TeleopInference(TeleopInferenceBase):
 		if self.alpha_method == 'prob':
 			return belief
 		elif self.alpha_method == 'beta':
-			return 1 #all joystick
-			return 0
+			#return 1 #all joystick
+			#return 0 #all assistance
 			#return np.clip(1 / beta, 0, 1)
+			return np.clip(1 / beta, 0.3, 1)
 			#return np.clip(0.5 / beta, 0, 1)
 			#return np.clip(np.exp(-beta + 0.1), 0, 1)
 
+	def update_IK_goals(self):
+		self.IK_goals = [p.calculateInverseKinematics(self.bullet_environment["robot"], 7, self.goal_locs[i])[:7] for i in range(self.num_goals)]
+
 if __name__ == '__main__':
-	TeleopInference()
+	task = int(sys.argv[1])
+	method = sys.argv[2]
+	TeleopInference(CONFIG_FILE_DICT[task][method])

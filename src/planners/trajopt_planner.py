@@ -9,11 +9,15 @@ import trajoptpy
 from utils.openrave_utils import *
 from utils.trajectory import Trajectory
 
+import pybullet as p
+from utils.environment_utils import *
+
+
 class TrajoptPlanner(object):
 	"""
 	This class plans a trajectory from start to goal with TrajOpt.
 	"""
-	def __init__(self, max_iter, num_waypts, environment, prefer_angles=True, use_constraint_learned=True):
+	def __init__(self, max_iter, num_waypts, environment, pb_environment, prefer_angles=True, use_constraint_learned=True):
 
 		# ---- Important internal variables ---- #
 		# These variables are trajopt parameters.
@@ -22,6 +26,9 @@ class TrajoptPlanner(object):
 
 		# Set OpenRAVE environment.
 		self.environment = environment
+
+		# Set pybullet environment.
+		self.bullet_environment = pb_environment
 
 		# whether to use goal angles over goal pose for planning
 		self.prefer_angles = prefer_angles
@@ -45,6 +52,27 @@ class TrajoptPlanner(object):
 		return feat_val / NUM_STEPS
 
 	# ---- Costs ---- #
+
+	def efficiency_clip_cost(self, waypt):
+		"""
+		Computes the total efficiency cost
+		---
+		input waypoint, output scalar cost
+		"""
+		feature_idx = self.environment.feat_list.index('efficiency_clip')
+		#feature = self.interpolate_features(waypt, waypt, feature_idx, NUM_STEPS=1)
+		feature = self.environment.featurize_single(waypt, feature_idx, planner_version=True)
+		return feature*self.weights[feature_idx]
+
+	def world_efficiency_cost(self, waypt):
+		"""
+		Computes the total world-space efficiency cost
+		---
+		input waypoint, output scalar cost
+		"""
+		feature_idx = self.environment.feat_list.index('world_efficiency')
+		feature = self.interpolate_features(waypt, waypt, feature_idx, NUM_STEPS=1)
+		return feature*self.weights[feature_idx]
 
 	def efficiency_cost(self, waypt):
 		"""
@@ -205,6 +233,9 @@ class TrajoptPlanner(object):
 		support = np.arange(len(self.weights))[self.weights != 0.0]
 		nonzero_feat_list = np.array(self.environment.feat_list)[support]
 		contains_learned_feat = any(np.array(self.environment.is_learned_feat)[support])
+
+		contains_world_eff = "world_efficiency" in nonzero_feat_list
+
 		print "Planning with features:", nonzero_feat_list
 
 		use_constraint = self.use_constraint_learned or not contains_learned_feat
@@ -216,7 +247,10 @@ class TrajoptPlanner(object):
 			self.environment.robot.SetDOFValues(aug_start)
 
 			# --- Linear interpolation seed --- #
-			if traj_seed is None:
+			if contains_world_eff:
+				init_waypts = self.get_min_world_dist_waypts(start, goal_pose, self.num_waypts)
+				print 'Using world_efficiency_cost initialization'
+			elif traj_seed is None:
 				#print("Using straight line initialization!")
 				init_waypts = np.zeros((self.num_waypts,7))
 				for count in range(self.num_waypts):
@@ -289,6 +323,10 @@ class TrajoptPlanner(object):
 					prob.AddCost(self.human_cost, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "human%i"%t)
 				if 'efficiency' in nonzero_feat_list:
 					prob.AddCost(self.efficiency_cost, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "efficiency%i"%t)
+				if 'world_efficiency' in nonzero_feat_list:
+					prob.AddCost(self.world_efficiency_cost, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "world_efficiency%i"%t)
+				if 'efficiency_clip' in nonzero_feat_list:
+					prob.AddCost(self.efficiency_clip_cost, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "efficiency_clip%i"%t)
 				if contains_learned_feat:
 					prob.AddErrorCost(self.learned_feature_costs, self.learned_feature_cost_derivatives, [(t-1, j) for j in range(7)]+[(t, j) for j in range(7)], "ABS", "learned_features%i"%t)
 			# give goal_dist cost 2 time points like the above costs
@@ -321,18 +359,56 @@ class TrajoptPlanner(object):
 		"""
 		assert weights is not None, "The weights vector is empty. Cannot plan without a cost preference."
 		self.weights = weights
+
+		num_traj_waypts = int((T-start_time)/timestep) + 1
+
 		import time
 		trajopt_start_time = time.time()
+
+		# if we are only using world_efficiency cost, we can compute the optimal solution
+		support = np.arange(len(self.weights))[self.weights != 0.0]
+		nonzero_feat_list = np.array(self.environment.feat_list)[support]
+		if len(nonzero_feat_list) == 1 and "world_efficiency" in nonzero_feat_list:
+			traj = Trajectory(self.get_min_world_dist_waypts(start, goal_pose, num_traj_waypts),
+							  np.linspace(start_time, T, num_traj_waypts))
+			traj_plan = Trajectory(self.get_min_world_dist_waypts(start, goal_pose, num_traj_waypts),
+								   np.linspace(start_time, T, num_traj_waypts))
+
+			print "planning took:", time.time() - trajopt_start_time
+			if return_both:
+				return traj, traj_plan
+			elif return_plan:
+				return traj_plan
+			else:
+				return traj
+
 		waypts = self.trajOpt(start, goal, goal_pose, traj_seed=seed)
 		print "planning took:", time.time() - trajopt_start_time
 		waypts_time = np.linspace(start_time, T, self.num_waypts)
 		traj = Trajectory(waypts, waypts_time)
 		if return_both:
-			return traj.resample(int((T-start_time)/timestep) + 1), traj
+			return traj.resample(num_traj_waypts), traj
 		elif return_plan:
 			return traj
 		else:
-			return traj.resample(int((T-start_time)/timestep) + 1)
+			return traj.resample(num_traj_waypts)
+
+	def get_min_world_dist_waypts(self, start, goal_pose, num_waypts):
+		goal_pose = np.array(goal_pose)
+
+		move_robot(self.bullet_environment["robot"], np.append(start.reshape(7), np.array([0.0, 0.0, 0.0])))
+		start_pose = robot_coords(self.bullet_environment["robot"])[-1]
+
+		mix_coeffs = np.linspace(0, 1, num_waypts).reshape((num_waypts, 1))
+		poses = start_pose.reshape((1,3)) * (1 - mix_coeffs) + goal_pose.reshape((1,3)) * mix_coeffs # shape (num_waypts, 3)
+
+		waypts = np.empty((num_waypts, 7))
+		waypts[0] = start
+		for i in range(1, num_waypts):
+			waypt = p.calculateInverseKinematics(self.bullet_environment["robot"], 7, poses[i])[:7]
+			move_robot(self.bullet_environment["robot"], np.append(waypt, np.array([0.0, 0.0, 0.0])))
+			waypts[i] = waypt
+		return waypts
 
 def expected_goal(belief, goals):
 	return np.sum([goal*prob for goal, prob in zip(goals, belief)], axis=0)

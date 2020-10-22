@@ -26,8 +26,9 @@ class TeleopInferenceBase(object):
 	This class represents a node that moves the Jaco with PID control AND supports receiving human corrections online.
 	"""
 
-	def __init__(self, is_server):
+	def __init__(self, is_server, config_file):
 		self.server = is_server
+		self.config_file = config_file
 		# Load parameters and set up subscribers/publishers.
 		self.load_parameters()
 
@@ -35,7 +36,7 @@ class TeleopInferenceBase(object):
 		"""
 		Loading parameters and setting up variables.
 		"""
-		with open('config/teleop_inference.yaml') as f:
+		with open(self.config_file) as f:
 			config = yaml.load(f)
 		self.config = config
 
@@ -43,7 +44,6 @@ class TeleopInferenceBase(object):
 		self.prefix = config["setup"]["prefix"]
 		self.T = config["setup"]["T"]
 		self.timestep = config["setup"]["timestep"]
-		self.save_dir = config["setup"]["save_dir"]
 
 		self.start = np.array(config["setup"]["start"])*(math.pi/180.0)
 		#self.start += np.random.normal(0, 0.157, self.start.shape)
@@ -59,10 +59,13 @@ class TeleopInferenceBase(object):
 			self.goals = fixed_goals
 
 		self.num_goals = len(self.goals) + len(config["setup"]["learned_goals"])
+		self.visual_goals = [np.array(goal)*(math.pi/180.0) for goal in config["setup"]["visual_goals"]]
 
 		if self.server:
 			from utils.environment import Environment
 			from planners.trajopt_planner import TrajoptPlanner
+			from utils.environment_utils import *
+			import pybullet as p
 
 			self.feat_list = config["setup"]["common_feat_list"]
 			feat_range = {'table': 0.98,
@@ -70,6 +73,8 @@ class TeleopInferenceBase(object):
 						  'laptop': 0.3,
 						  'human': 0.3,
 						  'efficiency': 0.22,
+						  'efficiency_clip': 0.22,
+						  'world_efficiency': 0.22,
 						  'proxemics': 0.3,
 						  'betweenobjects': 0.2}
 			common_weights = config["setup"]["common_feat_weights"]
@@ -102,6 +107,18 @@ class TeleopInferenceBase(object):
 										   plot_objects=False)
 			self.goal_locs = self.environment.goal_locs
 
+			# Setup pybullet environment
+
+			# ------- setup pybullet -------
+			physicsClient = p.connect(p.DIRECT)
+
+			# Add path to data resources for the environment.
+			p.setAdditionalSearchPath("../data/resources")
+
+			# Setup the environment.
+			self.bullet_environment = setup_environment([]) #setup with no goals
+
+
 			# ----- Planner Setup ----- #
 			# Retrieve the planner specific parameters.
 			planner_type = config["planner"]["type"]
@@ -112,7 +129,7 @@ class TeleopInferenceBase(object):
 				use_constraint_learned = config["planner"]["use_constraint_learned"]
 
 				# Initialize planner.
-				self.planner = TrajoptPlanner(max_iter, num_waypts, self.environment,
+				self.planner = TrajoptPlanner(max_iter, num_waypts, self.environment, self.bullet_environment,
 											  prefer_angles=prefer_angles, use_constraint_learned=use_constraint_learned)
 			else:
 				raise Exception('Planner {} not implemented.'.format(planner_type))

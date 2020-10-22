@@ -28,6 +28,7 @@ def setup_environment(goals):
 
     # Add goal visuals.
     for i,goal in enumerate(goals):
+        print "plotting goal"
         move_robot(objectID["robot"], np.append(goal.reshape(7), np.array([0, 0, 0])))
         pos = robot_coords(objectID["robot"])[-1]
         p.loadURDF("sphere_transparent.urdf", pos, useFixedBase=True, globalScaling=0.02)
@@ -40,7 +41,7 @@ def setup_environment(goals):
     jointPoses = p.calculateInverseKinematics(objectID["robot"], 7, targetPos, targetOr)
     move_robot(objectID["robot"], jointPoses)
     objectID["mug"] = p.loadURDF("dinnerware/cup/cup_small.urdf", globalScaling=1.0)
-    cid = p.createConstraint(objectID["robot"], 7, objectID["mug"], -1, p.JOINT_FIXED, [0, 0, 0], [0.0, 0.0, -0.13], 
+    cid = p.createConstraint(objectID["robot"], 7, objectID["mug"], -1, p.JOINT_FIXED, [0, 0, 0], [0.0, 0.0, -0.13],
                              [0, 0, 0], childFrameOrientation=p.getQuaternionFromEuler([0, -np.pi/2, 0]))
 
     return objectID
@@ -113,4 +114,3 @@ def upsample(trace, num_waypts, objectID):
     for waypt in trace_up:
         raw_trace.append(raw_features(objectID, waypt))
     return np.array(raw_trace)
-

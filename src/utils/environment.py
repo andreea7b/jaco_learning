@@ -83,6 +83,10 @@ class Environment(object):
 				self.feat_func_list.append(self.origin_features)
 			elif feat == 'efficiency':
 				self.feat_func_list.append(self.efficiency_features)
+			elif feat == 'efficiency_clip':
+				self.feat_func_list.append(self.efficiency_clip_features)
+			elif feat == 'world_efficiency':
+				self.feat_func_list.append(self.world_efficiency_features)
 			elif feat == 'proxemics':
 				self.feat_func_list.append(self.proxemics_features)
 			elif feat == 'betweenobjects':
@@ -116,7 +120,7 @@ class Environment(object):
 		for index in range(len(waypts)-1):
 			for feat in range(len(feat_idxs)):
 				waypt = waypts[index+1]
-				if self.feat_list[feat_idxs[feat]] == 'efficiency':
+				if 'efficiency' in self.feat_list[feat_idxs[feat]]:
 					waypt = np.concatenate((waypts[index+1],waypts[index]))
 				features[feat][index] = self.featurize_single(waypt, feat_idxs[feat])
 
@@ -140,7 +144,7 @@ class Environment(object):
 		return features
 
 	# -- Compute single feature for single waypoint -- #
-	def featurize_single(self, waypt, feat_idx):
+	def featurize_single(self, waypt, feat_idx, planner_version=False):
 		"""
 		Computes given feature value for a given waypoint.
 		---
@@ -154,7 +158,10 @@ class Environment(object):
 		if self.is_learned_feat[feat_idx]:
 			waypt = self.raw_features(waypt)
 		# Compute feature value.
-		featval = self.feat_func_list[feat_idx](waypt)
+		if planner_version: # TODO: should support planner versions of other features, also requires modifying feat_func_list part
+			featval = self.efficiency_clip_features_planner(waypt)
+		else:
+			featval = self.feat_func_list[feat_idx](waypt)
 		if self.is_learned_feat[feat_idx]:
 			featval = featval[0][0]
 		else:
@@ -182,7 +189,7 @@ class Environment(object):
 		else:
 			if len(waypt) < 10:
 				waypt_openrave = np.append(waypt.reshape(7), np.array([0, 0, 0]))
-				waypt_openrave[2] += math.pi
+				#waypt_openrave[2] += math.pi
 
 			with self.robot:
 				self.robot.SetDOFValues(waypt_openrave)
@@ -307,6 +314,8 @@ class Environment(object):
 									   weight,
 									   save_dict['s_g_exp_trajs'],
 									   save_dict['goal_poses'],
+									   save_dict['goal'],
+									   save_dict['goal_pose'],
 									   save_dict['known_feat_list'],
 									   save_dict['NN_dict'],
 									   save_dict['gen'])
@@ -315,7 +324,7 @@ class Environment(object):
 		meirl_obj.max_label = save_dict['max_label']
 		meirl_obj.min_label = save_dict['min_label']
 
-	def new_meirl_learned_feature(self, planner, weight, s_g_exp_trajs, goal_poses, known_feat_list, NN_dict, gen, name='', T=20., timestep=0.5, goal=None):
+	def new_meirl_learned_feature(self, planner, weight, s_g_exp_trajs, goal_poses, goal, goal_pose, known_feat_list, NN_dict, gen, name='', T=15., timestep=0.5):
 		"""
 		Adds a new maxent irl learned feature to the environment.
 		--
@@ -323,26 +332,14 @@ class Environment(object):
 			nb_layers -- number of NN layers
 			nb_units -- number of NN units per layer
 		"""
-		meirl_obj = DeepMaxEntIRL(self, planner, weight, s_g_exp_trajs, goal_poses, known_feat_list, NN_dict, gen, T, timestep)
+		meirl_obj = DeepMaxEntIRL(self, planner, weight, s_g_exp_trajs, goal_poses, goal, goal_pose, known_feat_list, NN_dict, gen, T, timestep)
 		self.learned_feats.append(meirl_obj)
 		self.feat_list.append('learned_feature'+name)
 		self.num_feats += 1
 		self.is_learned_feat = np.hstack((self.is_learned_feat, np.array([True])))
 		self.feat_func_list.append(self.learned_feats[-1].function)
-		if goal is None:
-			self.add_goal(np.mean([item[0][-1] for item in s_g_exp_trajs], axis=0))
-		else:
-			self.add_goal(goal)
-
-	def add_goal(self, goal):
 		self.goals.append(np.array(goal))
-		with self.robot:
-			angles = goal if len(goal) == 10 else np.append(goal, np.array([0,0,0]))
-			self.robot.SetDOFValues(angles)
-			cartesian_coords = robotToCartesian(self.robot)
-			goal_loc = cartesian_coords[6]
-			self.goal_locs.append(np.array(goal_loc))
-			plotSphere(self.env, self.bodies, goal_loc, 0.05, color=[1,1,1])
+		self.goal_locs.append(np.array(goal_pose))
 
 	# -- Goal Distance -- #
 
@@ -366,6 +363,48 @@ class Environment(object):
 
 		return np.linalg.norm(waypt[:7] - waypt[7:])**2
 
+	# -- Efficiency clipped-- #
+
+	def efficiency_clip_features(self, waypt):
+		"""
+		Computes efficiency feature for waypoint, but only penalizes above a certain threshold.
+		---
+		Params:
+			waypt -- single waypoint
+		Returns:
+			dist -- scalar feature
+		"""
+		#THRESH_DISP = 0.29 / 2
+		#
+		#return max(np.linalg.norm(waypt[:7] - waypt[7:])**2 - THRESH_DISP, 0)
+		return np.linalg.norm(waypt[:7] - waypt[7:])
+
+	def efficiency_clip_features_planner(self, waypt):
+		"""
+		Computes efficiency feature for waypoint, but only penalizes above a certain threshold. Larger threshold for planner.
+		---
+		Params:
+			waypt -- single waypoint
+		Returns:
+			dist -- scalar feature
+		"""
+		#THRESH_DISP = 0.29 / 2 * (30. / 4.)**2
+		#
+		#return np.linalg.norm(waypt[:7] - waypt[7:])**2
+		return np.linalg.norm(waypt[:7] - waypt[7:])
+
+	def world_efficiency_features(self, waypt):
+		"""
+		Computes efficiency feature for EE xyz positions.
+		---
+		Params:
+			waypt -- single waypoint
+		Returns:
+			dist -- scalar feature
+		"""
+
+		return np.linalg.norm(self.get_cartesian_coords(waypt[:7]) - self.get_cartesian_coords(waypt[7:]))
+
 	# -- Distance to Robot Base (origin of world) -- #
 
 	def origin_features(self, waypt):
@@ -380,7 +419,7 @@ class Environment(object):
 		"""
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
-			waypt[2] += math.pi
+			#waypt[2] += math.pi
 		with self.robot:
 			self.robot.SetDOFValues(waypt)
 			coords = robotToCartesian(self.robot)
@@ -401,7 +440,7 @@ class Environment(object):
 		"""
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
-			waypt[2] += math.pi
+			#waypt[2] += math.pi
 		with self.robot:
 			self.robot.SetDOFValues(waypt)
 			coords = robotToCartesian(self.robot)
@@ -422,7 +461,7 @@ class Environment(object):
 		"""
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
-			waypt[2] += math.pi
+			#waypt[2] += math.pi
 
 		with self.robot:
 			self.robot.SetDOFValues(waypt)
@@ -444,7 +483,7 @@ class Environment(object):
 		"""
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
-			waypt[2] += math.pi
+			#waypt[2] += math.pi
 		with self.robot:
 			self.robot.SetDOFValues(waypt)
 			coords = robotToCartesian(self.robot)
@@ -469,7 +508,7 @@ class Environment(object):
 		"""
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
-			waypt[2] += math.pi
+			#waypt[2] += math.pi
 		with self.robot:
 			self.robot.SetDOFValues(waypt)
 			coords = robotToCartesian(self.robot)
@@ -494,7 +533,7 @@ class Environment(object):
 		"""
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
-			waypt[2] += math.pi
+			#waypt[2] += math.pi
 		with self.robot:
 			self.robot.SetDOFValues(waypt)
 			coords = robotToCartesian(self.robot)
@@ -522,7 +561,7 @@ class Environment(object):
 		"""
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
-			waypt[2] += math.pi
+			#waypt[2] += math.pi
 		with self.robot:
 			self.robot.SetDOFValues(waypt)
 			coords = robotToCartesian(self.robot)
@@ -559,7 +598,7 @@ class Environment(object):
 		"""
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
-			waypt[2] += math.pi
+			#waypt[2] += math.pi
 		with self.robot:
 			self.robot.SetDOFValues(waypt)
 			EE_link = self.robot.GetLinks()[10]
@@ -574,7 +613,7 @@ class Environment(object):
 		"""
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
-			waypt[2] += math.pi
+			#waypt[2] += math.pi
 		with self.robot:
 			self.robot.SetDOFValues(waypt)
 			EE_link = self.robot.GetLinks()[7]
@@ -586,7 +625,7 @@ class Environment(object):
 		"""
 		if len(waypt) < 10:
 			waypt = np.append(waypt.reshape(7), np.array([0,0,0]))
-			waypt[2] += math.pi
+			#waypt[2] += math.pi
 		with self.robot:
 			self.robot.SetDOFValues(waypt)
 			world_dir = self.robot.GetLinks()[7].GetTransform()[:3,:3].dot([1,0,0])
@@ -619,9 +658,8 @@ class Environment(object):
 		"""
 		Note that joint_angles are assumed to be in radians
 		"""
-		if len(joint_angles) < 10:
-			joint_angles = np.append(joint_angles.reshape(7), np.array([0,0,0]))
-			joint_angles[2] += math.pi
+		joint_angles = np.append(joint_angles.reshape(7), np.array([0,0,0]))
+		#joint_angles[2] += math.pi
 		with self.robot:
 			self.robot.SetDOFValues(joint_angles)
 			return robotToCartesian(self.robot)[6]

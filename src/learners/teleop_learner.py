@@ -36,8 +36,6 @@ class TeleopLearner(object):
 		self.cache['goal_traj_plan_by_idx'] = {0: []}
 
 
-		self.goal_waypts = []
-
 		for i in range(main.num_goals):
 			#traj, traj_plan = main.planner.replan(main.start, main.goals[i], list(main.goal_locs[i]), main.goal_weights[i],
 			#									  main.T, main.timestep, return_both=True)
@@ -46,10 +44,9 @@ class TeleopLearner(object):
 
 			# Server versions:
 			# Using IK from goal loc as seed:
-			goal_waypt = p.calculateInverseKinematics(main.bullet_environment["robot"], 7, main.goal_locs[i])[:7]
-			(traj, traj_plan), traj_cost = main.planner.replan_and_get_cost(main.start, goal_waypt, i, i,
+			#goal_waypt = p.calculateInverseKinematics(main.bullet_environment["robot"], 7, main.goal_locs[i])[:7]
+			(traj, traj_plan), traj_cost = main.planner.replan_and_get_cost(main.start, main.IK_goals[i], i, i,
 																			main.T, main.timestep, return_both=True)
-			self.goal_waypts.append(goal_waypt)
 			# # Using server's goal position seed:
 			# (traj, traj_plan), traj_cost = main.planner.replan_and_get_cost(main.start, i, i, i,
 			# 																main.T, main.timestep, return_both=True)
@@ -81,6 +78,7 @@ class TeleopLearner(object):
 				raise ValueError
 		else:
 			raise ValueError
+		print "optimal costs", self.optimal_costs
 
 	def _dragan_update(self, is_joint):
 		main = self.main
@@ -92,6 +90,8 @@ class TeleopLearner(object):
 		#curr_traj_features = np.sum(main.environment.featurize(curr_traj), axis=1)
 		#curr_traj_costs = np.array([np.sum(main.goal_weights[i] * curr_traj_features) for i in range(main.num_goals)])
 		curr_traj_costs = np.array([main.planner.get_cost(curr_traj, i) for i in range(main.num_goals)])
+		print 'curr_traj costs:', curr_traj_costs
+
 		goal_traj_costs = np.zeros(main.num_goals)
 		curr_time = this_idx * main.timestep
 		self.cache['goal_traj_by_idx'][this_idx] = []
@@ -129,8 +129,8 @@ class TeleopLearner(object):
 			# 																				   main.timestep,
 			# 																				   return_both=True)
 			# print 'cost', goal_traj_costs[i]
-			# Using stored goal_waypt
-			(goal_traj, goal_traj_plan), goal_traj_costs[i] = main.planner.replan_and_get_cost(curr_pos, self.goal_waypts[i], i, i,
+			# Using IK_goal
+			(goal_traj, goal_traj_plan), goal_traj_costs[i] = main.planner.replan_and_get_cost(curr_pos, main.IK_goals[i], i, i,
 																							   main.T - curr_time,
 																							   main.timestep,
 																							   return_both=True)
@@ -147,7 +147,7 @@ class TeleopLearner(object):
 			self.cache['goal_traj_plan_by_idx'][this_idx].append(goal_traj_plan)
 		print 'goal traj costs', goal_traj_costs
 		suboptimality = curr_traj_costs + goal_traj_costs - self.optimal_costs
-		suboptimality *= (1. / self.optimal_costs)
+		#suboptimality *= (1. / self.optimal_costs)
 		#print 'suboptimality:', suboptimality
 		#print 'suboptimality/time:', suboptimality / this_idx
 		if is_joint: # joint inference over beta and goals
@@ -191,7 +191,7 @@ class TeleopLearner(object):
 		curr_time = this_idx * main.timestep
 		traj_costs = np.array([main.planner.get_cost(main.traj_hist, i, i) for i in range(main.num_goals)])
 		suboptimality = traj_costs - self.optimal_costs
-		suboptimality *= (1. / self.optimal_costs)
+		#suboptimality *= (1. / self.optimal_costs)
 		print 'curr traj costs', traj_costs
 		print 'optimal_costs', self.optimal_costs
 		print 'final suboptimality:', suboptimality

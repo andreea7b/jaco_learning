@@ -15,12 +15,20 @@ import numpy as np
 import cPickle as pickle
 import yaml
 
+MEIRL_CONFIG_FILE_DICT = {
+	2: "config/task2_meirl_config.yaml",
+	3: "config/task3_meirl_config.yaml",
+	4: "config/task4_meirl_config.yaml"
+}
+
 class Training(TeleopInferenceBase):
-	def __init__(self):
-		super(Training, self).__init__(True)
+	def __init__(self, meirl_config_file):
+
+		inference_config_file = "config/training_inference_config.yaml"
+		super(Training, self).__init__(True, inference_config_file)
 
 		# Setup meirl
-		with open('config/meirl.yaml') as f:
+		with open(meirl_config_file) as f:
 			config = yaml.load(f)
 
 		NN_dict = config['NN_dict']
@@ -28,9 +36,10 @@ class Training(TeleopInferenceBase):
 		print 'IRL dict', IRL_dict
 
 		# Load demonstrations
-		trajectory_list = [np.load(path) for path in config['demonstration_paths']]
+		npz_dict = np.load(config['demonstrations_path'], allow_pickle=True)
+
 		s_g_exp_trajs = []
-		for trajectory in trajectory_list:
+		for trajectory in npz_dict['demos']:
 			waypts = trajectory
 			waypts_time = np.linspace(0.0, self.T, waypts.shape[0])
 			traj = Trajectory(waypts, waypts_time)
@@ -55,7 +64,9 @@ class Training(TeleopInferenceBase):
 			self.planner,
 			learned_goal_weight,
 			s_g_exp_trajs,
-			None,
+			npz_dict['FKs'],
+			npz_dict['IK_goal'],
+			npz_dict['FK_goal'],
 			[],
 			NN_dict,
 			'waypt',
@@ -73,4 +84,5 @@ class Training(TeleopInferenceBase):
 
 
 if __name__ == "__main__":
-	Training()
+	task = int(sys.argv[1])
+	Training(MEIRL_CONFIG_FILE_DICT[task])

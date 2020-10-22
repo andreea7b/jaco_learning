@@ -15,6 +15,12 @@ setup:
         [150.0, 130.0, 160.0, 240.0, 180.0, 172.0, 280.0],
         [210.0, 130.0, 200.0, 240.0, 180.0, 172.0, 280.0]
     ]
+    visual_goals: [
+        [150.0, 130.0, 160.0, 240.0, 180.0, 172.0, 280.0],
+        [210.0, 130.0, 200.0, 240.0, 180.0, 172.0, 280.0],
+        [123.0, 155.0, 131.0, 284.0, 180.0, 176.0, 189.0]
+        #[180.0, 175.0, 180.0, 300.0, 180.0, 180.0, 190.0]
+    ]
     # for generating goal-specific feature weights
     goal_dist_feat_weight: 0.0 #currently not implemented
     learned_goals: [
@@ -27,7 +33,7 @@ setup:
     ]
     T: 15.0
     timestep: 0.5
-    demonstrations_save_path: "data/demo_user.npz"
+    demonstrations_save_path: "data/task2_demonstrations.npz"
 
 planner:
     # These settings have been tuned for trajopt planner.
@@ -66,7 +72,7 @@ learner:
     #goal_beliefs: [0., 0., 1.]
     #goal_beliefs: [1., 0.]
     # inference method is "dragan", "collect", or "none"
-    inference_method: "dragan"
+    inference_method: "collect"
     #inference_method: "none"
     #assistance_method: "blend"
     assistance_method: "none"

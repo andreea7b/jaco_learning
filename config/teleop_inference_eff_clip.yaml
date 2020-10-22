@@ -1,11 +1,10 @@
 setup:
     prefix: 'j2s7s300_driver'
     model_filename: "jaco_dynamics"
-    object_centers: {'HUMAN_CENTER': [-0.6,-0.55,0.0], 'LAPTOP_CENTER': [-0.7, 0.0, -0.05]}
+    object_centers: {'HUMAN_CENTER': [-0.6,-0.55,0.0], 'LAPTOP_CENTER': [-0.7,-0.1,0.0]}
     # for the features and weights that are shared between all goals
-    common_feat_list: ['world_efficiency']
-    #common_feat_list: ['efficiency_clip']
-    common_feat_weights: [50.0]
+    common_feat_list: ['efficiency_clip']
+    common_feat_weights: [30.0]
     #common_feat_weights: [30.0]
     start: [180.0, 175.0, 180.0, 300.0, 180.0, 180.0, 190.0]
     #start: [180.0, 150.0, 180.0, 270.0, 180.0, 180.0, 190.0]
@@ -27,7 +26,7 @@ setup:
     ]
     T: 15.0
     timestep: 0.5
-    demonstrations_save_path: "data/demo_user.npz"
+    save_dir: "/data/teleoperation/"
 
 planner:
     # These settings have been tuned for trajopt planner.
@@ -61,23 +60,23 @@ learner:
 
 
     betas: [0.1, 1, 10.]
-    goal_beliefs: "none" #if 'none' then uniform gets used
+    #goal_beliefs: "none" #if 'none' then uniform gets used
     #goal_beliefs: [0., 0., 0., 1.]
     #goal_beliefs: [0., 0., 1.]
-    #goal_beliefs: [1., 0.]
+    goal_beliefs: [1., 0.]
     # inference method is "dragan", "collect", or "none"
     inference_method: "dragan"
     #inference_method: "none"
-    #assistance_method: "blend"
-    assistance_method: "none"
+    assistance_method: "blend"
+    #assistance_method: "none"
     #beta_method: "joint"
     beta_method: "estimate"
     #beta_priors: [1] # if "joint" these are probabilities
     #beta_priors: [2, 2, 2] #if "estimate" these are exponential rate parameters
     #beta_priors: "none" #if 'none' then 0's are used
     #beta_priors: [0, 0, 0, -10000]
-    beta_priors: [4., 4.]
-    #beta_priors: [10., 10.]
+    #beta_priors: [0.1, 0.1]
+    beta_priors: [10., 10.]
     #beta_priors: [2, 2, -10000]
     zero_input_assist: True
     alpha_method: "beta"

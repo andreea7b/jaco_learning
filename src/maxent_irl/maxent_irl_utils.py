@@ -176,7 +176,8 @@ class ReLuNet(nn.Module):
 		else:
 			for layer in self.fc[:-1]:
 				x = F.leaky_relu(layer(x))
-			x = F.softplus(self.fc[-1](x))
+			#x = F.softplus(self.fc[-1](x))
+			x = 50 * F.tanh(self.fc[-1](x))
 		return x
 
 class DNN(nn.Module):
