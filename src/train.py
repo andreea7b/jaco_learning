@@ -57,7 +57,7 @@ class Training(TeleopInferenceBase):
 		for i in range(self.num_goals):
 			self.goal_weights[i] = np.hstack((self.goal_weights[i], 0))
 		learned_goal_weight = np.array(common_weights)
-		learned_goal_weight[len(self.feat_list)] = 50.
+		learned_goal_weight[len(self.feat_list)] = 1.
 		self.goal_weights.append(learned_goal_weight)
 
 		self.environment.new_meirl_learned_feature(
