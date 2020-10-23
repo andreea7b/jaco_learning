@@ -23,7 +23,8 @@ class Client():
         return self.query_server(query)[0]
 
     def replan_and_get_cost(self, start, goal, goal_pose, weight_idx, T, timestep, start_time=0.0,
-                            seed=None, return_plan=False, return_both=False, add_pose_penalty=False):
+                            seed=None, return_plan=False, return_both=False, add_pose_penalty=False,
+                            zero_learned_cost=False):
         query = [
             start,
             goal,
@@ -35,16 +36,18 @@ class Client():
         	seed,
             return_plan,
             return_both,
-            add_pose_penalty
+            add_pose_penalty,
+            zero_learned_cost
         ]
         query = [2, query]
         return self.query_server(query)
 
-    def get_cost(self, waypts, weight_idx, add_pose_penalty=False):
+    def get_cost(self, waypts, weight_idx, add_pose_penalty=False, zero_learned_cost=False):
         query = [
             waypts,
             weight_idx,
-            add_pose_penalty
+            add_pose_penalty,
+            zero_learned_cost
         ]
         query = [1, query]
         return self.query_server(query)[0]

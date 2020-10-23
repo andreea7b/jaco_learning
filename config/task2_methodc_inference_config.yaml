@@ -24,7 +24,7 @@ setup:
     # for generating goal-specific feature weights
     goal_dist_feat_weight: 0.0 #currently not implemented
     learned_goals: [
-        "data/task2_learned_goal.pt"
+    #    "data/task2_learned_goal.pt"
     #    "/root/catkin_ws/src/jaco_learning/data/pour_red_pose_uc.pt",
     #    "/root/catkin_ws/src/jaco_learning/data/goto_green_pose_uc.pt"
     #    "/root/catkin_ws/src/jaco_learning/data/pour_red_meirl.pt",
@@ -85,7 +85,7 @@ learner:
     #beta_priors: [0, 0, 0, -10000]
     #beta_priors: [4., 4.]
     #beta_priors: [10., 10.]
-    beta_priors: [4, 4, 4]
+    beta_priors: [4, 4]
     #beta_priors: [4, 4, -10000]
     zero_input_assist: True
     alpha_method: "beta"

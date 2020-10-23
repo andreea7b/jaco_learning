@@ -17,7 +17,7 @@ def setup_environment(goals):
     objectID["stand"] = p.loadURDF("support.urdf", pos, orientation, useFixedBase=True)
 
     # Add the laptop.
-    pos = [-0.7, 0.0, -0.05]
+    pos = [-0.4, -0.25, -0.05]
     orientation = p.getQuaternionFromEuler([0, 0, 0])
     objectID["laptop"] = p.loadURDF("laptop.urdf", pos, orientation, useFixedBase=True)
 

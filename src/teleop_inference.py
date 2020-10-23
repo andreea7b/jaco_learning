@@ -25,30 +25,30 @@ from teleop_inference_base import TeleopInferenceBase
 
 CONFIG_FILE_DICT = {
 	1: {
-		'a': "",
-		'b': "",
-		'c': ""
+		'a': "config/task1_methoda_inference_config.yaml",
+		'b': "config/task1_methodb_inference_config.yaml",
+		'c': "config/task1_methodc_inference_config.yaml"
 	},
 	2: {
-		'a': "",
-		'b': "",
-		'c': "",
+		'a': "config/task2_methoda_inference_config.yaml",
+		'b': "config/task2_methodb_inference_config.yaml",
+		'c': "config/task2_methodc_inference_config.yaml",
 		'd': "config/task2_methodd_inference_config.yaml",
 		'e': "config/task2_methode_inference_config.yaml"
 	},
 	3: {
-		'a': "",
-		'b': "",
-		'c': "",
-		'd': "",
-		'e': ""
+		'a': "config/task3_methoda_inference_config.yaml",
+		'b': "config/task3_methodb_inference_config.yaml",
+		'c': "config/task3_methodc_inference_config.yaml",
+		'd': "config/task3_methodd_inference_config.yaml",
+		'e': "config/task3_methode_inference_config.yaml"
 	},
 	4: {
-		'a': "",
-		'b': "",
-		'c': "",
-		'd': "",
-		'e': ""
+		'a': "config/task4_methoda_inference_config.yaml",
+		'b': "config/task4_methodb_inference_config.yaml",
+		'c': "config/task4_methodc_inference_config.yaml",
+		'd': "config/task4_methodd_inference_config.yaml",
+		'e': "config/task4_methode_inference_config.yaml"
 	}
 }
 
@@ -67,7 +67,9 @@ class TeleopInference(TeleopInferenceBase):
 		#physicsClient = p.connect(p.GUI, options="--opengl2")
 
 		# Set camera angle.
-		p.resetDebugVisualizerCamera(cameraDistance=2.50, cameraYaw=90, cameraPitch=-30, cameraTargetPosition=[-0.8,0.05,0.02])
+		p.resetDebugVisualizerCamera(cameraDistance=2.50, cameraYaw=90, cameraPitch=-30, cameraTargetPosition=[-0.8,0.05,0.02]) # for tasks 1, 2, 4
+		#p.resetDebugVisualizerCamera(cameraDistance=1.50, cameraYaw=90, cameraPitch=-70, cameraTargetPosition=[-0.4, -0.25, -0.05])
+		p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 1, lightPosition=[-0.4, -0.25,10])
 
 		# Add path to data resources for the environment.
 		p.setAdditionalSearchPath("../data/resources")
@@ -188,10 +190,9 @@ class TeleopInference(TeleopInferenceBase):
 				self.traj_hist[self.next_waypt_idx] = self.curr_pos.reshape(7)
 				self.next_waypt_idx += 1
 				#print "timestep:", self.next_waypt_idx
-				if not self.running_inference:
+				if not self.running_inference and self.next_waypt_idx - 1 != len(self.traj_hist) - 1: # second condition: don't call inference with 1 timestep left
 					#print 'calling inference from', self.next_waypt_idx - 1
 
-					# TODO: Use IK on goals for seed
 					self.update_IK_goals()
 					#print 'original goal distance:', np.linalg.norm(self.goals - self.curr_pos, axis=1)
 					#print 'IK goal distance:', np.linalg.norm(self.IK_goals - self.curr_pos, axis=1)
@@ -225,7 +226,7 @@ class TeleopInference(TeleopInferenceBase):
 					#print 'goal:', goal, 'beta:', beta
 					#print 'beta estimates:', self.learner.beta_estimates
 					#print 'goal beliefs:', self.learner.goal_beliefs
-				self.alpha = self.beta_arbitration(beta, belief)
+				self.alpha = self.beta_arbitration(beta, belief, goal)
 				print 'alpha:', self.alpha
 				if goal != self.curr_goal or True:
 					print 'new assistance trajectory, goal:', goal
@@ -313,6 +314,11 @@ class TeleopInference(TeleopInferenceBase):
 
 		# Get current EE position.
 		EEPos = robot_coords(self.bullet_environment["robot"])[EElink-1]
+		self.EEPos = EEPos
+
+		#for i, goal_loc in enumerate(self.goal_locs):
+		#	print 'distance from goal', i, np.linalg.norm(goal_loc - self.EEPos)
+
 		state = p.getJointStates(self.bullet_environment["robot"], range(p.getNumJoints(self.bullet_environment["robot"])))
 		jointPoses = np.array([s[0] for s in state])
 
@@ -359,9 +365,9 @@ class TeleopInference(TeleopInferenceBase):
 	def idx_to_time(self, idx):
 		return self.start_T + idx * self.timestep
 
-	def beta_arbitration(self, beta, belief):
+	def beta_arbitration(self, beta, belief, goal):
 		if self.alpha_method == 'prob':
-			return belief
+			return 1 - belief
 		elif self.alpha_method == 'beta':
 			#return 1 #all joystick
 			#return 0 #all assistance
@@ -369,6 +375,11 @@ class TeleopInference(TeleopInferenceBase):
 			return np.clip(1 / beta, 0.3, 1)
 			#return np.clip(0.5 / beta, 0, 1)
 			#return np.clip(np.exp(-beta + 0.1), 0, 1)
+		elif self.alpha_method == 'dist':
+			#return 1
+			D = 0.7
+			goal_dist = np.linalg.norm(self.goal_locs[goal] - self.EEPos)
+			return np.clip(goal_dist / D, 0, 1)
 
 	def update_IK_goals(self):
 		self.IK_goals = [p.calculateInverseKinematics(self.bullet_environment["robot"], 7, self.goal_locs[i])[:7] for i in range(self.num_goals)]

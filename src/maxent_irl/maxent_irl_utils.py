@@ -177,7 +177,9 @@ class ReLuNet(nn.Module):
 			for layer in self.fc[:-1]:
 				x = F.leaky_relu(layer(x))
 			#x = F.softplus(self.fc[-1](x))
-			x = 50 * F.tanh(self.fc[-1](x))
+			#x = 4 * F.tanh(self.fc[-1](x))
+			x = F.tanh(self.fc[-1](x))/2 + 0.5
+			#x = F.sigmoid(self.fc[-1](x))
 		return x
 
 class DNN(nn.Module):

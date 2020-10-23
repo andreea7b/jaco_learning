@@ -85,6 +85,6 @@ learner:
     beta_priors: [4., 4.]
     #beta_priors: [10., 10.]
     #beta_priors: [2, 2, -10000]
-    zero_input_assist: True
+    zero_input_assist: False
     alpha_method: "beta"
     demonstration_save_path: ""

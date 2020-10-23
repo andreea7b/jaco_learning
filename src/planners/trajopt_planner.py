@@ -166,9 +166,69 @@ class TrajoptPlanner(object):
 				feature_value = self.interpolate_features(curr_waypt, prev_waypt, feat_idx, NUM_STEPS=1) # CHANGED
 			feature_values.append(feature_value)
 		# calculate the cost
-		return np.matmul(self.weights[-n_learned:], np.array(feature_values))*np.linalg.norm(curr_waypt - prev_waypt)
+		world_dist = np.linalg.norm(self.environment.get_cartesian_coords(curr_waypt) - self.environment.get_cartesian_coords(prev_waypt))
+		return np.matmul(self.weights[-n_learned:], np.array(feature_values))*world_dist
 
 	def learned_feature_cost_derivatives(self, waypt):
+		"""
+		Computes the cost derivatives for all the learned features.
+		---
+		input waypoint, output scalar cost
+		"""
+		# get the number of learned features
+		n_learned = np.count_nonzero(self.environment.is_learned_feat)
+
+		J = []
+		sols = []
+		for i, feature in enumerate(self.environment.learned_feats):
+			feat_idx = self.environment.num_feats - n_learned + i
+			if self.weights[feat_idx] == 0.0:
+				J.append(np.zeros(len(waypt)))
+				continue
+
+			# Setup for computing Jacobian.
+			x = torch.tensor(waypt, requires_grad=True)
+
+			# Get the value of the feature
+			feat_val = torch.tensor(0.0, requires_grad=True)
+			NUM_STEPS = 1 # CHANGED
+			for step in range(NUM_STEPS):
+				delta = torch.tensor((1.0 + step)/NUM_STEPS, requires_grad=True)
+				inter_waypt = x[:7] + delta * (x[7:] - x[:7])
+				# Compute feature value.
+				z = self.environment.feat_func_list[feat_idx](self.environment.raw_features(inter_waypt).float(), torchify=True)
+				feat_val = feat_val + z
+			y = feat_val / torch.tensor(float(NUM_STEPS), requires_grad=True)
+			world_dist = torch.norm(self.environment.get_torch_transforms(x[7:])[6,0:3,3] - self.environment.get_torch_transforms(x[:7])[6,0:3,3])
+			y = y * torch.tensor(self.weights[-n_learned+i], requires_grad=True) * world_dist
+			y.backward()
+			J.append(x.grad.data.numpy())
+		return np.sum(np.array(J), axis = 0).reshape((1,-1))
+
+	def _learned_feature_costs(self, waypt):
+		"""
+		Computes the cost for all the learned features.
+		---
+		input waypoint, output scalar cost
+		"""
+		prev_waypt = waypt[0:7]
+		curr_waypt = waypt[7:14]
+		# get the number of learned features
+		n_learned = np.count_nonzero(self.environment.is_learned_feat)
+
+		feature_values = []
+		for i, feature in enumerate(self.environment.learned_feats):
+			# get the value of the feature
+			feat_idx = self.environment.num_feats - n_learned + i
+			if self.weights[feat_idx] == 0.0:
+				feature_value = 0.0
+			else:
+				feature_value = self.interpolate_features(curr_waypt, prev_waypt, feat_idx, NUM_STEPS=1) # CHANGED
+			feature_values.append(feature_value)
+		# calculate the cost
+		return np.matmul(self.weights[-n_learned:], np.array(feature_values))*np.linalg.norm(curr_waypt - prev_waypt)
+
+	def _learned_feature_cost_derivatives(self, waypt):
 		"""
 		Computes the cost derivatives for all the learned features.
 		---
@@ -202,6 +262,8 @@ class TrajoptPlanner(object):
 			y.backward()
 			J.append(x.grad.data.numpy())
 		return np.sum(np.array(J), axis = 0).reshape((1,-1))
+
+
 
 	# TODO: add interpolation for goal_dist cost so it behaves like other costs
 	def gen_goal_cost(self, goal_num):

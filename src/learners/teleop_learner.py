@@ -46,7 +46,8 @@ class TeleopLearner(object):
 			# Using IK from goal loc as seed:
 			#goal_waypt = p.calculateInverseKinematics(main.bullet_environment["robot"], 7, main.goal_locs[i])[:7]
 			(traj, traj_plan), traj_cost = main.planner.replan_and_get_cost(main.start, main.IK_goals[i], i, i,
-																			main.T, main.timestep, return_both=True)
+																			main.T, main.timestep, return_both=True,
+																			zero_learned_cost=True)
 			# # Using server's goal position seed:
 			# (traj, traj_plan), traj_cost = main.planner.replan_and_get_cost(main.start, i, i, i,
 			# 																main.T, main.timestep, return_both=True)
@@ -133,7 +134,8 @@ class TeleopLearner(object):
 			(goal_traj, goal_traj_plan), goal_traj_costs[i] = main.planner.replan_and_get_cost(curr_pos, main.IK_goals[i], i, i,
 																							   main.T - curr_time,
 																							   main.timestep,
-																							   return_both=True)
+																							   return_both=True,
+																							   zero_learned_cost=True)
 			print 'cost', goal_traj_costs[i]
 
 			# # Using server's goal position seed:

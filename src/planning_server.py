@@ -23,30 +23,30 @@ PORT_NUM = 10001
 
 CONFIG_FILE_DICT = {
 	1: {
-		'a': "",
-		'b': "",
-		'c': ""
+		'a': "config/task1_methoda_inference_config.yaml",
+		'b': "config/task1_methodb_inference_config.yaml",
+		'c': "config/task1_methodc_inference_config.yaml"
 	},
 	2: {
-		'a': "",
-		'b': "",
-		'c': "",
+		'a': "config/task2_methoda_inference_config.yaml",
+		'b': "config/task2_methodb_inference_config.yaml",
+		'c': "config/task2_methodc_inference_config.yaml",
 		'd': "config/task2_methodd_inference_config.yaml",
 		'e': "config/task2_methode_inference_config.yaml"
 	},
 	3: {
-		'a': "",
-		'b': "",
-		'c': "",
-		'd': "",
-		'e': ""
+		'a': "config/task3_methoda_inference_config.yaml",
+		'b': "config/task3_methodb_inference_config.yaml",
+		'c': "config/task3_methodc_inference_config.yaml",
+		'd': "config/task3_methodd_inference_config.yaml",
+		'e': "config/task3_methode_inference_config.yaml"
 	},
 	4: {
-		'a': "",
-		'b': "",
-		'c': "",
-		'd': "",
-		'e': ""
+		'a': "config/task4_methoda_inference_config.yaml",
+		'b': "config/task4_methodb_inference_config.yaml",
+		'c': "config/task4_methodc_inference_config.yaml",
+		'd': "config/task4_methodd_inference_config.yaml",
+		'e': "config/task4_methode_inference_config.yaml"
 	}
 }
 
@@ -107,9 +107,15 @@ class PlanningServer(TeleopInferenceBase):
 					params[0] = traj.waypts
 					params[1] = params[3] # weight vector index
 					params[2] = params[10] # add_pose_penalty
+					params[3] = params[11] # zero_learned_cost
 				if type == 1 or type == 2:
-					support = np.arange(len(self.goal_weights[params[1]]))[self.goal_weights[params[1]] != 0.0]
-					c_out = np.sum(self.goal_weights[params[1]][support] * np.sum(self.environment.featurize(params[0], support), axis=1))
+					goal_weights = np.copy(self.goal_weights[params[1]])
+					if params[3]: #zero out learned cost weights
+						goal_weights[self.environment.is_learned_feat] = 0.0
+					support = np.arange(len(goal_weights))[goal_weights != 0.0]
+					feat_vals = np.sum(self.environment.featurize(params[0], support), axis=1)
+					print "feature values", feat_vals
+					c_out = np.sum(goal_weights[support] * feat_vals)
 					out.append(c_out)
 				connection.sendall(pickle.dumps(out, 2))
 				connection.shutdown(2)
