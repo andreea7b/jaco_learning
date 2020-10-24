@@ -53,6 +53,10 @@ CONFIG_FILE_DICT = {
 class PlanningServer(TeleopInferenceBase):
 	def __init__(self, config_file):
 		super(PlanningServer, self).__init__(True, config_file)
+		if self.use_goal_rot_learned:
+			goal_rot = 4.5
+		else:
+			goal_rot = None
 
 		# setup socket
 		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -92,7 +96,8 @@ class PlanningServer(TeleopInferenceBase):
 													 params[6],
 													 params[7],
 													 False,
-													 True)
+													 True,
+													 goal_rot)
 					# always plan and get both, then send the desired plan/traj/both back
 					if not params[9]:
 						if params[8]:

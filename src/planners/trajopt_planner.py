@@ -277,7 +277,7 @@ class TrajoptPlanner(object):
 
 	# ---- Here's TrajOpt --- #
 
-	def trajOpt(self, start, goal, goal_pose, traj_seed=None):
+	def trajOpt(self, start, goal, goal_pose, traj_seed=None, EE_rot_angle=None):
 		"""
 		Computes a plan from start to goal using trajectory optimizer.
 		Reference: http://joschu.net/docs/trajopt-paper.pdf
@@ -321,6 +321,9 @@ class TrajoptPlanner(object):
 				#print("Using trajectory seed initialization!")
 				init_waypts = traj_seed
 
+			if EE_rot_angle:
+				rot_interp_weights = np.linspace(0, 1, self.num_waypts) ** 1.5
+				init_waypts[:, 6] = init_waypts[:, 6] * (1 - rot_interp_weights) + EE_rot_angle * rot_interp_weights
 			# --- Request construction --- #
 			# If pose is given, must include pose constraint.
 			if goal_pose is not None and not self.prefer_angles and use_constraint:
@@ -404,7 +407,7 @@ class TrajoptPlanner(object):
 			return result.GetTraj()
 
 	def replan(self, start, goal, goal_pose, weights, T, timestep, start_time=0.0,
-			   seed=None, return_plan=False, return_both=False):
+			   seed=None, return_plan=False, return_both=False, EE_rot_angle=None):
 		"""
 		Replan the trajectory from start to goal given weights.
 		---
@@ -444,7 +447,7 @@ class TrajoptPlanner(object):
 			else:
 				return traj
 
-		waypts = self.trajOpt(start, goal, goal_pose, traj_seed=seed)
+		waypts = self.trajOpt(start, goal, goal_pose, traj_seed=seed, EE_rot_angle=EE_rot_angle)
 		print "planning took:", time.time() - trajopt_start_time
 		waypts_time = np.linspace(start_time, T, self.num_waypts)
 		traj = Trajectory(waypts, waypts_time)

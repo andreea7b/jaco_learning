@@ -49,7 +49,8 @@ class DeepMaxEntIRL:
 
 		# care about known features
 		self.known_feat_list = known_feat_list
-		self.known_feat_transformer = TorchFeatureTransform(env.object_centers, known_feat_list, env.feat_range)
+		#self.known_feat_list = known_feat_list
+		self.known_feat_transformer = TorchFeatureTransform(env.object_centers, self.known_feat_list, env.feat_range)
 
 		# get some derivative data from the s_g_exp_trajs
 		self.init_s_g_exp_trajs = s_g_exp_trajs
@@ -73,7 +74,7 @@ class DeepMaxEntIRL:
 
 		# get the input dim & instantiate cost NN
 		self.raw_input_dim = transform_input(torch.ones(97), NN_dict).shape[1]
-		self.cost_nn = ReLuNet(NN_dict['n_layers'], NN_dict['n_units'], self.raw_input_dim, input_residuals=len(known_feat_list))
+		self.cost_nn = ReLuNet(NN_dict['n_layers'], NN_dict['n_units'], self.raw_input_dim, input_residuals=len(self.known_feat_list))
 
 		# To use for inference and assistance with this feature
 		self.goal = goal

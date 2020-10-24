@@ -44,9 +44,9 @@ CONFIG_FILE_DICT = {
 		'e': "config/task3_methode_inference_config.yaml"
 	},
 	4: {
-		'a': "config/task4_methoda_inference_config.yaml",
-		'b': "config/task4_methodb_inference_config.yaml",
-		'c': "config/task4_methodc_inference_config.yaml",
+		'a': "config/task2_methoda_inference_config.yaml",
+		'b': "config/task2_methodb_inference_config.yaml", # maybe this'll get changed
+		'c': "config/task2_methodc_inference_config.yaml",
 		'd': "config/task4_methodd_inference_config.yaml",
 		'e': "config/task4_methode_inference_config.yaml"
 	}
@@ -232,6 +232,9 @@ class TeleopInference(TeleopInferenceBase):
 					print 'new assistance trajectory, goal:', goal
 					self.curr_goal = goal
 					self.traj = self.learner.cache['goal_traj_by_idx'][self.last_inf_idx][goal]
+
+					print 'last joint angle:', self.traj.waypts[:,6]
+
 					self.traj_plan = self.learner.cache['goal_traj_plan_by_idx'][self.last_inf_idx][goal]
 					self.controller.set_trajectory(self.traj,
 												   path_start_T=self.idx_to_time(self.last_inf_idx))

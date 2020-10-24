@@ -1,40 +1,29 @@
 setup:
     prefix: 'j2s7s300_driver'
     model_filename: "jaco_dynamics"
-    object_centers: {'HUMAN_CENTER': [-0.6,-0.55,0.0], 'LAPTOP_CENTER': [-0.4, -0.25, -0.05]}
+    object_centers: {'HUMAN_CENTER': [-0.6,-0.55,0.0], 'LAPTOP_CENTER': [-0.7, 0.0, -0.05]}
     # for the features and weights that are shared between all goals
     common_feat_list: ['world_efficiency']
     #common_feat_list: ['efficiency_clip']
-    common_feat_weights: [1.0]
+    common_feat_weights: [50.0]
     #common_feat_weights: [30.0]
-    start: [180.0, 230.0, 180.0, 320.0, 180.0, 185.0, 190.0]
+    start: [180.0, 175.0, 180.0, 300.0, 180.0, 180.0, 190.0]
     #start: [180.0, 150.0, 180.0, 270.0, 180.0, 180.0, 190.0]
     goals: [
-        #[155.0, 135.0, 130.0, 245.0, 180.0, 168.0, 190.0]
-
-        #[155.0, 130.0, 165.0, 227.0, 180.0, 165.0, 190.0]
-
-
-        #[160.0, 140.0, 145.0, 245.0, 180.0, 170.0, 190.0],
-        [200.0, 140.0, 215.0, 245.0, 180.0, 170.0, 190.0]
-
-
+        #[140.0, 90.0, 180.0, 160.0, 270.0, 180.0, 280.0],
+        #[220.0, 90.0, 180.0, 160.0, 270.0, 180.0, 280.0],
+        [150.0, 130.0, 160.0, 240.0, 180.0, 172.0, 280.0],
+        [210.0, 130.0, 200.0, 240.0, 180.0, 172.0, 280.0]
     ]
     visual_goals: [
-        [155.0, 135.0, 130.0, 245.0, 180.0, 168.0, 190.0],
-
-        #[160.0, 140.0, 145.0, 245.0, 180.0, 170.0, 190.0],
-        [200.0, 140.0, 215.0, 245.0, 180.0, 170.0, 190.0]
-
-
-        #[155.0, 130.0, 165.0, 227.0, 180.0, 165.0, 190.0]
-
+        [150.0, 130.0, 160.0, 240.0, 180.0, 172.0, 280.0],
+        [210.0, 130.0, 200.0, 240.0, 180.0, 172.0, 280.0]
+        #[180.0, 175.0, 180.0, 300.0, 180.0, 180.0, 190.0]
     ]
     # for generating goal-specific feature weights
     goal_dist_feat_weight: 0.0 #currently not implemented
     learned_goals: [
-        "data/task3_learned_goal.pt"
-    #    "/root/catkin_ws/src/jaco_learning/data/pour_red_new_meirl_test2.pt",
+    #    "data/task2_learned_goal.pt"
     #    "/root/catkin_ws/src/jaco_learning/data/pour_red_pose_uc.pt",
     #    "/root/catkin_ws/src/jaco_learning/data/goto_green_pose_uc.pt"
     #    "/root/catkin_ws/src/jaco_learning/data/pour_red_meirl.pt",
@@ -43,7 +32,7 @@ setup:
     ]
     T: 15.0
     timestep: 0.5
-    demonstrations_save_path: "data/task3_demonstrations.npz"
+    demonstrations_save_path: "data/task1_demonstrations.npz"
 
 planner:
     # These settings have been tuned for trajopt planner.
@@ -76,25 +65,27 @@ learner:
 
 
 
-    betas: [0.1, 1, 10.]
-    #goal_beliefs: "none" #if 'none' then uniform gets used
+    betas: [0.1, 0.3, 1., 3., 10.]
+    goal_beliefs: "none" #if 'none' then uniform gets used
     #goal_beliefs: [0., 0., 0., 1.]
     #goal_beliefs: [0., 0., 1.]
-    goal_beliefs: [0., 1.]
+    #goal_beliefs: [1., 0.]
     # inference method is "dragan", "collect", or "none"
     inference_method: "dragan"
     #inference_method: "none"
     assistance_method: "blend"
     #assistance_method: "none"
     #beta_method: "joint"
+    #beta_priors: [0.2, 0.2, 0.2, 0.2, 0.2]
     beta_method: "estimate"
     #beta_priors: [1] # if "joint" these are probabilities
     #beta_priors: [2, 2, 2] #if "estimate" these are exponential rate parameters
     #beta_priors: "none" #if 'none' then 0's are used
     #beta_priors: [0, 0, 0, -10000]
-    beta_priors: [0, -10000.]
+    #beta_priors: [4., 4.]
     #beta_priors: [10., 10.]
-    #beta_priors: [2, 2, -10000]
+    beta_priors: [4, 4]
+    #beta_priors: [4, 4, -10000]
     zero_input_assist: True
     alpha_method: "beta"
     demonstration_save_path: ""

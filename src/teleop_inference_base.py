@@ -127,6 +127,10 @@ class TeleopInferenceBase(object):
 				num_waypts = config["planner"]["num_waypts"]
 				prefer_angles = config["planner"]["prefer_angles"]
 				use_constraint_learned = config["planner"]["use_constraint_learned"]
+				try:
+					self.use_goal_rot_learned = config["planner"]["use_goal_rot_learned"]
+				except KeyError:
+					self.use_goal_rot_learned = False
 
 				# Initialize planner.
 				self.planner = TrajoptPlanner(max_iter, num_waypts, self.environment, self.bullet_environment,

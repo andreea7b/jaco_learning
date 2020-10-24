@@ -44,10 +44,9 @@ class TeleopLearner(object):
 
 			# Server versions:
 			# Using IK from goal loc as seed:
-			#goal_waypt = p.calculateInverseKinematics(main.bullet_environment["robot"], 7, main.goal_locs[i])[:7]
 			(traj, traj_plan), traj_cost = main.planner.replan_and_get_cost(main.start, main.IK_goals[i], i, i,
 																			main.T, main.timestep, return_both=True,
-																			zero_learned_cost=True)
+																			zero_learned_cost=False)
 			# # Using server's goal position seed:
 			# (traj, traj_plan), traj_cost = main.planner.replan_and_get_cost(main.start, i, i, i,
 			# 																main.T, main.timestep, return_both=True)
@@ -135,7 +134,7 @@ class TeleopLearner(object):
 																							   main.T - curr_time,
 																							   main.timestep,
 																							   return_both=True,
-																							   zero_learned_cost=True)
+																							   zero_learned_cost=False)
 			print 'cost', goal_traj_costs[i]
 
 			# # Using server's goal position seed:
@@ -246,7 +245,7 @@ class TeleopLearner(object):
 	def _no_inference_final(self):
 		main = self.main
 		if self.inference_method == "collect":
-			np.save('placeholder', np.array(main.traj_hist))
+			#np.save('placeholder', np.array(main.traj_hist))
 			print 'saved trajectory'
 		main.final_inference_done = True
 
