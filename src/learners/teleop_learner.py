@@ -14,6 +14,8 @@ class TeleopLearner(object):
 		self.inf_hist = []
 		self.sub_hist = []
 		self.belief_hist = []
+		self.goal_costs = []
+		self.curr_cost = []
 
 		self.main = main # store a reference to the TeleopInference object
 		self.goal_priors = goal_priors
@@ -54,6 +56,7 @@ class TeleopLearner(object):
 			self.optimal_costs[i] = traj_cost
 			self.cache['goal_traj_by_idx'][0].append(traj)
 			self.cache['goal_traj_plan_by_idx'][0].append(traj_plan)
+		main.exp_data['optimal_costs'] = np.array(self.optimal_costs, copy=True)
 		if beta_method == "joint":
 			# joint_beliefs is shape (len(goals), len(betas))
 			self.joint_beliefs_prior = np.outer(goal_priors, beta_priors)
@@ -164,9 +167,9 @@ class TeleopLearner(object):
 			self._update_argmax_estimate()
 			# TODO: remove (for final project)
 			self.beta_hist.append(self.beta_estimates)
-			self.inf_hist.append(this_idx)
-			self.sub_hist.append(suboptimality)
-			self.belief_hist.append(self.goal_beliefs)
+		self.inf_hist.append(this_idx)
+		self.sub_hist.append(suboptimality)
+		self.belief_hist.append(self.goal_beliefs)
 
 		self.last_inf_idx = this_idx
 		end = time.time() #TODO: remove
@@ -202,7 +205,8 @@ class TeleopLearner(object):
 			prob_traj_joint = cond_prob_traj * self.joint_beliefs_prior
 			self.joint_beliefs = prob_traj_joint / np.sum(prob_traj_joint)
 			self._update_argmax_joint()
-			print 'final beta: ', self.argmax_joint_beliefs[1]
+			#print 'final beta: ', self.argmax_joint_beliefs[1]
+			self.beta_hist = []
 		else: # MAP estimation of beta
 			self.beta_estimates = (this_idx * 7 / 2) / (suboptimality + self.beta_priors)
 			cond_prob_traj = np.exp(suboptimality * -self.beta_estimates) * (((self.beta_estimates/(2*np.pi))**this_idx)**(7/2))
@@ -210,24 +214,23 @@ class TeleopLearner(object):
 			self.goal_beliefs = prob_traj_joint / np.sum(prob_traj_joint)
 			self._update_argmax_estimate()
 
-			# TODO: remove all of the below (for final project)
 			self.beta_hist.append(self.beta_estimates)
-			self.inf_hist.append(this_idx)
-			self.sub_hist.append(suboptimality)
-			self.belief_hist.append(self.goal_beliefs)
-			#np.save('/sub_hist.npy', np.array(self.sub_hist))
-			#np.save('/inf_hist.npy', np.array(self.inf_hist))
-			print 'beta:', np.array(self.beta_hist)
-			print 'suboptimality:', np.array(self.sub_hist)
-			print 'inference times:', np.array(self.inf_hist)
-			main.exp_data['beta_hist'] = np.array(self.beta_hist)
-			main.exp_data['sub_hist'] = np.array(self.sub_hist)
-			main.exp_data['belief_hist'] = np.array(self.belief_hist)
 
-			print 'final beta:', self.argmax_estimate[1]
-		if (is_joint and self.argmax_joint_beliefs[1] < 0.3) or (not is_joint and self.argmax_estimate[1] < 0.3):
-			# learn new goal here
-			print 'detected new goal:', main.traj_hist[-1]
+		self.inf_hist.append(this_idx)
+		self.sub_hist.append(suboptimality)
+		self.belief_hist.append(self.goal_beliefs)
+		#np.save('/sub_hist.npy', np.array(self.sub_hist))
+		#np.save('/inf_hist.npy', np.array(self.inf_hist))
+		print 'beta:', np.array(self.beta_hist)
+		print 'suboptimality:', np.array(self.sub_hist)
+		print 'inference times:', np.array(self.inf_hist)
+		main.exp_data['beta_hist'] = np.array(self.beta_hist)
+		main.exp_data['sub_hist'] = np.array(self.sub_hist)
+		main.exp_data['belief_hist'] = np.array(self.belief_hist)
+		main.exp_data['goal_costs'] = np.array(self.goal_costs)
+		main.exp_data['curr_cost'] = np.array(self.curr_cost)
+		main.exp_data['goal_traj_by_idx'] = {idx: [(traj.waypts, traj.waypts_time) for traj in traj_list] for idx, traj_list in self.cache['goal_traj_by_idx'].items()}
+		main.exp_data['goal_traj_plan_by_idx'] = {idx: [(traj.waypts, traj.waypts_time) for traj in traj_list] for idx, traj_list in self.cache['goal_traj_plan_by_idx'].items()}
 		#print 'joint6_assist', main.exp_data['joint6_assist']
 		#import pdb; pdb.set_trace()
 
@@ -239,14 +242,15 @@ class TeleopLearner(object):
 		main = self.main
 		this_idx = main.next_waypt_idx - 1
 		self.last_inf_idx = this_idx
-		print 'ran dummy inference'
+		#print 'ran dummy inference'
 		main.running_inference = False
 
 	def _no_inference_final(self):
 		main = self.main
 		if self.inference_method == "collect":
+			pass
 			#np.save('placeholder', np.array(main.traj_hist))
-			print 'saved trajectory'
+			#print 'saved trajectory'
 		main.final_inference_done = True
 
 	def _update_argmax_joint(self):

@@ -17,7 +17,8 @@ setup:
     ]
     visual_goals: [
         [150.0, 130.0, 160.0, 240.0, 180.0, 172.0, 280.0],
-        [210.0, 130.0, 200.0, 240.0, 180.0, 172.0, 280.0]
+        [210.0, 130.0, 200.0, 240.0, 180.0, 172.0, 280.0],
+        [123.0, 155.0, 131.0, 284.0, 180.0, 176.0, 189.0]
         #[180.0, 175.0, 180.0, 300.0, 180.0, 180.0, 190.0]
     ]
     # for generating goal-specific feature weights
@@ -32,8 +33,8 @@ setup:
     ]
     T: 15.0
     timestep: 0.5
-    demonstrations_save_path: "data/task1_demonstrations.npz"
-    data_save_path: "data/task1c_data.npz"
+    demonstrations_save_path: "data/task4_demonstrations.npz"
+    data_save_path: "data/task4c_data.npz"
 
 planner:
     # These settings have been tuned for trajopt planner.

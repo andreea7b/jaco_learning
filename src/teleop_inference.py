@@ -44,9 +44,9 @@ CONFIG_FILE_DICT = {
 		'e': "config/task3_methode_inference_config.yaml"
 	},
 	4: {
-		'a': "config/task2_methoda_inference_config.yaml",
-		'b': "config/task2_methodb_inference_config.yaml", # maybe this'll get changed
-		'c': "config/task2_methodc_inference_config.yaml",
+		'a': "config/task4_methoda_inference_config.yaml",
+		'b': "config/task4_methodb_inference_config.yaml",
+		'c': "config/task4_methodc_inference_config.yaml",
 		'd': "config/task4_methodd_inference_config.yaml",
 		'e': "config/task4_methode_inference_config.yaml"
 	}
@@ -117,6 +117,15 @@ class TeleopInference(TeleopInferenceBase):
 		self.running_final_inference = False
 		self.final_inference_done = False
 
+		self.exp_data['inf_start_time'] = []
+		self.exp_data['joy_cmd'] = []
+		self.exp_data['ctl_cmd'] = []
+		self.exp_data['cmd'] = []
+		self.exp_data['cmdpos_time'] = []
+		self.exp_data['curr_pos'] = []
+
+
+
 		print "----------------------------------"
 		print("Simulating robot, press ENTER to quit:")
 		# Start simulation.
@@ -173,6 +182,25 @@ class TeleopInference(TeleopInferenceBase):
 
 		# Disconnect once the session is over.
 		p.disconnect()
+		self.exp_data['traj_hist'] = self.traj_hist
+		self.exp_data['start_T'] = self.start_T
+		np.savez(config['setup']['data_save_path'],
+				 beta_hist=self.exp_data['beta_hist'],
+	 			 sub_hist=self.exp_data['sub_hist'],
+	 			 belief_hist=self.exp_data['belief_hist'],
+	 			 goal_costs=self.exp_data['goal_costs'],
+	 			 curr_cost=self.exp_data['curr_cost'],
+	 			 goal_traj_by_idx=self.exp_data['goal_traj_by_idx'],
+	 			 goal_traj_plan_by_idx=self.exp_data['goal_traj_plan_by_idx'],
+				 traj_hist=self.exp_data['traj_hist'],
+		 		 start_T=self.exp_data['start_T'],
+				 inf_start_time=self.exp_data['inf_start_time'],
+		 		 joy_cmd=self.exp_data['joy_cmd'],
+		 		 ctl_cmd=self.exp_data['ctl_cmd'],
+		 		 cmd=self.exp_data['cmd'],
+		 		 cmdpos_time=self.exp_data['cmdpos_time'],
+		 		 curr_pos=self.exp_data['curr_pos'])
+
 
 		print "----------------------------------"
 
@@ -200,18 +228,27 @@ class TeleopInference(TeleopInferenceBase):
 					self.running_inference = True
 					self.inference_thread = Thread(target=self.learner.inference_step)
 					self.inference_thread.start()
+					self.exp_data['inf_start_time'].append(time.time() - self.start_T)
 			elif not self.running_final_inference:
 				self.running_final_inference = True
 				self.inference_thread.join()
 				self.inference_thread = Thread(target=self.learner.final_step)
 				self.inference_thread.start()
+
+				print "Episode over. Running final calculations."
+				self.inference_thread.join()
+
+
+				self.running = False
+
 			elif self.final_inference_done:
 				pass
 
 		ctl_cmd = self.controller.get_command(self.curr_pos.reshape(7,1))
-		#print "joint 6 unblended assistance:", ctl_cmd[6,6]
-		#TODO: decide what to log
-		#self.exp_data['joint6_assist'].append(ctl_cmd[6,6])
+		self.exp_data['joy_cmd'].append(np.copy(self.joy_cmd[np.arange(7), np.arange(7)]))
+		self.exp_data['cmdpos_time'].append(time.time() - self.start_T)
+		self.exp_data['curr_pos'].append(np.copy(self.curr_pos))
+
 		if self.assistance_method == "blend":
 			if self.learner.last_inf_idx > self.last_inf_idx: # new inference step complete
 				self.last_inf_idx = self.learner.last_inf_idx
@@ -228,12 +265,10 @@ class TeleopInference(TeleopInferenceBase):
 					#print 'goal beliefs:', self.learner.goal_beliefs
 				self.alpha = self.beta_arbitration(beta, belief, goal)
 				print 'alpha:', self.alpha
-				if goal != self.curr_goal or True:
+				if goal != self.curr_goal or self.alpha_method != "zero":
 					print 'new assistance trajectory, goal:', goal
 					self.curr_goal = goal
 					self.traj = self.learner.cache['goal_traj_by_idx'][self.last_inf_idx][goal]
-
-					print 'last joint angle:', self.traj.waypts[:,6]
 
 					self.traj_plan = self.learner.cache['goal_traj_plan_by_idx'][self.last_inf_idx][goal]
 					self.controller.set_trajectory(self.traj,
@@ -242,6 +277,10 @@ class TeleopInference(TeleopInferenceBase):
 				self.cmd = self.joy_cmd
 			else:
 				self.cmd = self.alpha * self.joy_cmd + (1. - self.alpha) * ctl_cmd
+
+			# logging
+			self.exp_data['ctl_cmd'].append(np.copy(ctl_cmd[np.arange(7), np.arange(7)]))
+			self.exp_data['cmd'].append(np.copy(self.cmd[np.arange(7), np.arange(7)]))
 		elif self.assistance_method == "expected":
 			raise NotImplementedError
 		elif self.assistance_method == "none":
@@ -369,7 +408,11 @@ class TeleopInference(TeleopInferenceBase):
 		return self.start_T + idx * self.timestep
 
 	def beta_arbitration(self, beta, belief, goal):
-		if self.alpha_method == 'prob':
+		if self.alpha_method == 'joystick':
+			return 1.
+		elif self.alpha_method == 'zero':
+			return 0.
+		elif self.alpha_method == 'prob':
 			return 1 - belief
 		elif self.alpha_method == 'beta':
 			#return 1 #all joystick
@@ -380,7 +423,7 @@ class TeleopInference(TeleopInferenceBase):
 			#return np.clip(np.exp(-beta + 0.1), 0, 1)
 		elif self.alpha_method == 'dist':
 			#return 1
-			D = 0.7
+			D = 1
 			goal_dist = np.linalg.norm(self.goal_locs[goal] - self.EEPos)
 			return np.clip(goal_dist / D, 0, 1)
 

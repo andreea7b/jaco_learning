@@ -54,7 +54,7 @@ class PlanningServer(TeleopInferenceBase):
 	def __init__(self, config_file):
 		super(PlanningServer, self).__init__(True, config_file)
 		if self.use_goal_rot_learned:
-			goal_rot = 4.5
+			goal_rot = np.mean([s_g_exp_traj[0][-1, 6] for s_g_exp_traj in self.environment.learned_feats[-1].s_g_exp_trajs])
 		else:
 			goal_rot = None
 
@@ -121,6 +121,8 @@ class PlanningServer(TeleopInferenceBase):
 					feat_vals = np.sum(self.environment.featurize(params[0], support), axis=1)
 					print "feature values", feat_vals
 					c_out = np.sum(goal_weights[support] * feat_vals)
+					if isinstance(params[2], int):
+						c_out += 2 * np.sum(goal_weights) * np.linalg.norm(self.goal_locs[params[2]] - self.environment.get_cartesian_coords(params[0][-1]))
 					out.append(c_out)
 				connection.sendall(pickle.dumps(out, 2))
 				connection.shutdown(2)
