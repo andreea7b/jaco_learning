@@ -24,7 +24,12 @@ from teleop_inference_base import TeleopInferenceBase
 
 
 CONFIG_FILE_DICT = {
-	0: {'demos': 'config/task0_methoda_inference_config.yaml'},
+	0: {
+		'demos': 'config/task0_methodd_inference_config.yaml',
+		'ex': "config/task0_example_inference_config.yaml",
+		'a': "config/task0_methoda_inference_config.yaml",
+		'b': "config/task0_methodb_inference_config.yaml",
+		'c': "config/task0_methodc_inference_config.yaml"},
 	1: {
 		'ex': "config/task1_example_inference_config.yaml",
 		'a': "config/task1_methoda_inference_config.yaml",
@@ -444,7 +449,7 @@ class TeleopInference(TeleopInferenceBase):
 			#return np.clip(np.exp(-beta + 0.1), 0, 1)
 		elif self.alpha_method == 'dist':
 			#return 1
-			D = 1
+			D = 0.55
 			goal_dist = np.linalg.norm(self.goal_locs[goal] - self.EEPos)
 			return np.clip(goal_dist / D, 0, 1)
 

@@ -34,7 +34,7 @@ setup:
     T: 15.0
     timestep: 0.5
     demonstrations_save_path: "data/task0_demonstrations.npz"
-    data_save_path: "data/task0a_data.npz"
+    data_save_path: "data/task0b_data.npz"
 
 planner:
     # These settings have been tuned for trajopt planner.
@@ -62,8 +62,8 @@ learner:
     assistance_method: "blend"
     beta_method: "joint"
     beta_priors: [1]
-    zero_input_assist: False
-    alpha_method: "joystick"
+    zero_input_assist: True
+    alpha_method: "dist"
 
 
 

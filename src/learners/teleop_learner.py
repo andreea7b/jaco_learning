@@ -151,6 +151,7 @@ class TeleopLearner(object):
 			self.cache['goal_traj_plan_by_idx'][this_idx].append(goal_traj_plan)
 		print 'goal traj costs', goal_traj_costs
 		suboptimality = curr_traj_costs + goal_traj_costs - self.optimal_costs
+		suboptimality = suboptimality / 1.8
 		#suboptimality *= (1. / self.optimal_costs)
 		#print 'suboptimality:', suboptimality
 		#print 'suboptimality/time:', suboptimality / this_idx
@@ -195,6 +196,7 @@ class TeleopLearner(object):
 		curr_time = this_idx * main.timestep
 		traj_costs = np.array([main.planner.get_cost(main.traj_hist, i, i) for i in range(main.num_goals)])
 		suboptimality = traj_costs - self.optimal_costs
+		suboptimality = suboptimality / 1.8
 		#suboptimality *= (1. / self.optimal_costs)
 		print 'curr traj costs', traj_costs
 		print 'optimal_costs', self.optimal_costs

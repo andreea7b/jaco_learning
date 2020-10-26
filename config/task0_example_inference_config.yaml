@@ -34,7 +34,7 @@ setup:
     T: 15.0
     timestep: 0.5
     demonstrations_save_path: "data/task0_demonstrations.npz"
-    data_save_path: "data/task0a_data.npz"
+    data_save_path: "data/task0ex_data.npz"
 
 planner:
     # These settings have been tuned for trajopt planner.
@@ -57,13 +57,13 @@ controller:
 learner:
     # # for baseline
     betas: [1]
-    goal_beliefs: "none"
+    goal_beliefs: [0, 1]
     inference_method: "dragan"
     assistance_method: "blend"
-    beta_method: "joint"
-    beta_priors: [1]
-    zero_input_assist: False
-    alpha_method: "joystick"
+    beta_method: "estimate"
+    beta_priors: [5000, -5000]
+    zero_input_assist: True
+    alpha_method: "zero"
 
 
 

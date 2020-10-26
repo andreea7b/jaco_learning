@@ -5,7 +5,7 @@ setup:
     # for the features and weights that are shared between all goals
     common_feat_list: ['world_efficiency']
     #common_feat_list: ['efficiency_clip']
-    common_feat_weights: [30.0]
+    common_feat_weights: [50.0]
     #common_feat_weights: [30.0]
     start: [180.0, 175.0, 180.0, 300.0, 180.0, 180.0, 190.0]
     #start: [180.0, 150.0, 180.0, 270.0, 180.0, 180.0, 190.0]
