@@ -222,7 +222,8 @@ class TeleopInference(TeleopInferenceBase):
 					 cmd=self.exp_data['cmd'],
 					 cmdpos_time=self.exp_data['cmdpos_time'],
 					 curr_pos=self.exp_data['curr_pos'],
-					 num_key_presses=self.exp_data['num_key_presses'])
+					 num_key_presses=self.exp_data['num_key_presses'],
+					 optimal_costs=self.exp_data['optimal_costs'])
 
 
 		print "----------------------------------"

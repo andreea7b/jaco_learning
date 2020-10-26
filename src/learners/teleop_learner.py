@@ -171,6 +171,8 @@ class TeleopLearner(object):
 		self.inf_hist.append(this_idx)
 		self.sub_hist.append(suboptimality)
 		self.belief_hist.append(self.goal_beliefs)
+		self.goal_costs.append(goal_traj_costs)
+		self.curr_cost.append(curr_traj_costs)
 
 		self.last_inf_idx = this_idx
 		end = time.time() #TODO: remove
@@ -221,6 +223,8 @@ class TeleopLearner(object):
 		self.inf_hist.append(this_idx)
 		self.sub_hist.append(suboptimality)
 		self.belief_hist.append(self.goal_beliefs)
+		self.curr_cost.append(traj_costs)
+
 		#np.save('/sub_hist.npy', np.array(self.sub_hist))
 		#np.save('/inf_hist.npy', np.array(self.inf_hist))
 		print 'beta:', np.array(self.beta_hist)
