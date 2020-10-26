@@ -159,9 +159,12 @@ class TeleopInference(TeleopInferenceBase):
 
 				# Post time.
 				time_now = time.time() - start_time
-				if 'text' in locals():
-					p.removeUserDebugItem(text)
-				text = p.addUserDebugText("{:.2f} s".format(time_now), [-1,0.75,1],textSize=2)
+				if 'time_text' in locals():
+					p.removeUserDebugItem(time_text)
+				time_text = p.addUserDebugText("{:.2f}s".format(np.clip(15-time_now,0,15)), [-1,0.75,1],textSize=2)
+				if 'keys_text' in locals():
+					p.removeUserDebugItem(keys_text)
+				keys_text = p.addUserDebugText("{} keys".format(self.num_key_presses),[-1,0.75,0.75],textSize=2)
 
 				# Update position.
 				self.keyboard_input_callback()
