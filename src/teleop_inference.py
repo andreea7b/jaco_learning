@@ -149,11 +149,19 @@ class TeleopInference(TeleopInferenceBase):
 			self.running = True
 			self.record = True
 
+			start_time = time.time()
+			self.num_key_presses = 0
 			# Start simulation.
 			while self.running:
 				if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
 					line = raw_input()
 					break
+
+				# Post time.
+				time_now = time.time() - start_time
+				if 'text' in locals():
+					p.removeUserDebugItem(text)
+				text = p.addUserDebugText("{:.2f} s".format(time_now), [-1,0.75,1],textSize=2)
 
 				# Update position.
 				self.keyboard_input_callback()
@@ -186,20 +194,20 @@ class TeleopInference(TeleopInferenceBase):
 		self.exp_data['start_T'] = self.start_T
 		np.savez(config['setup']['data_save_path'],
 				 beta_hist=self.exp_data['beta_hist'],
-	 			 sub_hist=self.exp_data['sub_hist'],
-	 			 belief_hist=self.exp_data['belief_hist'],
-	 			 goal_costs=self.exp_data['goal_costs'],
-	 			 curr_cost=self.exp_data['curr_cost'],
-	 			 goal_traj_by_idx=self.exp_data['goal_traj_by_idx'],
-	 			 goal_traj_plan_by_idx=self.exp_data['goal_traj_plan_by_idx'],
+				 sub_hist=self.exp_data['sub_hist'],
+				 belief_hist=self.exp_data['belief_hist'],
+				 goal_costs=self.exp_data['goal_costs'],
+				 curr_cost=self.exp_data['curr_cost'],
+				 goal_traj_by_idx=self.exp_data['goal_traj_by_idx'],
+				 goal_traj_plan_by_idx=self.exp_data['goal_traj_plan_by_idx'],
 				 traj_hist=self.exp_data['traj_hist'],
-		 		 start_T=self.exp_data['start_T'],
+				 start_T=self.exp_data['start_T'],
 				 inf_start_time=self.exp_data['inf_start_time'],
-		 		 joy_cmd=self.exp_data['joy_cmd'],
-		 		 ctl_cmd=self.exp_data['ctl_cmd'],
-		 		 cmd=self.exp_data['cmd'],
-		 		 cmdpos_time=self.exp_data['cmdpos_time'],
-		 		 curr_pos=self.exp_data['curr_pos'])
+				 joy_cmd=self.exp_data['joy_cmd'],
+				 ctl_cmd=self.exp_data['ctl_cmd'],
+				 cmd=self.exp_data['cmd'],
+				 cmdpos_time=self.exp_data['cmdpos_time'],
+				 curr_pos=self.exp_data['curr_pos'])
 
 
 		print "----------------------------------"
@@ -265,7 +273,8 @@ class TeleopInference(TeleopInferenceBase):
 					#print 'goal beliefs:', self.learner.goal_beliefs
 				self.alpha = self.beta_arbitration(beta, belief, goal)
 				print 'alpha:', self.alpha
-				if goal != self.curr_goal or self.alpha_method != "zero":
+				#if goal != self.curr_goal or self.alpha_method != "zero":
+				if goal != self.curr_goal:
 					print 'new assistance trajectory, goal:', goal
 					self.curr_goal = goal
 					self.traj = self.learner.cache['goal_traj_by_idx'][self.last_inf_idx][goal]
@@ -349,9 +358,9 @@ class TeleopInference(TeleopInferenceBase):
 		# Reset variables.
 		jointVelocities = [0.0] * p.getNumJoints(self.bullet_environment["robot"])
 		#dist_step = [0.01, 0.01, 0.01]
-		dist_step = [0.005, 0.005, 0.005]
+		dist_step = [0.0025, 0.0025, 0.0025]
 		time_step = 0.05
-		turn_step = 0.05
+		turn_step = 0.025
 		EElink = 7
 
 		# Get current EE position.
@@ -359,7 +368,7 @@ class TeleopInference(TeleopInferenceBase):
 		self.EEPos = EEPos
 
 		#for i, goal_loc in enumerate(self.goal_locs):
-		#	print 'distance from goal', i, np.linalg.norm(goal_loc - self.EEPos)
+		#   print 'distance from goal', i, np.linalg.norm(goal_loc - self.EEPos)
 
 		state = p.getJointStates(self.bullet_environment["robot"], range(p.getNumJoints(self.bullet_environment["robot"])))
 		jointPoses = np.array([s[0] for s in state])
@@ -367,6 +376,7 @@ class TeleopInference(TeleopInferenceBase):
 		# Parse keyboard commands.
 		EEPos_new = np.copy(EEPos)
 		keys = p.getKeyboardEvents()
+		self.num_key_presses += len(keys)
 		if p.B3G_LEFT_ARROW in keys:
 			EEPos_new[1] -= dist_step[1]
 		if p.B3G_RIGHT_ARROW in keys:
@@ -375,18 +385,18 @@ class TeleopInference(TeleopInferenceBase):
 			EEPos_new[0] -= dist_step[0]
 		if p.B3G_DOWN_ARROW in keys:
 			EEPos_new[0] += dist_step[0]
-		if ord('i') in keys:
+		if ord('u') in keys:
 			EEPos_new[2] += dist_step[2]
-		if ord('k') in keys:
+		if ord('j') in keys:
 			EEPos_new[2] -= dist_step[2]
 
 		# Get new velocity.
 		if not np.array_equal(EEPos_new, EEPos):
 			newPoses = np.asarray((0.0,) + p.calculateInverseKinematics(self.bullet_environment["robot"], EElink, EEPos_new))
 			jointVelocities = (newPoses - jointPoses) / time_step
-		if ord('j') in keys:
+		if ord('h') in keys:
 			jointVelocities[EElink] += turn_step / time_step
-		if ord('l') in keys:
+		if ord('k') in keys:
 			jointVelocities[EElink] -= turn_step / time_step
 
 		# Update joystick command.
@@ -418,7 +428,7 @@ class TeleopInference(TeleopInferenceBase):
 			#return 1 #all joystick
 			#return 0 #all assistance
 			#return np.clip(1 / beta, 0, 1)
-			return np.clip(1 / beta, 0.3, 1)
+			return np.clip(1 / beta, 0, 1)
 			#return np.clip(0.5 / beta, 0, 1)
 			#return np.clip(np.exp(-beta + 0.1), 0, 1)
 		elif self.alpha_method == 'dist':

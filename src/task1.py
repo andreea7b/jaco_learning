@@ -12,6 +12,7 @@ if __name__ == '__main__':
         print 'Beginning method', method
         print 'First attempt: your interaction will not be recorded.'
         TeleopInference(CONFIG_FILE_DICT[1][method])
+        raw_input("If you're ready, please press ENTER")
         print 'Now, your interaction will be recorded.'
         while True:
             TeleopInference(CONFIG_FILE_DICT[1][method])
