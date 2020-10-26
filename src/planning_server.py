@@ -34,14 +34,14 @@ CONFIG_FILE_DICT = {
 		'd': "config/task2_methodd_inference_config.yaml",
 		'e': "config/task2_methode_inference_config.yaml"
 	},
-	3: {
+	-100: { #don't use
 		'a': "config/task3_methoda_inference_config.yaml",
 		'b': "config/task3_methodb_inference_config.yaml",
 		'c': "config/task3_methodc_inference_config.yaml",
 		'd': "config/task3_methodd_inference_config.yaml",
 		'e': "config/task3_methode_inference_config.yaml"
 	},
-	4: {
+	3: {
 		'a': "config/task4_methoda_inference_config.yaml",
 		'b': "config/task4_methodb_inference_config.yaml",
 		'c': "config/task4_methodc_inference_config.yaml",
@@ -53,8 +53,13 @@ CONFIG_FILE_DICT = {
 class PlanningServer(TeleopInferenceBase):
 	def __init__(self, config_file):
 		super(PlanningServer, self).__init__(True, config_file)
-		if self.use_goal_rot_learned:
-			goal_rot = np.mean([s_g_exp_traj[0][-1, 6] for s_g_exp_traj in self.environment.learned_feats[-1].s_g_exp_trajs])
+		if self.use_goal_rot_learned is not None:
+			if isinstance(self.use_goal_rot_learned, float):
+				goal_rot = self.use_goal_rot_learned
+			elif self.use_goal_rot_learned:
+				goal_rot = np.mean([s_g_exp_traj[0][-1, 6] for s_g_exp_traj in self.environment.learned_feats[-1].s_g_exp_trajs])
+			else:
+				goal_rot = None
 		else:
 			goal_rot = None
 
@@ -87,6 +92,10 @@ class PlanningServer(TeleopInferenceBase):
 						params[1] = self.goals[params[1]]
 					if isinstance(params[2], int):
 						params[2] = self.goal_locs[params[2]]
+					if params[3] == 2: # Assumes that the learned goal/goal to use goal_rot for is the 3rd one
+						gr = goal_rot
+					else:
+						gr = None
 					traj, plan = self.planner.replan(params[0],
 													 params[1],
 													 list(params[2]),
@@ -97,7 +106,7 @@ class PlanningServer(TeleopInferenceBase):
 													 params[7],
 													 False,
 													 True,
-													 goal_rot)
+													 gr)
 					# always plan and get both, then send the desired plan/traj/both back
 					if not params[9]:
 						if params[8]:

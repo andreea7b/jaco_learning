@@ -24,31 +24,35 @@ from teleop_inference_base import TeleopInferenceBase
 
 
 CONFIG_FILE_DICT = {
+	0: {'demos': 'config/task0_methoda_inference_config.yaml'},
 	1: {
+		'ex': "config/task1_example_inference_config.yaml",
 		'a': "config/task1_methoda_inference_config.yaml",
 		'b': "config/task1_methodb_inference_config.yaml",
 		'c': "config/task1_methodc_inference_config.yaml"
 	},
 	2: {
+		'ex': "config/task2_example_inference_config.yaml",
 		'a': "config/task2_methoda_inference_config.yaml",
 		'b': "config/task2_methodb_inference_config.yaml",
 		'c': "config/task2_methodc_inference_config.yaml",
-		'd': "config/task2_methodd_inference_config.yaml",
-		'e': "config/task2_methode_inference_config.yaml"
+		'demos': "config/task2_methodd_inference_config.yaml",
+		'c_learned': "config/task2_methode_inference_config.yaml"
 	},
-	3: {
+	-100: { # don't use this one
 		'a': "config/task3_methoda_inference_config.yaml",
 		'b': "config/task3_methodb_inference_config.yaml",
 		'c': "config/task3_methodc_inference_config.yaml",
 		'd': "config/task3_methodd_inference_config.yaml",
 		'e': "config/task3_methode_inference_config.yaml"
 	},
-	4: {
+	3: {
+		'ex': "config/task4_example_inference_config.yaml",
 		'a': "config/task4_methoda_inference_config.yaml",
 		'b': "config/task4_methodb_inference_config.yaml",
 		'c': "config/task4_methodc_inference_config.yaml",
-		'd': "config/task4_methodd_inference_config.yaml",
-		'e': "config/task4_methode_inference_config.yaml"
+		'demos': "config/task4_methodd_inference_config.yaml",
+		'c_learned': "config/task4_methode_inference_config.yaml"
 	}
 }
 
@@ -149,6 +153,7 @@ class TeleopInference(TeleopInferenceBase):
 			self.running = True
 			self.record = True
 
+			self.exp_data['num_key_presses'] = []
 			start_time = time.time()
 			self.num_key_presses = 0
 			# Start simulation.
@@ -157,14 +162,15 @@ class TeleopInference(TeleopInferenceBase):
 					line = raw_input()
 					break
 
-				# Post time.
-				time_now = time.time() - start_time
-				if 'time_text' in locals():
-					p.removeUserDebugItem(time_text)
-				time_text = p.addUserDebugText("{:.2f}s".format(np.clip(15-time_now,0,15)), [-1,0.75,1],textSize=2)
-				if 'keys_text' in locals():
-					p.removeUserDebugItem(keys_text)
-				keys_text = p.addUserDebugText("{} keys".format(self.num_key_presses),[-1,0.75,0.75],textSize=2)
+				if self.inference_method != "collect":
+					# Post time.
+					time_now = time.time() - start_time
+					if 'time_text' in locals():
+						p.removeUserDebugItem(time_text)
+					time_text = p.addUserDebugText("{:.2f}s".format(np.clip(15-time_now,0,15)), [-1,0.75,1],textSize=2)
+					if 'keys_text' in locals():
+						p.removeUserDebugItem(keys_text)
+					keys_text = p.addUserDebugText("{} keys".format(self.num_key_presses),[-1,0.75,0.75],textSize=2)
 
 				# Update position.
 				self.keyboard_input_callback()
@@ -193,24 +199,25 @@ class TeleopInference(TeleopInferenceBase):
 
 		# Disconnect once the session is over.
 		p.disconnect()
-		self.exp_data['traj_hist'] = self.traj_hist
-		self.exp_data['start_T'] = self.start_T
-		np.savez(config['setup']['data_save_path'],
-				 beta_hist=self.exp_data['beta_hist'],
-				 sub_hist=self.exp_data['sub_hist'],
-				 belief_hist=self.exp_data['belief_hist'],
-				 goal_costs=self.exp_data['goal_costs'],
-				 curr_cost=self.exp_data['curr_cost'],
-				 goal_traj_by_idx=self.exp_data['goal_traj_by_idx'],
-				 goal_traj_plan_by_idx=self.exp_data['goal_traj_plan_by_idx'],
-				 traj_hist=self.exp_data['traj_hist'],
-				 start_T=self.exp_data['start_T'],
-				 inf_start_time=self.exp_data['inf_start_time'],
-				 joy_cmd=self.exp_data['joy_cmd'],
-				 ctl_cmd=self.exp_data['ctl_cmd'],
-				 cmd=self.exp_data['cmd'],
-				 cmdpos_time=self.exp_data['cmdpos_time'],
-				 curr_pos=self.exp_data['curr_pos'])
+		if self.inference_method != "collect":
+			self.exp_data['traj_hist'] = self.traj_hist
+			self.exp_data['start_T'] = self.start_T
+			np.savez(config['setup']['data_save_path'],
+					 beta_hist=self.exp_data['beta_hist'],
+					 sub_hist=self.exp_data['sub_hist'],
+					 belief_hist=self.exp_data['belief_hist'],
+					 goal_costs=self.exp_data['goal_costs'],
+					 curr_cost=self.exp_data['curr_cost'],
+					 goal_traj_by_idx=self.exp_data['goal_traj_by_idx'],
+					 goal_traj_plan_by_idx=self.exp_data['goal_traj_plan_by_idx'],
+					 traj_hist=self.exp_data['traj_hist'],
+					 start_T=self.exp_data['start_T'],
+					 inf_start_time=self.exp_data['inf_start_time'],
+					 joy_cmd=self.exp_data['joy_cmd'],
+					 ctl_cmd=self.exp_data['ctl_cmd'],
+					 cmd=self.exp_data['cmd'],
+					 cmdpos_time=self.exp_data['cmdpos_time'],
+					 curr_pos=self.exp_data['curr_pos'])
 
 
 		print "----------------------------------"
@@ -259,6 +266,7 @@ class TeleopInference(TeleopInferenceBase):
 		self.exp_data['joy_cmd'].append(np.copy(self.joy_cmd[np.arange(7), np.arange(7)]))
 		self.exp_data['cmdpos_time'].append(time.time() - self.start_T)
 		self.exp_data['curr_pos'].append(np.copy(self.curr_pos))
+		self.exp_data['num_key_presses'].append(self.num_key_presses)
 
 		if self.assistance_method == "blend":
 			if self.learner.last_inf_idx > self.last_inf_idx: # new inference step complete

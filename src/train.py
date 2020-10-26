@@ -17,8 +17,8 @@ import yaml
 
 MEIRL_CONFIG_FILE_DICT = {
 	2: "config/task2_meirl_config.yaml",
-	3: "config/task3_meirl_config.yaml",
-	4: "config/task4_meirl_config.yaml"
+	-100: "config/task3_meirl_config.yaml",
+	3: "config/task4_meirl_config.yaml"
 }
 
 class Training(TeleopInferenceBase):

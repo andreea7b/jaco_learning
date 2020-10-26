@@ -321,7 +321,7 @@ class TrajoptPlanner(object):
 				#print("Using trajectory seed initialization!")
 				init_waypts = traj_seed
 
-			if EE_rot_angle:
+			if EE_rot_angle is not None:
 				rot_interp_weights = np.linspace(0, 1, self.num_waypts) ** 1.5
 				init_waypts[:, 6] = init_waypts[:, 6] * (1 - rot_interp_weights) + EE_rot_angle * rot_interp_weights
 			# --- Request construction --- #
@@ -434,9 +434,9 @@ class TrajoptPlanner(object):
 		support = np.arange(len(self.weights))[self.weights != 0.0]
 		nonzero_feat_list = np.array(self.environment.feat_list)[support]
 		if len(nonzero_feat_list) == 1 and "world_efficiency" in nonzero_feat_list:
-			traj = Trajectory(self.get_min_world_dist_waypts(start, goal_pose, num_traj_waypts),
+			traj = Trajectory(self.get_min_world_dist_waypts(start, goal_pose, num_traj_waypts, EE_rot_angle),
 							  np.linspace(start_time, T, num_traj_waypts))
-			traj_plan = Trajectory(self.get_min_world_dist_waypts(start, goal_pose, num_traj_waypts),
+			traj_plan = Trajectory(self.get_min_world_dist_waypts(start, goal_pose, num_traj_waypts, EE_rot_angle),
 								   np.linspace(start_time, T, num_traj_waypts))
 
 			print "planning took:", time.time() - trajopt_start_time
@@ -458,7 +458,7 @@ class TrajoptPlanner(object):
 		else:
 			return traj.resample(num_traj_waypts)
 
-	def get_min_world_dist_waypts(self, start, goal_pose, num_waypts):
+	def get_min_world_dist_waypts(self, start, goal_pose, num_waypts, EE_rot_angle=None):
 		goal_pose = np.array(goal_pose)
 
 		move_robot(self.bullet_environment["robot"], np.append(start.reshape(7), np.array([0.0, 0.0, 0.0])))
@@ -473,6 +473,10 @@ class TrajoptPlanner(object):
 			waypt = p.calculateInverseKinematics(self.bullet_environment["robot"], 7, poses[i])[:7]
 			move_robot(self.bullet_environment["robot"], np.append(waypt, np.array([0.0, 0.0, 0.0])))
 			waypts[i] = waypt
+
+		if EE_rot_angle:
+			rot_interp_weights = np.linspace(0, 1, num_waypts) ** 10
+			waypts[:, 6] = waypts[:, 6] * (1 - rot_interp_weights) + EE_rot_angle * rot_interp_weights
 		return waypts
 
 def expected_goal(belief, goals):
