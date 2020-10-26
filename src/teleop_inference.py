@@ -127,7 +127,7 @@ class TeleopInference(TeleopInferenceBase):
 		self.exp_data['cmd'] = []
 		self.exp_data['cmdpos_time'] = []
 		self.exp_data['curr_pos'] = []
-
+		self.exp_data['num_key_presses'] = []
 
 
 		print "----------------------------------"
@@ -153,7 +153,6 @@ class TeleopInference(TeleopInferenceBase):
 			self.running = True
 			self.record = True
 
-			self.exp_data['num_key_presses'] = []
 			start_time = time.time()
 			self.num_key_presses = 0
 			# Start simulation.
@@ -217,7 +216,8 @@ class TeleopInference(TeleopInferenceBase):
 					 ctl_cmd=self.exp_data['ctl_cmd'],
 					 cmd=self.exp_data['cmd'],
 					 cmdpos_time=self.exp_data['cmdpos_time'],
-					 curr_pos=self.exp_data['curr_pos'])
+					 curr_pos=self.exp_data['curr_pos'],
+					 num_key_presses=self.exp_data['num_key_presses'])
 
 
 		print "----------------------------------"
