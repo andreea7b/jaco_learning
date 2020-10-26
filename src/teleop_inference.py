@@ -337,9 +337,9 @@ class TeleopInference(TeleopInferenceBase):
 				trace = np.squeeze(np.array(self.demo))
 				lo = 0
 				hi = trace.shape[0] - 1
-				while lo < hi and np.linalg.norm(trace[lo] - trace[lo + 1]) < 0.01:
+				while lo < hi and np.linalg.norm(trace[lo] - trace[lo + 1]) < 0.001:
 					lo += 1
-				while hi > 0 and np.linalg.norm(trace[hi] - trace[hi - 1]) < 0.01:
+				while hi > 0 and np.linalg.norm(trace[hi] - trace[hi - 1]) < 0.001:
 					hi -= 1
 				trace = trace[lo:hi+1, :]
 				self.replay_trace(trace)
