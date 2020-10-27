@@ -166,15 +166,15 @@ class TeleopInference(TeleopInferenceBase):
 					line = raw_input()
 					break
 
-				if self.inference_method != "collect":
-					# Post time.
-					time_now = time.time() - start_time
-					if 'time_text' in locals():
-						p.removeUserDebugItem(time_text)
-					time_text = p.addUserDebugText("{:.2f}s".format(np.clip(15-time_now,0,15)), [-1,0.75,1],textSize=2)
-					if 'keys_text' in locals():
-						p.removeUserDebugItem(keys_text)
-					keys_text = p.addUserDebugText("{} keys".format(self.num_key_presses),[-1,0.75,0.75],textSize=2)
+				font_size = 0 if self.inference_method == "collect" else 2
+				time_now = time.time() - start_time
+				if 'time_text' in locals():
+					p.removeUserDebugItem(time_text)
+				time_text = p.addUserDebugText("{:.2f}s".format(np.clip(15-time_now,0,15)), [-1,0.75,1],textSize=font_size)
+				if 'keys_text' in locals():
+					p.removeUserDebugItem(keys_text)
+				keys_text = p.addUserDebugText("{} keys".format(self.num_key_presses),[-1,0.75,0.75],textSize=font_size)
+
 
 				# Update position.
 				self.keyboard_input_callback()
